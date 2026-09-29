@@ -1,0 +1,12 @@
+# Local environment files — may contain secrets (see .env.example)
+.env
+.env.local
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+
+# IntelliJ IDEA: rebuilt from pom.xml on open; shared run configurations live in .run/
+.idea/
+*.iml
+out/
