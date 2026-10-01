@@ -1,5 +1,6 @@
 package project.bill_locker.document;
 
+import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -36,15 +38,19 @@ public class DocumentController {
 		this.documentService = documentService;
 	}
 
-	/** {@code POST /api/documents/upload} — multipart form with a "file" and an optional "documentType". */
+	/**
+	 * {@code POST /api/documents/upload} — multipart form with a "file", and optionally a
+	 * "documentType" and the "productId" it belongs to.
+	 */
 	@PostMapping(path = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	@ResponseStatus(HttpStatus.CREATED)
 	public DocumentSummary upload(@AuthenticationPrincipal Jwt jwt, @RequestPart("file") MultipartFile file,
-			@RequestParam(required = false) DocumentType documentType) {
-		return documentService.upload(CurrentUser.id(jwt), file, documentType);
+			@RequestParam(required = false) DocumentType documentType,
+			@RequestParam(required = false) UUID productId) {
+		return documentService.upload(CurrentUser.id(jwt), file, documentType, productId);
 	}
 
-	/** {@code GET /api/documents?status=&documentType=} — the user's documents, newest first. */
+	/** {@code GET /api/documents?productId=&status=&documentType=} — the user's documents, newest first. */
 	@GetMapping
 	public List<DocumentSummary> list(@AuthenticationPrincipal Jwt jwt,
 			@RequestParam(required = false) UUID productId,
@@ -68,6 +74,13 @@ public class DocumentController {
 				.contentType(MediaType.parseMediaType(file.mimeType()))
 				.header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
 				.body(file.data());
+	}
+
+	/** {@code POST /api/documents/{id}/confirm} — save the checked details as a product ("Confirm & Save"). */
+	@PostMapping("/{id}/confirm")
+	public ConfirmResult confirm(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+			@Valid @RequestBody ConfirmDocumentRequest request) {
+		return documentService.confirm(CurrentUser.id(jwt), id, request);
 	}
 
 	/** {@code POST /api/documents/{id}/reprocess} — read the document again, e.g. after a failure. */

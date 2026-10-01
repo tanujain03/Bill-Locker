@@ -8,20 +8,26 @@ and the UI works unchanged.
 
 TypeScript definitions of every payload live in `frontend/src/types/`.
 
-### Implemented by the Spring Boot backend so far (step 4)
+### Implemented by the Spring Boot backend so far (step 5)
 
 | Endpoint | Notes |
 |---|---|
 | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `PUT /api/users/me` | Complete, except that login rate limiting is not implemented yet |
-| `POST /api/documents/upload`, `GET /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/download`, `DELETE /api/documents/{id}` | Files are stored in PostgreSQL. The `productId` part and filter are ignored (no products yet) |
-| `POST /api/documents/{id}/reprocess` | Complete (`409 DOCUMENT_NOT_READY` while still being read) |
-| Processing lifecycle (§8) | A background reader moves documents UPLOADED → PROCESSING (`OCR`, `EXTRACTION`) → **PROCESSED**, or FAILED with `errorMessage`. `extractedText` and `extraction` come from PDF text or OCR plus rule-based detail finding (no AI yet); `suggestedCategorySlug` is always `null`. No `DOCUMENT_PROCESSED` notifications yet |
+| `POST /api/documents/upload`, `GET /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/download`, `DELETE /api/documents/{id}` | Complete; files are stored in PostgreSQL |
+| `POST /api/documents/{id}/reprocess` | Complete |
+| `POST /api/documents/{id}/confirm` | Complete (step 5) |
+| Processing lifecycle (§8) | A background reader moves documents UPLOADED → PROCESSING (`OCR`, `EXTRACTION`) → **PROCESSED** (this backend's "needs review"; it never uses `REVIEW_REQUIRED`), or FAILED with `errorMessage`. `extractedText` and `extraction` come from PDF text or OCR plus rule-based detail finding (no AI yet); `suggestedCategorySlug` is always `null`. No `DOCUMENT_PROCESSED` notifications yet |
+| `GET /api/categories` | Complete (step 5) |
+| `GET /api/products`, `POST /api/products`, `GET`/`PUT`/`DELETE /api/products/{id}` | Complete (step 5). Every product has a `warranty` object (status `UNKNOWN` without months or purchase date). `nextServiceDate` is always `null` (no service records yet) |
+| `GET /api/warranties?status=` | Complete (step 5) |
+| `GET /api/dashboard/summary` | Complete (step 5). `upcomingServices` is always `[]` |
 
-Everything else (including `POST /api/documents/{id}/confirm`) is still mock-only.
-Against the real backend the frontend hides those features
+Service records, notifications, the AI assistant and search, and Gmail import are
+still mock-only. Against the real backend the frontend hides those features
 (`frontend/src/lib/features.ts`, `BACKEND_FEATURES`). How it works is explained in
-[`step-3-backend-basics.md`](step-3-backend-basics.md) and
-[`step-4-reading-documents.md`](step-4-reading-documents.md).
+[`step-3-backend-basics.md`](step-3-backend-basics.md),
+[`step-4-reading-documents.md`](step-4-reading-documents.md) and
+[`step-5-products-and-warranties.md`](step-5-products-and-warranties.md).
 
 ---
 

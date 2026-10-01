@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCheck, FileSearch, Link2, PackagePlus, Sparkles, SquarePen, type LucideIcon } from 'lucide-react';
+import { CheckCheck, FileSearch, Link2, PackagePlus, RotateCw, Sparkles, SquarePen, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Field, Select } from '@/components/ui/Field';
 import { useToast } from '@/components/ui/toast-context';
-import { useConfirmDocument } from '@/hooks/useDocuments';
+import { useConfirmDocument, useReprocessDocument } from '@/hooks/useDocuments';
 import { useCategories, useProducts } from '@/hooks/useProducts';
 import { getErrorMessage } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
@@ -55,6 +55,7 @@ export function ExtractionReview({ document }: ExtractionReviewProps) {
   const productsQuery = useProducts();
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
   const confirmDocument = useConfirmDocument(document.id);
+  const reprocess = useReprocessDocument(document.id);
 
   const suggestedCategoryId = categories.find((c) => c.slug === extraction?.suggestedCategorySlug)?.id ?? '';
   const extractedValues = useMemo(
@@ -141,6 +142,15 @@ export function ExtractionReview({ document }: ExtractionReviewProps) {
     () => setEditing(true),
   );
 
+  // Reads the file again, e.g. after the reading rules improved; the page then shows the progress.
+  async function readAgain() {
+    try {
+      await reprocess.mutateAsync();
+    } catch (error) {
+      toast.error('Could not read the document again', getErrorMessage(error));
+    }
+  }
+
   const values = watch();
   const stats = summarizeExtraction(extraction);
   const typeSource = confidenceLevel(extraction?.documentType, extraction?.confidence?.documentType);
@@ -221,11 +231,23 @@ export function ExtractionReview({ document }: ExtractionReviewProps) {
       <Card>
         <CardHeader
           icon={<Sparkles className="size-4 text-brand-600" aria-hidden />}
-          title="AI extracted information"
+          title="Details read from the document"
           description={
             editing
               ? 'Correct anything that looks wrong. Nothing is saved until you confirm.'
-              : 'Check each value against the document. Fields marked “Not found” were not on the document — the AI never guesses.'
+              : 'Check each value against the document. Fields marked “Not found” were not on the document — nothing is guessed.'
+          }
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void readAgain()}
+              loading={reprocess.isPending}
+              disabled={formState.isSubmitting}
+              leftIcon={<RotateCw className="size-4" aria-hidden />}
+            >
+              Read again
+            </Button>
           }
         />
         <CardBody>
@@ -279,7 +301,7 @@ function AiSummary({ stats }: { stats: ReturnType<typeof summarizeExtraction> })
       </span>
       <div className="min-w-0">
         <p className="font-semibold text-slate-900">
-          AI found {stats.found} of {stats.total} details
+          Found {stats.found} of {stats.total} details
         </p>
         <p className="mt-0.5 text-sm text-slate-600">
           {stats.needsAttention > 0

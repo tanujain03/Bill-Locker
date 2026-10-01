@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import project.bill_locker.common.ApiException;
+import project.bill_locker.product.Product;
+import project.bill_locker.product.ProductService;
 import project.bill_locker.user.User;
 import project.bill_locker.user.UserService;
 
@@ -23,20 +25,24 @@ public class DocumentService {
 	private final DocumentRepository documents;
 	private final DocumentFileRepository documentFiles;
 	private final UserService userService;
+	private final ProductService productService;
 
-	public DocumentService(DocumentRepository documents, DocumentFileRepository documentFiles, UserService userService) {
+	public DocumentService(DocumentRepository documents, DocumentFileRepository documentFiles, UserService userService,
+			ProductService productService) {
 		this.documents = documents;
 		this.documentFiles = documentFiles;
 		this.userService = userService;
+		this.productService = productService;
 	}
 
 	/**
 	 * Checks the file and saves it: one row in {@code documents} (the details) and one
 	 * in {@code document_files} (the bytes). Both are written in one transaction, so
-	 * either both are saved or neither.
+	 * either both are saved or neither. With a {@code productId}, the document belongs to
+	 * that product (which must be one of the user's own).
 	 */
 	@Transactional
-	public DocumentSummary upload(UUID userId, MultipartFile file, DocumentType documentType) {
+	public DocumentSummary upload(UUID userId, MultipartFile file, DocumentType documentType, UUID productId) {
 		if (file.isEmpty()) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "FILE_REQUIRED", "The file is empty. Choose another file.");
 		}
@@ -48,18 +54,18 @@ public class DocumentService {
 						"Only PDF, JPG, PNG and WEBP files are supported."));
 
 		User owner = userService.findUser(userId);
-		Document document = documents.save(new Document(owner, fileName, type.mimeType, content.length,
-				documentType != null ? documentType : DocumentType.OTHER));
+		Product product = productId == null ? null : productService.findOwned(userId, productId);
+		Document document = new Document(owner, fileName, type.mimeType, content.length,
+				documentType != null ? documentType : DocumentType.OTHER);
+		document.attachTo(product);
+		documents.save(document);
 		documentFiles.save(new DocumentFile(document, content));
 		return DocumentSummary.from(document);
 	}
 
 	@Transactional(readOnly = true)
 	public List<DocumentSummary> list(UUID userId, UUID productId, ProcessingStatus status, DocumentType documentType) {
-		if (productId != null) {
-			return List.of(); // products come in a later step, so no document is linked to one yet
-		}
-		return documents.findForUser(userId, status, documentType).stream().map(DocumentSummary::from).toList();
+		return documents.findForUser(userId, productId, status, documentType).stream().map(DocumentSummary::from).toList();
 	}
 
 	@Transactional(readOnly = true)
@@ -84,12 +90,39 @@ public class DocumentService {
 	@Transactional
 	public DocumentSummary reprocess(UUID userId, UUID documentId) {
 		Document document = findOwned(userId, documentId);
+		refuseIfConfirmed(document);
+		refuseIfStillReading(document);
+		document.queueForProcessing();
+		return DocumentSummary.from(document);
+	}
+
+	/**
+	 * "Confirm & Save": the user checked the details found in the document (and maybe
+	 * corrected them). Only now do they become a product with a warranty: a new product,
+	 * or an update of {@code request.productId()}. The document is linked to it and CONFIRMED.
+	 * A FAILED document can be confirmed too, with the details typed in by hand.
+	 */
+	@Transactional
+	public ConfirmResult confirm(UUID userId, UUID documentId, ConfirmDocumentRequest request) {
+		Document document = findOwned(userId, documentId);
+		refuseIfConfirmed(document);
+		refuseIfStillReading(document);
+		Product product = productService.saveFromDocument(userId, request.productId(), request.product(), document);
+		document.confirm(product, request.documentType());
+		return new ConfirmResult(DocumentSummary.from(document), productService.toResponse(product));
+	}
+
+	private static void refuseIfConfirmed(Document document) {
+		if (document.getProcessingStatus() == ProcessingStatus.CONFIRMED) {
+			throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_ALREADY_CONFIRMED", "This document has already been saved.");
+		}
+	}
+
+	private static void refuseIfStillReading(Document document) {
 		ProcessingStatus status = document.getProcessingStatus();
 		if (status == ProcessingStatus.UPLOADED || status == ProcessingStatus.PROCESSING) {
 			throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_NOT_READY", "This document is still being read.");
 		}
-		document.queueForProcessing();
-		return DocumentSummary.from(document);
 	}
 
 	// ---- Used by the background reader (processing/DocumentProcessor) ----

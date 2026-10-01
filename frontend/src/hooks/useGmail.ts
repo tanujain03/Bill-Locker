@@ -4,11 +4,13 @@ import { invalidateLockerData } from '@/lib/invalidate';
 import { queryKeys } from '@/lib/query-keys';
 import { gmailService } from '@/services/gmail.service';
 
-export function useGmailConnection() {
+/** `enabled: false` skips the request (e.g. while the backend has no Gmail import). */
+export function useGmailConnection(enabled = true) {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: queryKeys.gmail.connection,
     queryFn: gmailService.connection,
+    enabled,
     refetchInterval: (q) => (q.state.data?.syncStatus === 'SYNCING' ? 1500 : false),
   });
 

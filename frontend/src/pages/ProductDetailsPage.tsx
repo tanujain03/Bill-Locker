@@ -23,6 +23,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useDeleteProduct, useProduct } from '@/hooks/useProducts';
 import { useDeleteServiceRecord, useServiceRecords } from '@/hooks/useServiceRecords';
 import { ApiError, getErrorMessage } from '@/lib/api-client';
+import { isFeatureEnabled } from '@/lib/features';
 import { DOCUMENT_TYPES, type DocumentSummary, type Product, type ServiceRecord } from '@/types';
 import { formatCurrency, formatDate } from '@/utils/format';
 import { DOCUMENT_TYPE_LABELS } from '@/utils/labels';
@@ -60,7 +61,8 @@ function ProductDetails({ product }: { product: Product }) {
   const toast = useToast();
   const { openUpload } = useUpload();
   const documents = useDocuments({ productId: product.id });
-  const services = useServiceRecords(product.id);
+  const showServices = isFeatureEnabled('services');
+  const services = useServiceRecords(product.id, showServices);
   const deleteProduct = useDeleteProduct();
   const deleteService = useDeleteServiceRecord();
 
@@ -111,9 +113,11 @@ function ProductDetails({ product }: { product: Product }) {
         }
         actions={
           <>
-            <ButtonLink to={askAi} variant="secondary" leftIcon={<Sparkles className="size-4 text-brand-600" aria-hidden />}>
-              Ask AI
-            </ButtonLink>
+            {isFeatureEnabled('assistant') && (
+              <ButtonLink to={askAi} variant="secondary" leftIcon={<Sparkles className="size-4 text-brand-600" aria-hidden />}>
+                Ask AI
+              </ButtonLink>
+            )}
             <Button
               variant="secondary"
               onClick={() => openUpload({ productId: product.id, productName: product.name })}
@@ -204,49 +208,53 @@ function ProductDetails({ product }: { product: Product }) {
         </div>
       </Card>
 
-      <Card className="mt-6">
-        <CardHeader
-          icon={<Wrench className="size-4 text-slate-400" aria-hidden />}
-          title="Service history"
-          description={product.nextServiceDate ? `Next service ${formatDate(product.nextServiceDate)}` : 'Repairs and maintenance'}
-          action={
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => setServiceDialog({ open: true, record: null })}
-              leftIcon={<Plus className="size-4" aria-hidden />}
-            >
-              Add service
-            </Button>
-          }
-        />
-        <div className="mt-2">
-          {services.isPending ? (
-            <div className="space-y-3 px-5 py-4 sm:px-6">
-              <Skeleton className="h-14 w-full" />
-            </div>
-          ) : services.isError ? (
-            <ErrorState compact error={services.error} onRetry={() => void services.refetch()} />
-          ) : services.data.length === 0 ? (
-            <EmptyState compact icon={<Wrench aria-hidden />} title="No service records" description="Log repairs and maintenance, and set a next service date for reminders." />
-          ) : (
-            <ServiceHistory
-              records={services.data}
-              showProduct={false}
-              onEdit={(record) => setServiceDialog({ open: true, record })}
-              onDelete={setServiceToDelete}
-            />
-          )}
-        </div>
-      </Card>
+      {showServices && (
+        <Card className="mt-6">
+          <CardHeader
+            icon={<Wrench className="size-4 text-slate-400" aria-hidden />}
+            title="Service history"
+            description={product.nextServiceDate ? `Next service ${formatDate(product.nextServiceDate)}` : 'Repairs and maintenance'}
+            action={
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setServiceDialog({ open: true, record: null })}
+                leftIcon={<Plus className="size-4" aria-hidden />}
+              >
+                Add service
+              </Button>
+            }
+          />
+          <div className="mt-2">
+            {services.isPending ? (
+              <div className="space-y-3 px-5 py-4 sm:px-6">
+                <Skeleton className="h-14 w-full" />
+              </div>
+            ) : services.isError ? (
+              <ErrorState compact error={services.error} onRetry={() => void services.refetch()} />
+            ) : services.data.length === 0 ? (
+              <EmptyState compact icon={<Wrench aria-hidden />} title="No service records" description="Log repairs and maintenance, and set a next service date for reminders." />
+            ) : (
+              <ServiceHistory
+                records={services.data}
+                showProduct={false}
+                onEdit={(record) => setServiceDialog({ open: true, record })}
+                onDelete={setServiceToDelete}
+              />
+            )}
+          </div>
+        </Card>
+      )}
 
       <ProductFormDialog open={editOpen} onClose={() => setEditOpen(false)} product={product} />
-      <ServiceRecordDialog
-        open={serviceDialog.open}
-        record={serviceDialog.record}
-        productId={product.id}
-        onClose={() => setServiceDialog({ open: false, record: null })}
-      />
+      {showServices && (
+        <ServiceRecordDialog
+          open={serviceDialog.open}
+          record={serviceDialog.record}
+          productId={product.id}
+          onClose={() => setServiceDialog({ open: false, record: null })}
+        />
+      )}
       <ConfirmDialog
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}

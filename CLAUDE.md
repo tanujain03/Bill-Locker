@@ -9,8 +9,8 @@ the backend, kept simple and explained ("what happens where"). Keep code minimal
 readable, with short comments that explain *why*. Write or update a step guide in
 `docs/` (see `docs/step-3-backend-basics.md`), and don't add features before the user
 asks for them. Branches: only `dev` (where work happens) and `main` (merged into from
-`dev` by pull request); steps 1-3 are in both. Tag `step-2-database` marks the full
-entity design. Never merge to `main` or push unless asked.
+`dev` by pull request); steps 1-3 are in both, step 4 is on `dev`. Tag `step-2-database`
+marks the full entity design. Never commit, merge to `main` or push unless asked.
 
 ## Repository
 
@@ -26,8 +26,13 @@ entity design. Never merge to `main` or push unless asked.
   Step 4 = a background reader (`processing` package): PDFBox for PDF text, Tesseract
   OCR (Tess4J) for photos and scanned PDFs, rule-based `DetailExtractor` (no AI yet);
   documents end PROCESSED with `extractedText` + `extraction` (jsonb), or FAILED.
-  Packages: `security`, `auth`, `user`, `document`, `processing`, `common`. Guides:
-  `docs/step-3-backend-basics.md`, `docs/step-4-reading-documents.md`.
+  Step 5 = `categories` (seeded by `DefaultCategories`), `products`, `warranties` (one
+  per product, `@OneToOne`; dates in `WarrantyDates`, status computed, never stored),
+  "Confirm & Save" (`POST /api/documents/{id}/confirm` → CONFIRMED + product), the
+  warranties list and the dashboard summary.
+  Packages: `security`, `auth`, `user`, `document`, `processing`, `product`, `warranty`,
+  `dashboard`, `common`. Guides: `docs/step-3-backend-basics.md`,
+  `docs/step-4-reading-documents.md`, `docs/step-5-products-and-warranties.md`.
 - `docs/database-design.md` — the **target** design (13 tables). Its entity classes
   and tests are at tag `step-2-database`; bring parts back one feature at a time.
   Hibernate `ddl-auto=update` creates the tables. No migration scripts or Flyway: the
@@ -89,9 +94,10 @@ entity design. Never merge to `main` or push unless asked.
 - `frontend/.env.development.local` (git-ignored) sets `VITE_API_MOCKING=false`, so
   `npm run dev` proxies `/api` to `http://localhost:8080`. `true` means the mock demo.
 - `frontend/src/lib/features.ts`: `BACKEND_FEATURES` lists what the real backend has
-  (now `documentProcessing`). Unbuilt features are hidden (nav, top bar, routes redirect
-  to `homePath()`). Until `products` exists, read documents show the read-only
-  `ExtractedDetails` instead of `ExtractionReview` (which needs products/categories).
+  (now `documentProcessing`, `products`, `warranties`, `dashboard`). Unbuilt features
+  are hidden: nav, top bar, routes redirect to `homePath()`, and parts of pages
+  (`isFeatureEnabled('gmail' | 'services' | 'assistant' | 'search')`; hooks like
+  `useGmailConnection(enabled)` / `useServiceRecords(id, enabled)` skip the request).
   Add a feature there when its endpoints land. Tests force mock mode
   (`vite.config.ts` `test.env`).
 
@@ -121,11 +127,11 @@ entity design. Never merge to `main` or push unless asked.
 - Files exporting React components must export only components (react-refresh lint);
   put shared constants/helpers in sibling `.ts` files.
 
-## Backend roadmap (from the spec; done: auth + JWT, uploads, error handler, OCR + rules)
+## Backend roadmap (from the spec; done: auth + JWT, uploads, error handler, OCR + rules, products + warranties + dashboard)
 
-Next candidates: **AI extraction** (better product names; rules stay as a check) and
-**products + warranties with "Confirm & Save"** (entities at tag `step-2-database`). Later:
-MinIO storage, provider-agnostic AI (`AIService`,
+Next candidates (no AI needed): **reminders/notifications** (daily `@Scheduled` job) and
+**service records**; then **AI extraction** (better product names, category suggestion;
+rules stay as a check). Later: MinIO storage, provider-agnostic AI (`AIService`,
 `DocumentExtractionService`, `EmbeddingService`, `RagService`; Gemini first; prompts in
 `ai/prompts/`), pgvector RAG, scheduled reminders, Gmail OAuth (read-only scope,
 encrypted refresh tokens, callback redirects to `/gmail?status=connected|error`),

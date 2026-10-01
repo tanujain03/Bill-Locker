@@ -14,6 +14,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useCategories, useProducts } from '@/hooks/useProducts';
 import { cn } from '@/lib/cn';
+import { isFeatureEnabled } from '@/lib/features';
 import { WARRANTY_STATUSES, type Product, type WarrantyStatus } from '@/types';
 import { pluralize } from '@/utils/format';
 import { describeSearchFilters, PRODUCT_SORT_LABELS, sortProducts, type ProductSort } from '@/utils/search';
@@ -29,7 +30,9 @@ const AI_EXAMPLES = [
 export function ProductsPage() {
   useDocumentTitle('My Products');
   const [params, setParams] = useSearchParams();
-  const aiQuery = params.get('ai')?.trim() ?? '';
+  // Plain-English questions need the AI search; without it the box is a keyword search.
+  const aiSearch = isFeatureEnabled('search');
+  const aiQuery = aiSearch ? (params.get('ai')?.trim() ?? '') : '';
   const [input, setInput] = useState(aiQuery);
   const [categoryId, setCategoryId] = useState('');
   const [status, setStatus] = useState<WarrantyStatus | ''>('');
@@ -54,6 +57,7 @@ export function ProductsPage() {
 
   function runAiSearch(event?: FormEvent) {
     event?.preventDefault();
+    if (!aiSearch) return; // the keyword search already runs while typing
     const query = input.trim();
     if (query) setParams({ ai: query });
   }
@@ -88,7 +92,7 @@ export function ProductsPage() {
 
       <form onSubmit={runAiSearch} role="search" className="mb-4">
         <label htmlFor="product-search" className="sr-only">
-          Search products or ask in plain English
+          {aiSearch ? 'Search products or ask in plain English' : 'Search products'}
         </label>
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
@@ -98,7 +102,11 @@ export function ProductsPage() {
               ref={inputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Search by name, brand or seller — or ask “warranties expiring in 90 days”"
+              placeholder={
+                aiSearch
+                  ? 'Search by name, brand or seller — or ask “warranties expiring in 90 days”'
+                  : 'Search by name, brand, model, seller, serial or invoice number'
+              }
               className="h-11 w-full rounded-xl border border-slate-300 bg-white pr-10 pl-10 text-sm shadow-xs placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 focus:outline-none"
             />
             {input && (
@@ -112,11 +120,13 @@ export function ProductsPage() {
               </button>
             )}
           </div>
-          <Button type="submit" size="lg" className="h-11" leftIcon={<Sparkles className="size-4" aria-hidden />} disabled={!input.trim()}>
-            Ask AI
-          </Button>
+          {aiSearch && (
+            <Button type="submit" size="lg" className="h-11" leftIcon={<Sparkles className="size-4" aria-hidden />} disabled={!input.trim()}>
+              Ask AI
+            </Button>
+          )}
         </div>
-        {!aiQuery && (
+        {aiSearch && !aiQuery && (
           <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
             Try:
             {AI_EXAMPLES.map((example) => (
@@ -188,7 +198,9 @@ export function ProductsPage() {
                   icon={<SearchX aria-hidden />}
                   title="No products match"
                   description={
-                    keyword ? `Nothing matches “${keyword}”. Press “Ask AI” to search in plain English.` : 'Try a different filter.'
+                    keyword
+                      ? `Nothing matches “${keyword}”.${aiSearch ? ' Press “Ask AI” to search in plain English.' : ''}`
+                      : 'Try a different filter.'
                   }
                   action={
                     <Button variant="secondary" onClick={clearFilters}>
@@ -200,7 +212,7 @@ export function ProductsPage() {
                 <EmptyState
                   icon={<Package aria-hidden />}
                   title="No products yet"
-                  description="Upload your first bill to get started — AI fills in the product and warranty for you."
+                  description="Upload your first bill to get started — Bill Locker fills in the product and warranty for you."
                   action={
                     <>
                       <Button onClick={() => openUpload()} leftIcon={<Upload className="size-4" aria-hidden />}>

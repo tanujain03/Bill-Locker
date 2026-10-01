@@ -14,7 +14,6 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { DocumentStatusBadge, DocumentTypeBadge, SourceBadge } from '@/components/documents/DocumentBadges';
 import { DocumentPreview } from '@/components/documents/DocumentPreview';
-import { ExtractedDetails } from '@/components/documents/ExtractedDetails';
 import { ExtractionReview } from '@/components/documents/ExtractionReview';
 import { stepForDocument } from '@/components/documents/processing';
 import { ProcessingSteps } from '@/components/documents/ProcessingSteps';
@@ -28,7 +27,6 @@ import { useDeleteDocument, useDocument, useReprocessDocument } from '@/hooks/us
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ApiError, getErrorMessage } from '@/lib/api-client';
-import { isFeatureEnabled } from '@/lib/features';
 import { documentService } from '@/services/document.service';
 import type { DocumentDetail } from '@/types';
 import { saveBlob } from '@/utils/file';
@@ -69,7 +67,6 @@ function DocumentDetailView({ document }: { document: DocumentDetail }) {
   const [manualEntry, setManualEntry] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const status = document.processingStatus;
-  const canSaveProducts = isFeatureEnabled('products');
   const reviewing = needsReview(status) || (status === 'FAILED' && manualEntry);
 
   async function download() {
@@ -144,12 +141,11 @@ function DocumentDetailView({ document }: { document: DocumentDetail }) {
           ) : isStoredOnly(status) ? (
             <StoredPanel />
           ) : reviewing ? (
-            // Until products can be saved, the details are shown read-only.
-            canSaveProducts ? <ExtractionReview document={document} /> : <ExtractedDetails document={document} />
+            <ExtractionReview document={document} />
           ) : status === 'CONFIRMED' ? (
             <ConfirmedPanel document={document} />
           ) : status === 'FAILED' ? (
-            <FailedPanel document={document} onManualEntry={canSaveProducts ? () => setManualEntry(true) : undefined} />
+            <FailedPanel document={document} onManualEntry={() => setManualEntry(true)} />
           ) : null}
         </div>
       </div>
@@ -238,8 +234,7 @@ function ConfirmedPanel({ document }: { document: DocumentDetail }) {
   );
 }
 
-/** `onManualEntry` is left out while products can't be saved yet. */
-function FailedPanel({ document, onManualEntry }: { document: DocumentDetail; onManualEntry?: () => void }) {
+function FailedPanel({ document, onManualEntry }: { document: DocumentDetail; onManualEntry: () => void }) {
   const reprocess = useReprocessDocument(document.id);
   const toast = useToast();
 
@@ -269,11 +264,9 @@ function FailedPanel({ document, onManualEntry }: { document: DocumentDetail; on
         <Button onClick={() => void retry()} loading={reprocess.isPending} leftIcon={<RotateCw className="size-4" aria-hidden />}>
           Try again
         </Button>
-        {onManualEntry && (
-          <Button variant="secondary" onClick={onManualEntry} leftIcon={<PencilLine className="size-4" aria-hidden />}>
-            Enter details manually
-          </Button>
-        )}
+        <Button variant="secondary" onClick={onManualEntry} leftIcon={<PencilLine className="size-4" aria-hidden />}>
+          Enter details manually
+        </Button>
       </div>
     </Card>
   );

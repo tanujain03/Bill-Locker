@@ -22,10 +22,12 @@ describe('features against the real backend', () => {
     const { homePath, isFeatureEnabled } = await withRealBackend();
 
     expect(isFeatureEnabled('documentProcessing')).toBe(true);
-    expect(isFeatureEnabled('dashboard')).toBe(false);
-    expect(isFeatureEnabled('products')).toBe(false);
+    expect(isFeatureEnabled('products')).toBe(true);
+    expect(isFeatureEnabled('warranties')).toBe(true);
+    expect(isFeatureEnabled('dashboard')).toBe(true);
+    expect(isFeatureEnabled('services')).toBe(false);
     expect(isFeatureEnabled('gmail')).toBe(false);
-    expect(homePath()).toBe('/documents');
+    expect(homePath()).toBe('/dashboard');
   });
 
   it('waits while an uploaded document is being read', async () => {

@@ -54,7 +54,7 @@ So the upload only stores the file, and the reading happens separately.
 | File | Change |
 |---|---|
 | `src/lib/features.ts` | `documentProcessing` added to `BACKEND_FEATURES`, so the progress steps come back |
-| `src/components/documents/ExtractedDetails.tsx` | New: read-only list of the details plus the text that was read |
+| `src/components/documents/ExtractedDetails.tsx` | New: read-only list of the details plus the text that was read (replaced by the review screen in step 5) |
 | `src/pages/DocumentDetailPage.tsx` | Shows `ExtractedDetails` until products can be saved; "Try again" on failures |
 
 ---
@@ -210,6 +210,7 @@ starts it at a known moment.
 ## 10. Next
 
 - **AI extraction:** better product names and messy bills.
-- **Products and warranties:** "Confirm & Save" turns the checked details into a
-  product with a tracked warranty, and the full review screen replaces the read-only
-  view.
+- **Products and warranties:** done in
+  [step 5](step-5-products-and-warranties.md). "Confirm & Save" turns the checked
+  details into a product with a tracked warranty, and the review screen (which now
+  has the **Read again** button) replaces the read-only view.

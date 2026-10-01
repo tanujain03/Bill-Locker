@@ -18,6 +18,7 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 import project.bill_locker.common.AuditableEntity;
+import project.bill_locker.product.Product;
 import project.bill_locker.user.User;
 
 /**
@@ -25,7 +26,10 @@ import project.bill_locker.user.User;
  * The file itself is stored separately, in {@link DocumentFile}.
  */
 @Entity
-@Table(name = "documents", indexes = @Index(name = "idx_documents_user_created", columnList = "user_id, created_at DESC"))
+@Table(name = "documents", indexes = {
+		@Index(name = "idx_documents_user_created", columnList = "user_id, created_at DESC"),
+		@Index(name = "idx_documents_product", columnList = "product_id")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Document extends AuditableEntity {
@@ -35,6 +39,12 @@ public class Document extends AuditableEntity {
 	@JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_documents_user"))
 	@OnDelete(action = OnDeleteAction.CASCADE)
 	private User user;
+
+	/** The product this bill belongs to, once linked. Deleting the product keeps the bill (SET NULL). */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "product_id", foreignKey = @ForeignKey(name = "fk_documents_product"))
+	@OnDelete(action = OnDeleteAction.SET_NULL)
+	private Product product;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "document_type", nullable = false, length = 20)
@@ -51,7 +61,10 @@ public class Document extends AuditableEntity {
 	@Column(name = "file_size", nullable = false)
 	private long fileSize;
 
-	/** UPLOADED → PROCESSING → PROCESSED, or FAILED. The background reader moves it along. */
+	/**
+	 * UPLOADED → PROCESSING → PROCESSED (or FAILED): the background reader moves it along.
+	 * CONFIRMED once the user saved the details as a product.
+	 */
 	@Enumerated(EnumType.STRING)
 	@Column(name = "processing_status", nullable = false, length = 20)
 	private ProcessingStatus processingStatus = ProcessingStatus.UPLOADED;
@@ -103,6 +116,18 @@ public class Document extends AuditableEntity {
 	public void failProcessing(String reason) {
 		processingStatus = ProcessingStatus.FAILED;
 		errorMessage = reason;
+	}
+
+	/** E.g. "Add document" on a product's page: the bill belongs to that product. */
+	public void attachTo(Product product) {
+		this.product = product;
+	}
+
+	/** "Confirm & Save": the user checked the details and saved them as this product. */
+	public void confirm(Product product, DocumentType documentType) {
+		this.product = product;
+		this.documentType = documentType;
+		this.processingStatus = ProcessingStatus.CONFIRMED;
 	}
 
 	/** Back in the queue: the background reader will read it (again). */

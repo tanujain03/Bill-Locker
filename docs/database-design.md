@@ -6,14 +6,22 @@ updates the tables in PostgreSQL from these classes
 (`spring.jpa.hibernate.ddl-auto=update`). There are no SQL migration scripts.
 The schema backs the REST contract in [`api-contract.md`](api-contract.md).
 
-> **What exists today (step 4):** only `users`, `documents` and `document_files`.
-> The file bytes are in `document_files.data` (bytea); see
-> [`step-3-backend-basics.md`](step-3-backend-basics.md) §3. Step 4 added
-> `processing_stage`, `error_message`, `extracted_text` and `extraction` (jsonb) to
-> `documents`; see [`step-4-reading-documents.md`](step-4-reading-documents.md) §6. Everything below §1 is
-> the **target design**. Its entity classes and tests are saved at the git tag
-> `step-2-database` and come back one feature at a time. When a part returns,
-> update this document.
+> **What exists today (step 5):** `users`, `documents`, `document_files`,
+> `categories`, `products` and `warranties`.
+> - The file bytes are in `document_files.data` (bytea); see
+>   [`step-3-backend-basics.md`](step-3-backend-basics.md) §3.
+> - Step 4 added `processing_stage`, `error_message`, `extracted_text` and
+>   `extraction` (jsonb) to `documents`; see
+>   [`step-4-reading-documents.md`](step-4-reading-documents.md) §6.
+> - Step 5 added the product tables and `documents.product_id`; see
+>   [`step-5-products-and-warranties.md`](step-5-products-and-warranties.md) §4 and §8.
+>   Differences from the target below: one warranty per product (unique
+>   `uk_warranties_product`), no `warranty_type`/`coverage_note` yet, and no
+>   `(user_id, category_id)` index yet.
+>
+> Everything below §1 is the **target design**. Its entity classes and tests are
+> saved at the git tag `step-2-database` and come back one feature at a time. When a
+> part returns, update this document.
 
 | What | Where |
 |---|---|

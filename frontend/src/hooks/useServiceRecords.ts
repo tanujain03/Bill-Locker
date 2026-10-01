@@ -4,10 +4,12 @@ import { queryKeys } from '@/lib/query-keys';
 import { serviceRecordService } from '@/services/service-record.service';
 import type { ServiceRecordInput } from '@/types';
 
-export function useServiceRecords(productId?: string) {
+/** `enabled: false` skips the request (e.g. while the backend has no service records). */
+export function useServiceRecords(productId?: string, enabled = true) {
   return useQuery({
     queryKey: queryKeys.serviceRecords.list(productId),
     queryFn: () => serviceRecordService.list(productId),
+    enabled,
   });
 }
 

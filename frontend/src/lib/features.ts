@@ -24,6 +24,9 @@ export type Feature =
 /** Features the real backend already implements. Add one here when its endpoints exist. */
 const BACKEND_FEATURES: ReadonlySet<Feature> = new Set<Feature>([
   'documentProcessing', // step 4: uploads are read (PDF text / OCR) and their details found
+  'products', // step 5: products, categories, and "Confirm & Save" of a read document
+  'warranties', // step 5: warranty status and the warranties page
+  'dashboard', // step 5: the dashboard summary
 ]);
 
 export function isFeatureEnabled(feature: Feature): boolean {

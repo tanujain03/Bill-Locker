@@ -38,7 +38,10 @@ public class GlobalExceptionHandler {
 	ResponseEntity<ApiErrorBody> handleInvalidFields(MethodArgumentNotValidException ex) {
 		Map<String, String> fieldErrors = new LinkedHashMap<>();
 		for (FieldError error : ex.getBindingResult().getFieldErrors()) {
-			fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage());
+			// A field inside a nested object ("product.name" when confirming a document) is
+			// reported by its own name, the one the form uses.
+			String field = error.getField().substring(error.getField().lastIndexOf('.') + 1);
+			fieldErrors.putIfAbsent(field, error.getDefaultMessage());
 		}
 		return respond(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Please check the highlighted fields.", fieldErrors);
 	}

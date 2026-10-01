@@ -8,7 +8,7 @@ describe('AI extraction review', () => {
     await signIn();
     const { user, router } = renderApp('/documents/doc_airfryer_review');
 
-    expect(await screen.findByText(/AI found 8 of 9 details/)).toBeInTheDocument();
+    expect(await screen.findByText(/Found 8 of 9 details/)).toBeInTheDocument();
     expect(screen.getByText(/3 fields need your attention/)).toBeInTheDocument();
     // Serial number is not on the invoice → shown as "Not found", never guessed.
     expect(screen.getAllByText('Not found').length).toBeGreaterThan(0);

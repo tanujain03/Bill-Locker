@@ -2,11 +2,11 @@ package project.bill_locker.document;
 
 import java.time.Instant;
 import java.util.UUID;
+import project.bill_locker.product.Product;
 
 /**
  * A document as the API returns it in lists (docs/api-contract.md §8,
- * "DocumentSummary"). Products and Gmail import come in later steps, so for now
- * productId/productName are always null and the source is always "UPLOAD".
+ * "DocumentSummary"). Gmail import comes in a later step, so the source is always "UPLOAD".
  */
 public record DocumentSummary(
 		UUID id,
@@ -23,8 +23,10 @@ public record DocumentSummary(
 		Instant createdAt,
 		Instant updatedAt) {
 
-	static DocumentSummary from(Document document) {
-		return new DocumentSummary(document.getId(), null, null, document.getDocumentType(), document.getFileName(),
+	public static DocumentSummary from(Document document) {
+		Product product = document.getProduct();
+		return new DocumentSummary(document.getId(), product == null ? null : product.getId(),
+				product == null ? null : product.getName(), document.getDocumentType(), document.getFileName(),
 				document.getMimeType(), document.getFileSize(), document.getProcessingStatus(),
 				document.getProcessingStage(), "UPLOAD", document.getErrorMessage(), document.getCreatedAt(),
 				document.getUpdatedAt());

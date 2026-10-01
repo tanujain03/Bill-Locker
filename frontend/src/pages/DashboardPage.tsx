@@ -32,6 +32,8 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useGmailConnection } from '@/hooks/useGmail';
 import { useDashboard } from '@/hooks/useWarranties';
 import { useAuth } from '@/lib/auth-context';
+import { cn } from '@/lib/cn';
+import { isFeatureEnabled } from '@/lib/features';
 import type { DashboardSummary } from '@/types';
 import { describeDueDate, formatCompactCurrency, formatCurrency, formatDate, greeting, pluralize } from '@/utils/format';
 import { SERVICE_TYPE_LABELS } from '@/utils/labels';
@@ -52,9 +54,11 @@ export function DashboardPage() {
         description="Here’s everything happening with your purchases and warranties."
         actions={
           <>
-            <ButtonLink to="/gmail" variant="secondary" leftIcon={<Mail className="size-4" aria-hidden />}>
-              Import from Gmail
-            </ButtonLink>
+            {isFeatureEnabled('gmail') && (
+              <ButtonLink to="/gmail" variant="secondary" leftIcon={<Mail className="size-4" aria-hidden />}>
+                Import from Gmail
+              </ButtonLink>
+            )}
             <Button onClick={() => openUpload()} leftIcon={<Upload className="size-4" aria-hidden />}>
               Upload bill
             </Button>
@@ -79,7 +83,8 @@ export function DashboardPage() {
 
 function DashboardContent({ data }: { data: DashboardSummary }) {
   const [spendingView, setSpendingView] = useState<'chart' | 'table'>('chart');
-  const gmail = useGmailConnection();
+  const gmail = useGmailConnection(isFeatureEnabled('gmail'));
+  const showServices = isFeatureEnabled('services');
   const { warranties } = data;
 
   return (
@@ -94,7 +99,7 @@ function DashboardContent({ data }: { data: DashboardSummary }) {
             </ButtonLink>
           }
         >
-          AI has extracted the details — confirm them to add the products to your locker.
+          Their details have been read — confirm them to add the products to your locker.
         </Alert>
       )}
 
@@ -177,7 +182,7 @@ function DashboardContent({ data }: { data: DashboardSummary }) {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className={cn('grid gap-6', showServices && 'lg:grid-cols-2')}>
         <Card>
           <CardHeader
             title="Upcoming warranty expirations"
@@ -211,44 +216,46 @@ function DashboardContent({ data }: { data: DashboardSummary }) {
           )}
         </Card>
 
-        <Card>
-          <CardHeader
-            title="Upcoming services"
-            description="Maintenance due in the next 60 days"
-            action={
-              <Link to="/services" className="text-sm font-medium text-brand-700 hover:text-brand-800">
-                View all
-              </Link>
-            }
-          />
-          {data.upcomingServices.length === 0 ? (
-            <EmptyState compact icon={<Wrench aria-hidden />} title="No services due" description="Add a next service date when you log maintenance." />
-          ) : (
-            <ul className="mt-2 divide-y divide-slate-100">
-              {data.upcomingServices.map((record) => (
-                <li key={record.id}>
-                  <Link
-                    to={`/products/${record.productId}`}
-                    className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50 sm:px-6"
-                  >
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
-                      <CalendarClock className="size-4" aria-hidden />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-900">{record.productName}</p>
-                      <p className="text-xs text-slate-500">
-                        {SERVICE_TYPE_LABELS[record.serviceType]} · {formatDate(record.nextServiceDate)}
-                      </p>
-                    </div>
-                    {record.nextServiceDate && (
-                      <Badge tone={dueTone(record.nextServiceDate)}>{describeDueDate(record.nextServiceDate)}</Badge>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+        {showServices && (
+          <Card>
+            <CardHeader
+              title="Upcoming services"
+              description="Maintenance due in the next 60 days"
+              action={
+                <Link to="/services" className="text-sm font-medium text-brand-700 hover:text-brand-800">
+                  View all
+                </Link>
+              }
+            />
+            {data.upcomingServices.length === 0 ? (
+              <EmptyState compact icon={<Wrench aria-hidden />} title="No services due" description="Add a next service date when you log maintenance." />
+            ) : (
+              <ul className="mt-2 divide-y divide-slate-100">
+                {data.upcomingServices.map((record) => (
+                  <li key={record.id}>
+                    <Link
+                      to={`/products/${record.productId}`}
+                      className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-slate-50 sm:px-6"
+                    >
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
+                        <CalendarClock className="size-4" aria-hidden />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-900">{record.productName}</p>
+                        <p className="text-xs text-slate-500">
+                          {SERVICE_TYPE_LABELS[record.serviceType]} · {formatDate(record.nextServiceDate)}
+                        </p>
+                      </div>
+                      {record.nextServiceDate && (
+                        <Badge tone={dueTone(record.nextServiceDate)}>{describeDueDate(record.nextServiceDate)}</Badge>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        )}
       </div>
 
       <Card>
@@ -262,7 +269,12 @@ function DashboardContent({ data }: { data: DashboardSummary }) {
           }
         />
         {data.recentDocuments.length === 0 ? (
-          <EmptyState compact icon={<FileText aria-hidden />} title="No documents yet" description="Upload a bill or import one from Gmail." />
+          <EmptyState
+            compact
+            icon={<FileText aria-hidden />}
+            title="No documents yet"
+            description={isFeatureEnabled('gmail') ? 'Upload a bill or import one from Gmail.' : 'Upload a bill to keep it here.'}
+          />
         ) : (
           <DocumentList documents={data.recentDocuments} variant="compact" className="mt-2" />
         )}
@@ -294,10 +306,10 @@ function Onboarding() {
     {
       icon: Upload,
       title: 'Upload a bill',
-      text: 'Snap a photo or drop a PDF. AI reads it for you.',
+      text: 'Snap a photo or drop a PDF. Bill Locker reads it for you.',
       action: <Button onClick={() => openUpload()}>Upload your first bill</Button>,
     },
-    {
+    isFeatureEnabled('gmail') && {
       icon: Mail,
       title: 'Import from Gmail',
       text: 'Let AI find invoices already sitting in your inbox.',
@@ -317,7 +329,7 @@ function Onboarding() {
         </Button>
       ),
     },
-  ];
+  ].filter((option) => option !== false);
 
   return (
     <Card className="px-6 py-10 text-center sm:px-10 sm:py-14">
@@ -325,7 +337,7 @@ function Onboarding() {
       <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
         Upload your first bill to get started — Bill Locker will track the warranty and remind you before it expires.
       </p>
-      <div className="mt-8 grid gap-4 text-left md:grid-cols-3">
+      <div className={cn('mt-8 grid gap-4 text-left', options.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
         {options.map(({ icon: Icon, title, text, action }) => (
           <div key={title} className="flex flex-col rounded-2xl border border-slate-200 p-5">
             <span className="flex size-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">

@@ -1,9 +1,10 @@
 package project.bill_locker.document;
 
 /**
- * Where a document is in the reading pipeline. For now every document stays
- * UPLOADED; OCR and AI extraction (next steps) move it through
- * UPLOADED → PROCESSING → REVIEW_REQUIRED → CONFIRMED, or FAILED.
+ * Where a document is in the pipeline: UPLOADED → PROCESSING → PROCESSED (details
+ * found, waiting for the user's review) → CONFIRMED (saved as a product), or FAILED.
+ * REVIEW_REQUIRED is the contract's other name for "waiting for review"; this
+ * backend uses PROCESSED.
  */
 public enum ProcessingStatus {
 	UPLOADED,
