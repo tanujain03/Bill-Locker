@@ -3,6 +3,7 @@ package project.bill_locker.document;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -77,6 +78,56 @@ public class DocumentService {
 	public void delete(UUID userId, UUID documentId) {
 		// PostgreSQL removes the matching document_files row by itself (ON DELETE CASCADE).
 		documents.delete(findOwned(userId, documentId));
+	}
+
+	/** Puts a read (or failed) document back in the queue, so it is read again. */
+	@Transactional
+	public DocumentSummary reprocess(UUID userId, UUID documentId) {
+		Document document = findOwned(userId, documentId);
+		ProcessingStatus status = document.getProcessingStatus();
+		if (status == ProcessingStatus.UPLOADED || status == ProcessingStatus.PROCESSING) {
+			throw new ApiException(HttpStatus.CONFLICT, "DOCUMENT_NOT_READY", "This document is still being read.");
+		}
+		document.queueForProcessing();
+		return DocumentSummary.from(document);
+	}
+
+	// ---- Used by the background reader (processing/DocumentProcessor) ----
+	// Each method is one short transaction, so no database lock is held while OCR runs.
+
+	/** Takes the oldest UPLOADED document, marks it PROCESSING and hands over its file. */
+	@Transactional
+	public Optional<FileToProcess> startNextProcessing() {
+		return documents.findFirstByProcessingStatusOrderByCreatedAtAsc(ProcessingStatus.UPLOADED).map(document -> {
+			document.startProcessing();
+			byte[] data = documentFiles.findById(document.getId()).map(DocumentFile::getData).orElse(new byte[0]);
+			return new FileToProcess(document.getId(), document.getMimeType(), data);
+		});
+	}
+
+	// The document may have been deleted while it was being read: then there is nothing to update.
+
+	@Transactional
+	public void moveToStage(UUID documentId, ProcessingStage stage) {
+		documents.findById(documentId).ifPresent(document -> document.moveToStage(stage));
+	}
+
+	@Transactional
+	public void finishProcessing(UUID documentId, String text, ExtractionResult details) {
+		documents.findById(documentId).ifPresent(document -> document.finishProcessing(text, details));
+	}
+
+	@Transactional
+	public void failProcessing(UUID documentId, String reason) {
+		documents.findById(documentId).ifPresent(document -> document.failProcessing(reason));
+	}
+
+	/** Documents that were half-read when the app stopped go back in the queue. */
+	@Transactional
+	public int requeueInterrupted() {
+		List<Document> interrupted = documents.findByProcessingStatus(ProcessingStatus.PROCESSING);
+		interrupted.forEach(Document::queueForProcessing);
+		return interrupted.size();
 	}
 
 	/** Someone else's document looks exactly like a missing one (404), so ids reveal nothing. */

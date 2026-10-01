@@ -28,6 +28,12 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<pdfbox.version>3.0.8</pdfbox.version>
+		<!-- Not 5.20.0: its Windows Tesseract DLL needs the Visual C++ runtime 14.40+, but Java 21
+		     loads its own older msvcp140.dll (14.36) first and the OCR then crashes the JVM.
+		     5.19.0 bundles Tesseract 5.5.2 built with an older compiler that works with it. -->
+		<tess4j.version>5.19.0</tess4j.version>
+		<twelvemonkeys.version>3.15.2</twelvemonkeys.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -51,6 +57,25 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+		</dependency>
+		<!-- Reading documents (step 4) -->
+		<!-- PDFBox: reads the text inside PDFs, and turns scanned pages into images -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>${pdfbox.version}</version>
+		</dependency>
+		<!-- Tesseract OCR (through Tess4J): reads the text in photos and scanned pages -->
+		<dependency>
+			<groupId>net.sourceforge.tess4j</groupId>
+			<artifactId>tess4j</artifactId>
+			<version>${tess4j.version}</version>
+		</dependency>
+		<!-- Lets Java open .webp photos -->
+		<dependency>
+			<groupId>com.twelvemonkeys.imageio</groupId>
+			<artifactId>imageio-webp</artifactId>
+			<version>${twelvemonkeys.version}</version>
 		</dependency>
 
 		<dependency>

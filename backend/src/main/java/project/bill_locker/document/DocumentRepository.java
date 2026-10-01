@@ -23,4 +23,9 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 			""")
 	List<Document> findForUser(@Param("userId") UUID userId, @Param("status") ProcessingStatus status,
 			@Param("documentType") DocumentType documentType);
+
+	/** The next document waiting to be read: the oldest one with this status (for the background reader). */
+	Optional<Document> findFirstByProcessingStatusOrderByCreatedAtAsc(ProcessingStatus status);
+
+	List<Document> findByProcessingStatus(ProcessingStatus status);
 }

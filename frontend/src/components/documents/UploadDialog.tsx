@@ -109,14 +109,14 @@ export function UploadDialog({ open, onClose, options }: UploadDialogProps) {
       title="Upload bills & documents"
       description={
         aiReading
-          ? 'AI reads each document and pre-fills the details. You review everything before it is saved.'
+          ? 'Each document is read automatically and its details are filled in for you. You review everything before it is saved.'
           : 'Your files are stored safely in your locker.'
       }
       footer={
         <>
           {hasUploads && aiReading && (
             <p className="mr-auto self-center text-xs text-slate-500">
-              You can close this window — processing continues and you’ll be notified.
+              You can close this window — reading continues in the background.
             </p>
           )}
           <Button variant={hasUploads ? 'primary' : 'secondary'} onClick={onClose}>
@@ -137,7 +137,7 @@ export function UploadDialog({ open, onClose, options }: UploadDialogProps) {
 
         <Field
           label="What are you uploading?"
-          hint={aiReading ? 'Leave on auto-detect and the AI will classify it for you.' : 'Optional — helps you find it later.'}
+          hint={aiReading ? 'Optional — leave on auto-detect if you’re not sure.' : 'Optional — helps you find it later.'}
         >
           <Select value={documentType} onChange={(event) => setDocumentType(event.target.value as DocumentType | '')}>
             <option value="">{aiReading ? 'Auto-detect (recommended)' : 'Not specified'}</option>

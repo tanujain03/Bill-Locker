@@ -86,7 +86,8 @@ export function Sidebar({ onNavigate, onClose }: SidebarProps) {
   const allItems: NavItem[] = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, feature: 'dashboard' },
     { to: '/products', label: 'My Products', icon: Package, feature: 'products' },
-    { to: '/documents', label: 'Documents', icon: FileText, badge: toReview },
+    // "To review" only makes sense once read details can be saved as products.
+    { to: '/documents', label: 'Documents', icon: FileText, badge: isFeatureEnabled('products') ? toReview : undefined },
     { to: '/warranties', label: 'Warranties', icon: ShieldCheck, feature: 'warranties' },
     { to: '/services', label: 'Services', icon: Wrench, feature: 'services' },
     { to: '/assistant', label: 'AI Assistant', icon: Sparkles, feature: 'assistant' },

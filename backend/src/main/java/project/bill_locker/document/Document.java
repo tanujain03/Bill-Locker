@@ -13,8 +13,10 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.hibernate.type.SqlTypes;
 import project.bill_locker.common.AuditableEntity;
 import project.bill_locker.user.User;
 
@@ -49,10 +51,28 @@ public class Document extends AuditableEntity {
 	@Column(name = "file_size", nullable = false)
 	private long fileSize;
 
-	/** Always UPLOADED for now; reading the document (OCR) is the next step. */
+	/** UPLOADED → PROCESSING → PROCESSED, or FAILED. The background reader moves it along. */
 	@Enumerated(EnumType.STRING)
 	@Column(name = "processing_status", nullable = false, length = 20)
 	private ProcessingStatus processingStatus = ProcessingStatus.UPLOADED;
+
+	/** Which part of the reading is running (only while PROCESSING, or where a failure stopped). */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "processing_stage", length = 12)
+	private ProcessingStage processingStage;
+
+	/** User-readable reason when the reading FAILED. */
+	@Column(name = "error_message", length = 500)
+	private String errorMessage;
+
+	/** All the text found in the file (from the PDF itself, or by OCR). */
+	@Column(name = "extracted_text", columnDefinition = "text")
+	private String extractedText;
+
+	/** The details found in that text, stored as JSON (jsonb): suggestions, not product data. */
+	@JdbcTypeCode(SqlTypes.JSON)
+	@Column(name = "extraction")
+	private ExtractionResult extraction;
 
 	public Document(User user, String fileName, String mimeType, long fileSize, DocumentType documentType) {
 		this.user = user;
@@ -60,5 +80,37 @@ public class Document extends AuditableEntity {
 		this.mimeType = mimeType;
 		this.fileSize = fileSize;
 		this.documentType = documentType;
+	}
+
+	public void startProcessing() {
+		processingStatus = ProcessingStatus.PROCESSING;
+		processingStage = ProcessingStage.OCR;
+		errorMessage = null;
+	}
+
+	public void moveToStage(ProcessingStage stage) {
+		processingStage = stage;
+	}
+
+	public void finishProcessing(String text, ExtractionResult details) {
+		extractedText = text;
+		extraction = details;
+		processingStatus = ProcessingStatus.PROCESSED;
+		processingStage = null;
+	}
+
+	/** Keeps the stage, so the app can show where the reading stopped. */
+	public void failProcessing(String reason) {
+		processingStatus = ProcessingStatus.FAILED;
+		errorMessage = reason;
+	}
+
+	/** Back in the queue: the background reader will read it (again). */
+	public void queueForProcessing() {
+		processingStatus = ProcessingStatus.UPLOADED;
+		processingStage = null;
+		errorMessage = null;
+		extractedText = null;
+		extraction = null;
 	}
 }

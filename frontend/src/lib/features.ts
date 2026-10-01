@@ -22,7 +22,9 @@ export type Feature =
   | 'documentProcessing';
 
 /** Features the real backend already implements. Add one here when its endpoints exist. */
-const BACKEND_FEATURES: ReadonlySet<Feature> = new Set<Feature>([]);
+const BACKEND_FEATURES: ReadonlySet<Feature> = new Set<Feature>([
+  'documentProcessing', // step 4: uploads are read (PDF text / OCR) and their details found
+]);
 
 export function isFeatureEnabled(feature: Feature): boolean {
   return config.apiMocking || BACKEND_FEATURES.has(feature);

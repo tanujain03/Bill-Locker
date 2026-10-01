@@ -8,8 +8,9 @@ The user builds Bill Locker **step by step to learn**: each step adds one featur
 the backend, kept simple and explained ("what happens where"). Keep code minimal and
 readable, with short comments that explain *why*. Write or update a step guide in
 `docs/` (see `docs/step-3-backend-basics.md`), and don't add features before the user
-asks for them. Branches: `step-1-frontend`, `step-2-database` (full entity design),
-`step-3-basic-backend`. Never merge to `main` or push unless asked.
+asks for them. Branches: only `dev` (where work happens) and `main` (merged into from
+`dev` by pull request); steps 1-3 are in both. Tag `step-2-database` marks the full
+entity design. Never merge to `main` or push unless asked.
 
 ## Repository
 
@@ -22,10 +23,13 @@ asks for them. Branches: `step-1-frontend`, `step-2-database` (full entity desig
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
   Step 3 = register/login (Spring Security + JWT) and document upload with the file
   bytes stored in PostgreSQL. Tables: `users`, `documents`, `document_files`.
-  Packages: `security`, `auth`, `user`, `document`, `common`. Guide:
-  `docs/step-3-backend-basics.md`.
+  Step 4 = a background reader (`processing` package): PDFBox for PDF text, Tesseract
+  OCR (Tess4J) for photos and scanned PDFs, rule-based `DetailExtractor` (no AI yet);
+  documents end PROCESSED with `extractedText` + `extraction` (jsonb), or FAILED.
+  Packages: `security`, `auth`, `user`, `document`, `processing`, `common`. Guides:
+  `docs/step-3-backend-basics.md`, `docs/step-4-reading-documents.md`.
 - `docs/database-design.md` — the **target** design (13 tables). Its entity classes
-  and tests are on branch `step-2-database`; bring parts back one feature at a time.
+  and tests are at tag `step-2-database`; bring parts back one feature at a time.
   Hibernate `ddl-auto=update` creates the tables. No migration scripts or Flyway: the
   user explicitly rejected that style.
 - Root `pom.xml` — aggregator only (`<module>backend</module>`), so IntelliJ IDEA
@@ -48,7 +52,9 @@ asks for them. Branches: `step-1-frontend`, `step-2-database` (full entity desig
   real values in `application.properties` or commit them.
 - `.\mvnw.cmd test` — MockMvc API tests against Testcontainers (`pgvector/pgvector:pg17`,
   needs Docker); never touches the local database. Keep all tests green.
-- IntelliJ's run uses devtools: recompiling (e.g. `mvnw compile`) restarts a running app.
+- IntelliJ's run uses devtools: recompiling (e.g. `mvnw compile`) restarts a running app;
+  after a `pom.xml` change that restart fails until the user clicks "Load Maven Changes"
+  and re-runs — tell them.
 
 ## Backend conventions
 
@@ -67,16 +73,27 @@ asks for them. Branches: `step-1-frontend`, `step-2-database` (full entity desig
   user's OK).
 - Uploads: magic-byte type check (`AllowedFileType`), cleaned file names, 10 MB limit
   (`spring.servlet.multipart.*`).
+- Reading: `DocumentProcessor` (`@Scheduled` every 2 s, `app.processing.enabled`) uses
+  short `DocumentService` transactions, never a transaction around OCR. `ApiTest` turns
+  the schedule off; tests call `processPendingDocuments()` themselves.
+- `DetailExtractor`: a line starting "Label : value" (Product, Brand, Price, Seller) wins
+  over the fallbacks (known-brand list, brand-line guess, totals). When a real bill reads
+  badly, add its OCR text (from `documents.extracted_text`) as a `DetailExtractorTests`
+  case; existing documents pick up rule changes via **Read again** (`…/reprocess`).
+- **Keep Tess4J at 5.19.0** unless a newer release's Windows DLL is built with linker
+  ≤ 14.39: 5.20.0 (linker 14.51) needs msvcp140 ≥ 14.40, but the JDK's own msvcp140
+  (14.36) is loaded first and OCR crashes the JVM ("Invalid memory access").
 
 ## Frontend ↔ backend
 
 - `frontend/.env.development.local` (git-ignored) sets `VITE_API_MOCKING=false`, so
   `npm run dev` proxies `/api` to `http://localhost:8080`. `true` means the mock demo.
-- `frontend/src/lib/features.ts`: `BACKEND_FEATURES` lists what the real backend has.
-  Unbuilt features are hidden (nav, top bar, routes redirect to `homePath()`), and
-  `UPLOADED` counts as final (`isStoredOnly`) until `documentProcessing` exists. Add
-  a feature there when its endpoints land. Tests force mock mode (`vite.config.ts`
-  `test.env`).
+- `frontend/src/lib/features.ts`: `BACKEND_FEATURES` lists what the real backend has
+  (now `documentProcessing`). Unbuilt features are hidden (nav, top bar, routes redirect
+  to `homePath()`). Until `products` exists, read documents show the read-only
+  `ExtractedDetails` instead of `ExtractionReview` (which needs products/categories).
+  Add a feature there when its endpoints land. Tests force mock mode
+  (`vite.config.ts` `test.env`).
 
 ## Commands (run inside `frontend/`)
 
@@ -104,10 +121,11 @@ asks for them. Branches: `step-1-frontend`, `step-2-database` (full entity desig
 - Files exporting React components must export only components (react-refresh lint);
   put shared constants/helpers in sibling `.ts` files.
 
-## Backend roadmap (from the spec; done: auth + JWT, uploads, error handler)
+## Backend roadmap (from the spec; done: auth + JWT, uploads, error handler, OCR + rules)
 
-Next the user wants **OCR / data extraction**. Later: products and warranties (entities
-on `step-2-database`), MinIO storage, provider-agnostic AI (`AIService`,
+Next candidates: **AI extraction** (better product names; rules stay as a check) and
+**products + warranties with "Confirm & Save"** (entities at tag `step-2-database`). Later:
+MinIO storage, provider-agnostic AI (`AIService`,
 `DocumentExtractionService`, `EmbeddingService`, `RagService`; Gemini first; prompts in
 `ai/prompts/`), pgvector RAG, scheduled reminders, Gmail OAuth (read-only scope,
 encrypted refresh tokens, callback redirects to `/gmail?status=connected|error`),

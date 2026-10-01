@@ -8,7 +8,7 @@ This step gives Bill Locker a real backend for three things:
 
 Files are stored inside your PostgreSQL database. Everything else (reading
 documents with OCR, products, warranties, Gmail…) is added in later steps. The full
-target design is kept on the git branch `step-2-database`.
+target design is kept at the git tag `step-2-database`.
 
 This guide explains **what happens, and in which file**, for every request.
 
@@ -282,11 +282,11 @@ running. Run them from `backend/` with `./mvnw test`, or in IntelliJ: right-clic
 
 ## 8. Not in this step (on purpose)
 
-- **Reading documents** (OCR + AI extraction) is the next step. Documents stay `UPLOADED`.
+- **Reading documents** came in step 4: see [`step-4-reading-documents.md`](step-4-reading-documents.md).
 - **Refresh tokens:** after 24 h you log in again.
 - **Rate limiting on login:** there is no limit yet on how many passwords one person
   can try.
 - **Object storage (MinIO/S3):** files live in PostgreSQL for now. `DocumentFile` is
   the only class that would change.
 - **Products, warranties, dashboard, notifications, AI chat, Gmail:** the designs are
-  on branch `step-2-database`.
+  at the git tag `step-2-database`.

@@ -6,10 +6,12 @@ updates the tables in PostgreSQL from these classes
 (`spring.jpa.hibernate.ddl-auto=update`). There are no SQL migration scripts.
 The schema backs the REST contract in [`api-contract.md`](api-contract.md).
 
-> **What exists today (step 3):** only `users`, `documents` and `document_files`.
+> **What exists today (step 4):** only `users`, `documents` and `document_files`.
 > The file bytes are in `document_files.data` (bytea); see
-> [`step-3-backend-basics.md`](step-3-backend-basics.md) §3. Everything below §1 is
-> the **target design**. Its entity classes and tests are saved on the git branch
+> [`step-3-backend-basics.md`](step-3-backend-basics.md) §3. Step 4 added
+> `processing_stage`, `error_message`, `extracted_text` and `extraction` (jsonb) to
+> `documents`; see [`step-4-reading-documents.md`](step-4-reading-documents.md) §6. Everything below §1 is
+> the **target design**. Its entity classes and tests are saved at the git tag
 > `step-2-database` and come back one feature at a time. When a part returns,
 > update this document.
 
@@ -17,7 +19,7 @@ The schema backs the REST contract in [`api-contract.md`](api-contract.md).
 |---|---|
 | Entity classes | `backend/src/main/java/project/bill_locker/<package>/` |
 | Database settings | `backend/src/main/resources/application.properties` + `backend/.env` |
-| Full target entity model, pgvector setup (`schema.sql`), default categories, mapping tests | branch `step-2-database` |
+| Full target entity model, pgvector setup (`schema.sql`), default categories, mapping tests | tag `step-2-database` |
 
 ---
 
@@ -52,7 +54,7 @@ dropped. (With the target design, `schema.sql` also enables pgvector and
 ### pgvector (needed later, for AI document search)
 
 Today's code doesn't use pgvector. The AI search step will need it for the
-`document_chunks` table. On the `step-2-database` branch the backend still starts
+`document_chunks` table. At the `step-2-database` tag the backend still starts
 without it: every table except `document_chunks` is created, and the log says why
 that table is missing.
 
@@ -459,7 +461,7 @@ Docker (`pgvector/pgvector:pg17`). They never touch your local database. Run
 them in `backend/` with `./mvnw test` (PowerShell: `.\mvnw.cmd test`). Docker
 Desktop must be running. Today's tests are listed in
 [`step-3-backend-basics.md`](step-3-backend-basics.md) §7. `EntityMappingTests`,
-for the full target model, is on the `step-2-database` branch.
+for the full target model, is at the `step-2-database` tag.
 
 The tests cover:
 - every table and column type (`uuid`, `jsonb`, `vector`) and the seeded

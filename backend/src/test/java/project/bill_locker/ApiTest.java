@@ -16,8 +16,10 @@ import org.springframework.test.web.servlet.MockMvc;
  * Base class for API tests. {@link MockMvc} sends requests through the real
  * security filters and controllers (without opening a network port), and the
  * data goes to a throwaway PostgreSQL started by {@link TestcontainersConfiguration}.
+ * The background document reader is switched off, so tests that need it run it
+ * themselves at a known moment.
  */
-@SpringBootTest
+@SpringBootTest(properties = "app.processing.enabled=false")
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 public abstract class ApiTest {

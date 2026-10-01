@@ -70,6 +70,12 @@ public class DocumentController {
 				.body(file.data());
 	}
 
+	/** {@code POST /api/documents/{id}/reprocess} — read the document again, e.g. after a failure. */
+	@PostMapping("/{id}/reprocess")
+	public DocumentSummary reprocess(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+		return documentService.reprocess(CurrentUser.id(jwt), id);
+	}
+
 	/** {@code DELETE /api/documents/{id}} — removes the document and its file. */
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)

@@ -21,7 +21,7 @@ export function ConfidenceBadge({ source, score }: ConfidenceBadgeProps) {
   if (!source || source === 'unscored') return null;
   const { tone, icon: Icon, label } = STYLE[source];
   const title = typeof score === 'number' && ['high', 'medium', 'low'].includes(source)
-    ? `AI confidence ${Math.round(score * 100)}%`
+    ? `Confidence ${Math.round(score * 100)}%`
     : undefined;
   return (
     <Badge tone={tone} size="sm" title={title} icon={<Icon className="size-3" aria-hidden />}>

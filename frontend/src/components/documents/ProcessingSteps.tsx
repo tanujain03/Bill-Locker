@@ -5,7 +5,7 @@ import type { ProcessingStep } from './processing';
 const STEPS: { key: ProcessingStep; label: string; active: string }[] = [
   { key: 'upload', label: 'Upload', active: 'Uploading…' },
   { key: 'ocr', label: 'Read', active: 'Processing… reading the document (OCR)' },
-  { key: 'ai', label: 'Analyze', active: 'Analyzing with AI…' },
+  { key: 'ai', label: 'Analyze', active: 'Finding the details…' },
   { key: 'ready', label: 'Review', active: 'Ready for review' },
 ];
 

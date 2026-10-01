@@ -21,17 +21,19 @@ describe('features against the real backend', () => {
   it('shows only what the backend already serves', async () => {
     const { homePath, isFeatureEnabled } = await withRealBackend();
 
+    expect(isFeatureEnabled('documentProcessing')).toBe(true);
     expect(isFeatureEnabled('dashboard')).toBe(false);
+    expect(isFeatureEnabled('products')).toBe(false);
     expect(isFeatureEnabled('gmail')).toBe(false);
-    expect(isFeatureEnabled('documentProcessing')).toBe(false);
     expect(homePath()).toBe('/documents');
   });
 
-  it('treats an uploaded document as stored, not as still processing', async () => {
+  it('waits while an uploaded document is being read', async () => {
     const { isProcessing, isStoredOnly } = await withRealBackend();
 
-    expect(isProcessing('UPLOADED')).toBe(false);
-    expect(isStoredOnly('UPLOADED')).toBe(true);
+    expect(isProcessing('UPLOADED')).toBe(true);
     expect(isProcessing('PROCESSING')).toBe(true);
+    expect(isStoredOnly('UPLOADED')).toBe(false);
+    expect(isProcessing('PROCESSED')).toBe(false);
   });
 });
