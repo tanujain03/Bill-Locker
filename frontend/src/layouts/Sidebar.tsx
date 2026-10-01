@@ -22,12 +22,15 @@ import { useDocumentActivity } from '@/hooks/useDocuments';
 import { useUnreadCount } from '@/hooks/useNotifications';
 import { useAuth } from '@/lib/auth-context';
 import { cn } from '@/lib/cn';
+import { homePath, isFeatureEnabled, type Feature } from '@/lib/features';
 
 interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
   badge?: number;
+  /** Shown only when this feature is available (see lib/features.ts). */
+  feature?: Feature;
 }
 
 function NavItemLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
@@ -77,19 +80,20 @@ export function Sidebar({ onNavigate, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { openUpload } = useUpload();
-  const { data: unread = 0 } = useUnreadCount();
+  const { data: unread = 0 } = useUnreadCount(isFeatureEnabled('notifications'));
   const { toReview } = useDocumentActivity();
 
-  const items: NavItem[] = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/products', label: 'My Products', icon: Package },
+  const allItems: NavItem[] = [
+    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, feature: 'dashboard' },
+    { to: '/products', label: 'My Products', icon: Package, feature: 'products' },
     { to: '/documents', label: 'Documents', icon: FileText, badge: toReview },
-    { to: '/warranties', label: 'Warranties', icon: ShieldCheck },
-    { to: '/services', label: 'Services', icon: Wrench },
-    { to: '/assistant', label: 'AI Assistant', icon: Sparkles },
-    { to: '/gmail', label: 'Gmail Import', icon: Mail },
-    { to: '/notifications', label: 'Notifications', icon: Bell, badge: unread },
+    { to: '/warranties', label: 'Warranties', icon: ShieldCheck, feature: 'warranties' },
+    { to: '/services', label: 'Services', icon: Wrench, feature: 'services' },
+    { to: '/assistant', label: 'AI Assistant', icon: Sparkles, feature: 'assistant' },
+    { to: '/gmail', label: 'Gmail Import', icon: Mail, feature: 'gmail' },
+    { to: '/notifications', label: 'Notifications', icon: Bell, badge: unread, feature: 'notifications' },
   ];
+  const items = allItems.filter((item) => !item.feature || isFeatureEnabled(item.feature));
 
   function signOut() {
     onNavigate?.();
@@ -100,7 +104,7 @@ export function Sidebar({ onNavigate, onClose }: SidebarProps) {
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="flex h-16 shrink-0 items-center justify-between px-5">
-        <Link to="/dashboard" onClick={onNavigate} aria-label="Bill Locker home">
+        <Link to={homePath()} onClick={onNavigate} aria-label="Bill Locker home">
           <Logo />
         </Link>
         {onClose && (

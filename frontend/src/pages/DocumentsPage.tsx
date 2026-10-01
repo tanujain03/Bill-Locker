@@ -11,6 +11,7 @@ import { FilterTabs } from '@/components/ui/misc';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useDocuments } from '@/hooks/useDocuments';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { isFeatureEnabled } from '@/lib/features';
 import { DOCUMENT_TYPES, type DocumentSummary, type DocumentType } from '@/types';
 import { DOCUMENT_TYPE_LABELS, isProcessing, needsReview } from '@/utils/labels';
 
@@ -30,6 +31,7 @@ export function DocumentsPage() {
   const documents = useDocuments();
   const [tab, setTab] = useState<StatusTab>('all');
   const [type, setType] = useState<DocumentType | ''>('');
+  const gmailEnabled = isFeatureEnabled('gmail');
 
   const counts = useMemo(() => {
     const list = documents.data ?? [];
@@ -49,9 +51,11 @@ export function DocumentsPage() {
         description="Every bill, invoice, warranty card and receipt — safely stored and searchable."
         actions={
           <>
-            <ButtonLink to="/gmail" variant="secondary" leftIcon={<Mail className="size-4" aria-hidden />}>
-              Import from Gmail
-            </ButtonLink>
+            {gmailEnabled && (
+              <ButtonLink to="/gmail" variant="secondary" leftIcon={<Mail className="size-4" aria-hidden />}>
+                Import from Gmail
+              </ButtonLink>
+            )}
             <Button onClick={() => openUpload()} leftIcon={<Upload className="size-4" aria-hidden />}>
               Upload
             </Button>
@@ -64,19 +68,22 @@ export function DocumentsPage() {
       </div>
 
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <FilterTabs
-          label="Filter documents by status"
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'all', label: 'All', count: counts.all },
-            { value: 'review', label: 'Needs review', count: counts.review },
-            { value: 'processing', label: 'Processing', count: counts.processing },
-            { value: 'saved', label: 'Saved', count: counts.saved },
-            { value: 'failed', label: 'Failed', count: counts.failed },
-          ]}
-        />
-        <div className="md:w-52">
+        {/* Status tabs only mean something once documents are read (OCR/AI). */}
+        {isFeatureEnabled('documentProcessing') && (
+          <FilterTabs
+            label="Filter documents by status"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'all', label: 'All', count: counts.all },
+              { value: 'review', label: 'Needs review', count: counts.review },
+              { value: 'processing', label: 'Processing', count: counts.processing },
+              { value: 'saved', label: 'Saved', count: counts.saved },
+              { value: 'failed', label: 'Failed', count: counts.failed },
+            ]}
+          />
+        )}
+        <div className="md:ml-auto md:w-52">
           <Select aria-label="Filter by document type" value={type} onChange={(event) => setType(event.target.value as DocumentType | '')}>
             <option value="">All types</option>
             {DOCUMENT_TYPES.map((value) => (
@@ -101,15 +108,21 @@ export function DocumentsPage() {
           <EmptyState
             icon={<FileText aria-hidden />}
             title="No documents yet"
-            description="Upload your first bill to get started, or import invoices from Gmail."
+            description={
+              gmailEnabled
+                ? 'Upload your first bill to get started, or import invoices from Gmail.'
+                : 'Upload your first bill to get started.'
+            }
             action={
               <>
                 <Button onClick={() => openUpload()} leftIcon={<Upload className="size-4" aria-hidden />}>
                   Upload bill
                 </Button>
-                <ButtonLink to="/gmail" variant="secondary">
-                  Connect Gmail
-                </ButtonLink>
+                {gmailEnabled && (
+                  <ButtonLink to="/gmail" variant="secondary">
+                    Connect Gmail
+                  </ButtonLink>
+                )}
               </>
             }
           />

@@ -1,4 +1,15 @@
-import { ArrowRight, CircleCheck, Download, FileQuestion, PencilLine, RotateCw, ScanText, Trash, TriangleAlert } from 'lucide-react';
+import {
+  ArrowRight,
+  CircleCheck,
+  Download,
+  FileQuestion,
+  PencilLine,
+  RotateCw,
+  ScanText,
+  ShieldCheck,
+  Trash,
+  TriangleAlert,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { DocumentStatusBadge, DocumentTypeBadge, SourceBadge } from '@/components/documents/DocumentBadges';
@@ -20,7 +31,7 @@ import { documentService } from '@/services/document.service';
 import type { DocumentDetail } from '@/types';
 import { saveBlob } from '@/utils/file';
 import { formatDateTime, formatFileSize } from '@/utils/format';
-import { isProcessing, needsReview } from '@/utils/labels';
+import { isProcessing, isStoredOnly, needsReview } from '@/utils/labels';
 
 export function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -127,6 +138,8 @@ function DocumentDetailView({ document }: { document: DocumentDetail }) {
         <div className="order-1 min-w-0 lg:order-2">
           {isProcessing(status) ? (
             <ProcessingPanel document={document} />
+          ) : isStoredOnly(status) ? (
+            <StoredPanel />
           ) : reviewing ? (
             <ExtractionReview document={document} />
           ) : status === 'CONFIRMED' ? (
@@ -165,6 +178,24 @@ function ProcessingPanel({ document }: { document: DocumentDetail }) {
           <li>2. AI identifies the product, price, dates, seller and warranty.</li>
           <li>3. You review everything before anything is saved.</li>
         </ul>
+      </CardBody>
+    </Card>
+  );
+}
+
+/** Shown while the backend only stores files (reading them with OCR/AI comes later). */
+function StoredPanel() {
+  return (
+    <Card>
+      <CardHeader
+        icon={<ShieldCheck className="size-4 text-emerald-600" aria-hidden />}
+        title="Stored safely"
+        description="This document is saved in your locker. Only you can see it."
+      />
+      <CardBody>
+        <p className="text-sm text-slate-600">
+          Use Download to keep a copy. Reading the details from your documents automatically is coming soon.
+        </p>
       </CardBody>
     </Card>
   );

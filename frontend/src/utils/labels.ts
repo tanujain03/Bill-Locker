@@ -1,3 +1,4 @@
+import { isFeatureEnabled } from '@/lib/features';
 import type {
   DocumentSource,
   DocumentType,
@@ -63,7 +64,14 @@ export const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD'] as const;
 
 /** Processing states in which the backend is still working on the document. */
 export function isProcessing(status: ProcessingStatus | undefined): boolean {
-  return status === 'UPLOADED' || status === 'PROCESSING';
+  // Until the backend reads documents (OCR/AI), an uploaded file is simply stored.
+  if (status === 'UPLOADED') return isFeatureEnabled('documentProcessing');
+  return status === 'PROCESSING';
+}
+
+/** Uploaded and stored, and nothing more will happen to it (no OCR/AI in the backend yet). */
+export function isStoredOnly(status: ProcessingStatus | undefined): boolean {
+  return status === 'UPLOADED' && !isFeatureEnabled('documentProcessing');
 }
 
 /** States in which the user has to review the AI extraction. */

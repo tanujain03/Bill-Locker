@@ -3,9 +3,15 @@ import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { cn } from '@/lib/cn';
 import type { DocumentSource, DocumentType, ProcessingStatus } from '@/types';
 import { isImageMime, isPdfMime } from '@/utils/file';
-import { DOCUMENT_TYPE_LABELS, PROCESSING_STATUS_LABELS } from '@/utils/labels';
+import { DOCUMENT_TYPE_LABELS, isStoredOnly, PROCESSING_STATUS_LABELS } from '@/utils/labels';
 
-const STATUS_STYLE: Record<ProcessingStatus, { tone: BadgeTone; icon: LucideIcon; spin?: boolean }> = {
+interface StatusStyle {
+  tone: BadgeTone;
+  icon: LucideIcon;
+  spin?: boolean;
+}
+
+const STATUS_STYLE: Record<ProcessingStatus, StatusStyle> = {
   UPLOADED: { tone: 'info', icon: LoaderCircle, spin: true },
   PROCESSING: { tone: 'info', icon: LoaderCircle, spin: true },
   PROCESSED: { tone: 'warning', icon: ScanEye },
@@ -14,8 +20,11 @@ const STATUS_STYLE: Record<ProcessingStatus, { tone: BadgeTone; icon: LucideIcon
   FAILED: { tone: 'danger', icon: CircleX },
 };
 
+/** While the backend only stores files, "Uploaded" is final: no spinner. */
+const STORED_STYLE: StatusStyle = { tone: 'neutral', icon: CircleCheck };
+
 export function DocumentStatusBadge({ status, size = 'md' }: { status: ProcessingStatus; size?: 'sm' | 'md' }) {
-  const { tone, icon: Icon, spin } = STATUS_STYLE[status];
+  const { tone, icon: Icon, spin } = isStoredOnly(status) ? STORED_STYLE : STATUS_STYLE[status];
   return (
     <Badge tone={tone} size={size} icon={<Icon className={cn('size-3.5', spin && 'animate-spin')} aria-hidden />}>
       {PROCESSING_STATUS_LABELS[status]}

@@ -2,18 +2,32 @@
 
 Guidance for AI-assisted work on Bill Locker (hackathon project; built in phases).
 
+## How the user works
+
+The user builds Bill Locker **step by step to learn**: each step adds one feature to
+the backend, kept simple and explained ("what happens where"). Keep code minimal and
+readable, with short comments that explain *why*. Write or update a step guide in
+`docs/` (see `docs/step-3-backend-basics.md`), and don't add features before the user
+asks for them. Branches: `step-1-frontend`, `step-2-database` (full entity design),
+`step-3-basic-backend`. Never merge to `main` or push unless asked.
+
 ## Repository
 
 - `frontend/` — React 19 + TypeScript + Vite 6 + Tailwind CSS 4 + TanStack Query 5 +
-  React Router 7 + React Hook Form + Zod 3 + Recharts 3 + lucide-react 1.x. Complete.
-- `docs/api-contract.md` — **source of truth** for the REST API. Frontend types in
-  `frontend/src/types/` mirror it; the mock API in `frontend/src/mocks/` implements it.
+  React Router 7 + React Hook Form + Zod 3 + Recharts 3 + lucide-react 1.x. Complete;
+  runs against the mock API or the real backend (see Frontend ↔ backend below).
+- `docs/api-contract.md` — **source of truth** for the REST API (its top lists what the
+  real backend implements so far). Frontend types in `frontend/src/types/` mirror it;
+  the mock API in `frontend/src/mocks/` implements all of it.
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
-  Step 2 (database design) is done as **JPA entity classes**: Hibernate
-  `ddl-auto=update` creates the tables in the user's local PostgreSQL. No migration
-  scripts, no Flyway — the user explicitly rejected that style.
-- `docs/database-design.md` — entities, columns, rules, delete behaviour, local setup,
-  pgvector install, `ddl-auto=update` caveats.
+  Step 3 = register/login (Spring Security + JWT) and document upload with the file
+  bytes stored in PostgreSQL. Tables: `users`, `documents`, `document_files`.
+  Packages: `security`, `auth`, `user`, `document`, `common`. Guide:
+  `docs/step-3-backend-basics.md`.
+- `docs/database-design.md` — the **target** design (13 tables). Its entity classes
+  and tests are on branch `step-2-database`; bring parts back one feature at a time.
+  Hibernate `ddl-auto=update` creates the tables. No migration scripts or Flyway: the
+  user explicitly rejected that style.
 - Root `pom.xml` — aggregator only (`<module>backend</module>`), so IntelliJ IDEA
   (Community 2025.1, JDK named "21") opens the repo root with `backend` as a Maven
   module. Not a parent: build from `backend/`. `.run/Backend.run.xml` is the shared run
@@ -23,41 +37,50 @@ Guidance for AI-assisted work on Bill Locker (hackathon project; built in phases
 - Work only in this checkout. A different copy of the project exists on this machine
   (`D:\projects\okruti\repo\Bill-Locker`); the user said not to use it. Its Docker stack
   is named `bill-locker` and uses ports 5433/9000/9001 — never touch it. Port 5432 is
-  the user's local Windows PostgreSQL 17 (pgvector not installed yet, psql not on PATH).
+  the user's local Windows PostgreSQL 17, database `BillLocker` (capital letters), user
+  `postgres`; pgvector not installed; psql is at `C:\Program Files\PostgreSQL\17\bin`.
 
 ## Backend commands (run inside `backend/`)
 
-- `.\mvnw.cmd spring-boot:run` (Git Bash: `./mvnw`) — uses `backend/.env` (copy of
-  `.env.example`, git-ignored; found when started from `backend/` or the repo root) or
-  the env vars `DATABASE_URL` / `DATABASE_USERNAME` / `DATABASE_PASSWORD`. Never commit
-  a password.
-- `.\mvnw.cmd test` — Testcontainers (`pgvector/pgvector:pg17`, needs Docker); never
-  touches the local database. Keep all tests green.
+- `.\mvnw.cmd spring-boot:run` (Git Bash: `./mvnw`) or IntelliJ's **Backend** run
+  configuration. Reads `backend/.env` (git-ignored; keys in `.env.example`:
+  `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET`). Never put
+  real values in `application.properties` or commit them.
+- `.\mvnw.cmd test` — MockMvc API tests against Testcontainers (`pgvector/pgvector:pg17`,
+  needs Docker); never touches the local database. Keep all tests green.
+- IntelliJ's run uses devtools: recompiling (e.g. `mvnw compile`) restarts a running app.
 
-## Database conventions
+## Backend conventions
 
-- The entity classes are the schema. When you change one, update
-  `docs/database-design.md`. `update` never drops/renames/retypes columns or updates
-  enum CHECK constraints (see the doc, §6).
-- Extend `AuditableEntity` (or `BaseEntity` for append-only rows): UUID ids,
-  `created_at`/`updated_at` via callbacks. `@Enumerated(STRING)`; money `BigDecimal`
-  `NUMERIC(12,2)`; `LocalDate` for dates, `Instant` (UTC) for instants; JSONB via
-  `@JdbcTypeCode(SqlTypes.JSON)` on records/lists/maps.
-- Name constraints `fk_<table>_<column>`, `uk_…`, `idx_…`. Declare delete behaviour with
-  `@OnDelete`: user delete cascades everything; deleting a product keeps its documents
-  (SET NULL + `Product.@PreRemove`) — never lose a bill.
-- Warranty expiry is only derived (`WarrantyDates`, `Warranty` setters/callbacks).
-  Status is never stored: `warranty.statusOn(user.today(clock))`.
-- Every query on user data filters by the JWT user; `DocumentChunk.user` exists so RAG
-  search filters without joins (`cosine_distance` in HQL).
-- `schema.sql` must stay a single statement (`spring.sql.init.separator`): a plain
-  `CREATE EXTENSION vector` without pgvector installed kills the Hikari connection
-  (SQLSTATE 0A000) and aborts startup.
-- Reminder dedupe keys use the formats listed in `docs/database-design.md`.
+- Controller (HTTP ↔ Java) → service (rules, `@Transactional`) → repository (Spring
+  Data). Request/response shapes are records; entities never go to the browser.
+- Errors: throw `ApiException(status, CODE, message[, fieldErrors])`;
+  `GlobalExceptionHandler` renders `{ success:false, code, message, fieldErrors? }`
+  with the codes from the contract. 401s come from `JsonAuthenticationEntryPoint`.
+- The user id comes only from the token: `@AuthenticationPrincipal Jwt jwt` +
+  `CurrentUser.id(jwt)`. Load user data with `findByIdAndUserId`, so another user's
+  item is a 404.
+- Entities extend `AuditableEntity` (or `BaseEntity`): UUID ids, timestamps via
+  callbacks, `@Enumerated(STRING)`, delete rules with `@OnDelete`, constraint names
+  `fk_/uk_/idx_`. `update` never drops/renames/retypes columns or updates enum CHECK
+  constraints: when a table's shape changes incompatibly, reset the dev DB (with the
+  user's OK).
+- Uploads: magic-byte type check (`AllowedFileType`), cleaned file names, 10 MB limit
+  (`spring.servlet.multipart.*`).
+
+## Frontend ↔ backend
+
+- `frontend/.env.development.local` (git-ignored) sets `VITE_API_MOCKING=false`, so
+  `npm run dev` proxies `/api` to `http://localhost:8080`. `true` means the mock demo.
+- `frontend/src/lib/features.ts`: `BACKEND_FEATURES` lists what the real backend has.
+  Unbuilt features are hidden (nav, top bar, routes redirect to `homePath()`), and
+  `UPLOADED` counts as final (`isStoredOnly`) until `documentProcessing` exists. Add
+  a feature there when its endpoints land. Tests force mock mode (`vite.config.ts`
+  `test.env`).
 
 ## Commands (run inside `frontend/`)
 
-- `npm run dev` — dev server :5173, mock API on (`.env.development`)
+- `npm run dev` — dev server :5173 (mock or real backend, see above)
 - `npm test` — Vitest (jsdom + MSW); `npm run lint`; `npm run typecheck`; `npm run build`
 - Node here is 20.18 — keep Vite 6 / Vitest 3 / TypeScript 5.9 (Vite 7+ needs Node ≥ 20.19).
 
@@ -81,14 +104,12 @@ Guidance for AI-assisted work on Bill Locker (hackathon project; built in phases
 - Files exporting React components must export only components (react-refresh lint);
   put shared constants/helpers in sibling `.ts` files.
 
-## Backend phase checklist (from the spec)
+## Backend roadmap (from the spec; done: auth + JWT, uploads, error handler)
 
-Spring Security + JWT, PostgreSQL + pgvector (entities done in step 2), MinIO storage,
-pluggable OCR (Document AI/Vision → Tesseract fallback), provider-agnostic AI
-(`AIService`, `DocumentExtractionService`, `EmbeddingService`, `RagService`; Gemini
-first), prompts in `ai/prompts/`, scheduled reminder job, Gmail OAuth (read-only scope,
+Next the user wants **OCR / data extraction**. Later: products and warranties (entities
+on `step-2-database`), MinIO storage, provider-agnostic AI (`AIService`,
+`DocumentExtractionService`, `EmbeddingService`, `RagService`; Gemini first; prompts in
+`ai/prompts/`), pgvector RAG, scheduled reminders, Gmail OAuth (read-only scope,
 encrypted refresh tokens, callback redirects to `/gmail?status=connected|error`),
-Swagger, global exception handler returning `{ success:false, code, message, fieldErrors? }`,
-tests (auth, authorization/isolation incl. RAG chunks, warranty maths, uploads, AI parsing),
-Docker Compose (frontend, backend, postgres+pgvector, minio). Seed the demo account
-`demo@billlocker.app` / `Demo@1234` with the same demo products as `src/mocks/seed.ts`.
+login rate limiting, Swagger, Docker Compose. Seed the demo account
+`demo@billlocker.app` / `Demo@1234` with the demo products from `src/mocks/seed.ts`.

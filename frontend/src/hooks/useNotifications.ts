@@ -38,11 +38,12 @@ export function useOpenNotification(onNavigate?: () => void) {
   );
 }
 
-export function useUnreadCount() {
+export function useUnreadCount(enabled = true) {
   return useQuery({
     queryKey: queryKeys.notifications.unreadCount,
     queryFn: notificationService.unreadCount,
     refetchInterval: 30_000,
+    enabled,
   });
 }
 

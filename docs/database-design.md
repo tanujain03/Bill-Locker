@@ -6,13 +6,18 @@ updates the tables in PostgreSQL from these classes
 (`spring.jpa.hibernate.ddl-auto=update`). There are no SQL migration scripts.
 The schema backs the REST contract in [`api-contract.md`](api-contract.md).
 
+> **What exists today (step 3):** only `users`, `documents` and `document_files`.
+> The file bytes are in `document_files.data` (bytea); see
+> [`step-3-backend-basics.md`](step-3-backend-basics.md) §3. Everything below §1 is
+> the **target design**. Its entity classes and tests are saved on the git branch
+> `step-2-database` and come back one feature at a time. When a part returns,
+> update this document.
+
 | What | Where |
 |---|---|
 | Entity classes | `backend/src/main/java/project/bill_locker/<package>/` |
 | Database settings | `backend/src/main/resources/application.properties` + `backend/.env` |
-| pgvector setup (runs before Hibernate) | `backend/src/main/resources/schema.sql` |
-| Default categories | `product/DefaultCategories.java` (inserted on startup if missing) |
-| Mapping tests | `backend/src/test/java/project/bill_locker/EntityMappingTests.java` |
+| Full target entity model, pgvector setup (`schema.sql`), default categories, mapping tests | branch `step-2-database` |
 
 ---
 
@@ -39,21 +44,17 @@ The schema backs the REST contract in [`api-contract.md`](api-contract.md).
    `backend/.env` is found whether the app starts in `backend/` or in the
    repository root.
 
-On every start:
+On every start, Hibernate creates any missing tables, columns, foreign keys,
+indexes and unique constraints. Restarting is safe: nothing is duplicated or
+dropped. (With the target design, `schema.sql` also enables pgvector and
+`DefaultCategories` inserts the 9 categories.)
 
-1. `schema.sql` enables the `vector` extension if pgvector is installed.
-2. Hibernate creates any missing tables, columns, foreign keys, indexes and
-   unique constraints.
-3. `DefaultCategories` inserts the 9 categories.
-4. `PgVectorCheck` logs a warning if pgvector is missing.
+### pgvector (needed later, for AI document search)
 
-Restarting is safe: nothing is duplicated or dropped.
-
-### pgvector (needed only for AI document search)
-
-Without pgvector the backend still starts. Every table except `document_chunks`
-is created, and the log says why that table is missing. Everything except
-RAG / "chat with your documents" works.
+Today's code doesn't use pgvector. The AI search step will need it for the
+`document_chunks` table. On the `step-2-database` branch the backend still starts
+without it: every table except `document_chunks` is created, and the log says why
+that table is missing.
 
 To install pgvector for PostgreSQL 17 on Windows:
 
@@ -453,10 +454,12 @@ LLM-generated SQL.
 
 ## 9. Tests
 
-`EntityMappingTests` runs against a real PostgreSQL 17 + pgvector that
-Testcontainers starts in Docker (`pgvector/pgvector:pg17`). The tests never
-touch your local database. Run them in `backend/` with `./mvnw test`
-(PowerShell: `.\mvnw.cmd test`). Docker Desktop must be running.
+All backend tests run against a real PostgreSQL 17 that Testcontainers starts in
+Docker (`pgvector/pgvector:pg17`). They never touch your local database. Run
+them in `backend/` with `./mvnw test` (PowerShell: `.\mvnw.cmd test`). Docker
+Desktop must be running. Today's tests are listed in
+[`step-3-backend-basics.md`](step-3-backend-basics.md) §7. `EntityMappingTests`,
+for the full target model, is on the `step-2-database` branch.
 
 The tests cover:
 - every table and column type (`uuid`, `jsonb`, `vector`) and the seeded

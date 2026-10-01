@@ -1,6 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { BrainCircuit, EyeOff, LockKeyhole, LogOut, Mail, RotateCcw, ShieldCheck, UserRound } from 'lucide-react';
+import {
+  BrainCircuit,
+  EyeOff,
+  LockKeyhole,
+  LogOut,
+  Mail,
+  RotateCcw,
+  ShieldCheck,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
@@ -17,6 +27,7 @@ import { useGmailConnection } from '@/hooks/useGmail';
 import { apiClient, getErrorMessage } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { config } from '@/lib/config';
+import { isFeatureEnabled, type Feature } from '@/lib/features';
 import { authService } from '@/services/auth.service';
 import { formatDate } from '@/utils/format';
 
@@ -26,9 +37,9 @@ const profileSchema = z.object({
 
 type ProfileValues = z.infer<typeof profileSchema>;
 
-const PRIVACY_POINTS = [
+const PRIVACY_POINTS: { icon: LucideIcon; text: string; feature?: Feature }[] = [
   { icon: LockKeyhole, text: 'Your documents are private to your account — every request is checked against your identity.' },
-  { icon: EyeOff, text: 'Gmail access is read-only and can be revoked at any time.' },
+  { icon: EyeOff, text: 'Gmail access is read-only and can be revoked at any time.', feature: 'gmail' },
   { icon: BrainCircuit, text: 'AI suggestions are never saved without your confirmation, and your data is not used to train models.' },
 ];
 
@@ -37,7 +48,6 @@ export function ProfilePage() {
   const { user, setUser, logout } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
-  const gmail = useGmailConnection();
 
   const updateProfile = useMutation({ mutationFn: authService.updateProfile, onSuccess: setUser });
 
@@ -98,38 +108,13 @@ export function ProfilePage() {
           </CardBody>
         </Card>
 
-        <Card>
-          <CardHeader
-            icon={<Mail className="size-4 text-slate-400" aria-hidden />}
-            title="Connected accounts"
-            description="Import bills automatically from your inbox."
-          />
-          <CardBody>
-            <div className="flex flex-col gap-4 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-                <Mail className="size-5" aria-hidden />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  Gmail
-                  {gmail.data?.connected ? <Badge tone="success" size="sm">Connected</Badge> : <Badge size="sm">Not connected</Badge>}
-                </p>
-                <p className="truncate text-sm text-slate-500">
-                  {gmail.data?.connected ? gmail.data.email : 'Let AI find invoices and warranty cards in your inbox.'}
-                </p>
-              </div>
-              <ButtonLink to="/gmail" variant="secondary" size="sm">
-                {gmail.data?.connected ? 'Manage' : 'Connect'}
-              </ButtonLink>
-            </div>
-          </CardBody>
-        </Card>
+        {isFeatureEnabled('gmail') && <ConnectedAccountsCard />}
 
         <Card>
           <CardHeader icon={<ShieldCheck className="size-4 text-slate-400" aria-hidden />} title="Privacy & security" />
           <CardBody>
             <ul className="space-y-3">
-              {PRIVACY_POINTS.map(({ icon: Icon, text }) => (
+              {PRIVACY_POINTS.filter((point) => !point.feature || isFeatureEnabled(point.feature)).map(({ icon: Icon, text }) => (
                 <li key={text} className="flex gap-3 text-sm text-slate-600">
                   <Icon className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden />
                   {text}
@@ -152,6 +137,39 @@ export function ProfilePage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function ConnectedAccountsCard() {
+  const gmail = useGmailConnection();
+
+  return (
+    <Card>
+      <CardHeader
+        icon={<Mail className="size-4 text-slate-400" aria-hidden />}
+        title="Connected accounts"
+        description="Import bills automatically from your inbox."
+      />
+      <CardBody>
+        <div className="flex flex-col gap-4 rounded-xl border border-slate-200 p-4 sm:flex-row sm:items-center">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+            <Mail className="size-5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+              Gmail
+              {gmail.data?.connected ? <Badge tone="success" size="sm">Connected</Badge> : <Badge size="sm">Not connected</Badge>}
+            </p>
+            <p className="truncate text-sm text-slate-500">
+              {gmail.data?.connected ? gmail.data.email : 'Let AI find invoices and warranty cards in your inbox.'}
+            </p>
+          </div>
+          <ButtonLink to="/gmail" variant="secondary" size="sm">
+            {gmail.data?.connected ? 'Manage' : 'Connect'}
+          </ButtonLink>
+        </div>
+      </CardBody>
+    </Card>
   );
 }
 

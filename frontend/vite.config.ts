@@ -34,6 +34,8 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       environment: 'jsdom',
+      // Tests run against the mock API (MSW), so every feature is available.
+      env: { VITE_API_MOCKING: 'true' },
       globals: true,
       setupFiles: ['./src/test/setup.ts'],
       css: false,

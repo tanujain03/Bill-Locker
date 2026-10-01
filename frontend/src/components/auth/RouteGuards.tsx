@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { PageLoader } from '@/components/ui/feedback';
 import { LogoMark } from '@/components/ui/Logo';
 import { useAuth } from '@/lib/auth-context';
+import { homePath, isFeatureEnabled, type Feature } from '@/lib/features';
 
 function FullScreenLoader() {
   return (
@@ -48,7 +49,12 @@ export function ProtectedRoute() {
 function safeRedirect(from: unknown): string {
   // Only same-origin, absolute paths — never `//evil.example` or full URLs.
   if (typeof from === 'string' && from.startsWith('/') && !from.startsWith('//')) return from;
-  return '/dashboard';
+  return homePath();
+}
+
+/** Pages whose backend isn't built yet send the user to the home page instead. */
+export function FeatureRoute({ feature }: { feature: Feature }) {
+  return isFeatureEnabled(feature) ? <Outlet /> : <Navigate to={homePath()} replace />;
 }
 
 /** Login/register: signed-in users go straight to where they were heading. */

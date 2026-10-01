@@ -17,6 +17,7 @@ import { ButtonLink } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useAuth } from '@/lib/auth-context';
+import { homePath } from '@/lib/features';
 
 const FEATURES = [
   { icon: ScanText, title: 'AI reads every bill', text: 'OCR + AI extract product, price, dates, seller and warranty from photos and PDFs.' },
@@ -47,7 +48,7 @@ export function LandingPage() {
           </Link>
           <nav className="flex items-center gap-2" aria-label="Account">
             {signedIn ? (
-              <ButtonLink to="/dashboard" rightIcon={<ArrowRight className="size-4" aria-hidden />}>
+              <ButtonLink to={homePath()} rightIcon={<ArrowRight className="size-4" aria-hidden />}>
                 Open my locker
               </ButtonLink>
             ) : (
@@ -84,7 +85,7 @@ export function LandingPage() {
                 your warranties and reminds you before they expire.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <ButtonLink to={signedIn ? '/dashboard' : '/register'} size="lg" rightIcon={<ArrowRight className="size-4" aria-hidden />}>
+                <ButtonLink to={signedIn ? homePath() : '/register'} size="lg" rightIcon={<ArrowRight className="size-4" aria-hidden />}>
                   {signedIn ? 'Open my locker' : 'Create your free locker'}
                 </ButtonLink>
                 {!signedIn && (
@@ -142,7 +143,7 @@ export function LandingPage() {
             <h2 className="max-w-2xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
               Start with the bill in your inbox. It takes a minute.
             </h2>
-            <ButtonLink to={signedIn ? '/dashboard' : '/register'} size="lg" variant="secondary" className="border-0">
+            <ButtonLink to={signedIn ? homePath() : '/register'} size="lg" variant="secondary" className="border-0">
               {signedIn ? 'Open my locker' : 'Get started — it’s free'}
             </ButtonLink>
           </div>

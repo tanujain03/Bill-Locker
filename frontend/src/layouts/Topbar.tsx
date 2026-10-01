@@ -8,6 +8,7 @@ import { LogoMark } from '@/components/ui/Logo';
 import { Menu } from '@/components/ui/Menu';
 import { Avatar } from '@/components/ui/misc';
 import { useAuth } from '@/lib/auth-context';
+import { homePath, isFeatureEnabled } from '@/lib/features';
 
 /** Natural-language search: sends the query to the AI search on the products page. */
 function GlobalSearch() {
@@ -84,7 +85,9 @@ function UserMenu() {
       }
       items={[
         { label: 'Profile & settings', icon: <Settings className="size-4" aria-hidden />, onSelect: () => navigate('/profile') },
-        { label: 'Gmail import', icon: <Mail className="size-4" aria-hidden />, onSelect: () => navigate('/gmail') },
+        ...(isFeatureEnabled('gmail')
+          ? [{ label: 'Gmail import', icon: <Mail className="size-4" aria-hidden />, onSelect: () => navigate('/gmail') }]
+          : []),
         {
           label: 'Sign out',
           icon: <LogOut className="size-4" aria-hidden />,
@@ -107,24 +110,26 @@ export function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
       <Button variant="ghost" size="icon" className="-ml-2 lg:hidden" onClick={onOpenMenu} aria-label="Open navigation">
         <MenuIcon className="size-5" aria-hidden />
       </Button>
-      <Link to="/dashboard" className="lg:hidden" aria-label="Bill Locker home">
+      <Link to={homePath()} className="lg:hidden" aria-label="Bill Locker home">
         <LogoMark />
       </Link>
 
-      <GlobalSearch />
+      {isFeatureEnabled('search') && <GlobalSearch />}
 
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
-        <Link
-          to="/products?focus=search"
-          aria-label="Search products"
-          className="inline-flex size-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 md:hidden"
-        >
-          <Search className="size-5" aria-hidden />
-        </Link>
+        {isFeatureEnabled('products') && (
+          <Link
+            to="/products?focus=search"
+            aria-label="Search products"
+            className="inline-flex size-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 md:hidden"
+          >
+            <Search className="size-5" aria-hidden />
+          </Link>
+        )}
         <Button className="hidden sm:inline-flex" onClick={() => openUpload()} leftIcon={<Upload className="size-4" aria-hidden />}>
           Upload bill
         </Button>
-        <NotificationBell />
+        {isFeatureEnabled('notifications') && <NotificationBell />}
         <UserMenu />
       </div>
     </header>

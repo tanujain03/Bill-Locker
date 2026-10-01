@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Mail, Package, RotateCw, X } from 'lucide-react';
+import { ArrowRight, CircleCheck, Mail, Package, RotateCw, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/Button';
@@ -7,12 +7,13 @@ import { Field, Select } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { useDocument } from '@/hooks/useDocuments';
 import { getErrorMessage } from '@/lib/api-client';
+import { isFeatureEnabled } from '@/lib/features';
 import { invalidateLockerData } from '@/lib/invalidate';
 import { documentService } from '@/services/document.service';
 import { DOCUMENT_TYPES, type DocumentSummary, type DocumentType } from '@/types';
 import { validateUploadFile } from '@/utils/file';
 import { formatFileSize } from '@/utils/format';
-import { DOCUMENT_TYPE_LABELS, needsReview } from '@/utils/labels';
+import { DOCUMENT_TYPE_LABELS, isStoredOnly, needsReview } from '@/utils/labels';
 import { FileTypeIcon } from './DocumentBadges';
 import { stepForDocument } from './processing';
 import { ProcessingSteps } from './ProcessingSteps';
@@ -98,6 +99,7 @@ export function UploadDialog({ open, onClose, options }: UploadDialogProps) {
   }
 
   const hasUploads = entries.length > 0;
+  const aiReading = isFeatureEnabled('documentProcessing');
 
   return (
     <Modal
@@ -105,10 +107,14 @@ export function UploadDialog({ open, onClose, options }: UploadDialogProps) {
       onClose={onClose}
       size="lg"
       title="Upload bills & documents"
-      description="AI reads each document and pre-fills the details. You review everything before it is saved."
+      description={
+        aiReading
+          ? 'AI reads each document and pre-fills the details. You review everything before it is saved.'
+          : 'Your files are stored safely in your locker.'
+      }
       footer={
         <>
-          {hasUploads && (
+          {hasUploads && aiReading && (
             <p className="mr-auto self-center text-xs text-slate-500">
               You can close this window — processing continues and you’ll be notified.
             </p>
@@ -129,9 +135,12 @@ export function UploadDialog({ open, onClose, options }: UploadDialogProps) {
           </div>
         )}
 
-        <Field label="What are you uploading?" hint="Leave on auto-detect and the AI will classify it for you.">
+        <Field
+          label="What are you uploading?"
+          hint={aiReading ? 'Leave on auto-detect and the AI will classify it for you.' : 'Optional — helps you find it later.'}
+        >
           <Select value={documentType} onChange={(event) => setDocumentType(event.target.value as DocumentType | '')}>
-            <option value="">Auto-detect (recommended)</option>
+            <option value="">{aiReading ? 'Auto-detect (recommended)' : 'Not specified'}</option>
             {DOCUMENT_TYPES.map((type) => (
               <option key={type} value={type}>
                 {DOCUMENT_TYPE_LABELS[type]}
@@ -156,7 +165,7 @@ export function UploadDialog({ open, onClose, options }: UploadDialogProps) {
           </ul>
         )}
 
-        {!options.productId && (
+        {!options.productId && isFeatureEnabled('gmail') && (
           <p className="flex items-center justify-center gap-1.5 text-sm text-slate-500">
             <Mail className="size-4" aria-hidden />
             Bills arrive by email?
@@ -183,6 +192,8 @@ function UploadRow({ entry, onRetry, onRemove, onReview }: UploadRowProps) {
   const current = document ?? entry.document;
   const failed = entry.phase === 'error' || entry.phase === 'invalid' || current?.processingStatus === 'FAILED';
   const ready = current && (needsReview(current.processingStatus) || current.processingStatus === 'CONFIRMED');
+  // Without OCR/AI in the backend yet, a finished upload is the last step.
+  const stored = entry.phase === 'uploaded' && isStoredOnly(current?.processingStatus);
   const step = entry.phase === 'uploading' || entry.phase === 'invalid' || entry.phase === 'error' ? 'upload' : stepForDocument(current);
 
   return (
@@ -195,7 +206,7 @@ function UploadRow({ entry, onRetry, onRemove, onReview }: UploadRowProps) {
               <p className="truncate text-sm font-medium text-slate-900">{entry.file.name}</p>
               <p className="text-xs text-slate-500">{formatFileSize(entry.file.size)}</p>
             </div>
-            {(failed || ready) && (
+            {(failed || ready || stored) && (
               <button
                 type="button"
                 onClick={onRemove}
@@ -211,6 +222,11 @@ function UploadRow({ entry, onRetry, onRemove, onReview }: UploadRowProps) {
             {entry.phase === 'invalid' ? (
               <p className="text-xs font-medium text-rose-600" role="alert">
                 {entry.error}
+              </p>
+            ) : stored ? (
+              <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700" aria-live="polite">
+                <CircleCheck className="size-3.5" aria-hidden />
+                Uploaded — saved in your locker
               </p>
             ) : (
               <ProcessingSteps
@@ -228,21 +244,21 @@ function UploadRow({ entry, onRetry, onRemove, onReview }: UploadRowProps) {
             )}
           </div>
 
-          {(entry.phase === 'error' || ready || current?.processingStatus === 'FAILED') && (
+          {(entry.phase === 'error' || ready || stored || current?.processingStatus === 'FAILED') && (
             <div className="mt-3 flex flex-wrap gap-2">
               {entry.phase === 'error' && (
                 <Button size="sm" variant="secondary" onClick={onRetry} leftIcon={<RotateCw className="size-3.5" aria-hidden />}>
                   Retry upload
                 </Button>
               )}
-              {current && (ready || current.processingStatus === 'FAILED') && (
+              {current && (ready || stored || current.processingStatus === 'FAILED') && (
                 <Button
                   size="sm"
                   variant={ready ? 'primary' : 'secondary'}
                   onClick={() => onReview(current.id)}
                   rightIcon={<ArrowRight className="size-3.5" aria-hidden />}
                 >
-                  {ready ? 'Review extracted details' : 'View details'}
+                  {ready ? 'Review extracted details' : stored ? 'View document' : 'View details'}
                 </Button>
               )}
             </div>

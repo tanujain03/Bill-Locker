@@ -3,6 +3,7 @@ import { isRouteErrorResponse, useRouteError } from 'react-router';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { LogoMark } from '@/components/ui/Logo';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { homePath } from '@/lib/features';
 
 export function NotFoundPage() {
   useDocumentTitle('Page not found');
@@ -12,8 +13,8 @@ export function NotFoundPage() {
       <Compass className="size-8 text-slate-300" aria-hidden />
       <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Page not found</h1>
       <p className="max-w-sm text-sm text-slate-500">The page you’re looking for doesn’t exist or has moved.</p>
-      <ButtonLink to="/dashboard" className="mt-3">
-        Go to dashboard
+      <ButtonLink to={homePath()} className="mt-3">
+        Go to my locker
       </ButtonLink>
     </div>
   );
@@ -37,8 +38,8 @@ export function RouteErrorPage() {
       <p className="max-w-md text-sm text-slate-500">{message}</p>
       <div className="mt-3 flex gap-2">
         <Button onClick={() => window.location.reload()}>Reload page</Button>
-        <ButtonLink to="/dashboard" variant="secondary" reloadDocument>
-          Go to dashboard
+        <ButtonLink to={homePath()} variant="secondary" reloadDocument>
+          Go to my locker
         </ButtonLink>
       </div>
     </div>

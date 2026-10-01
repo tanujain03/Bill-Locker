@@ -1,11 +1,12 @@
 import { lazy } from 'react';
 import { createBrowserRouter, type RouteObject } from 'react-router';
-import { ProtectedRoute, PublicOnlyRoute } from '@/components/auth/RouteGuards';
+import { FeatureRoute, ProtectedRoute, PublicOnlyRoute } from '@/components/auth/RouteGuards';
 import { AppLayout } from '@/layouts/AppLayout';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { NotFoundPage, RouteErrorPage } from '@/pages/ErrorPages';
+import type { Feature } from '@/lib/features';
 import { LandingPage } from '@/pages/LandingPage';
 
 // Signed-in pages are code-split; the charts library only loads with the dashboard.
@@ -20,6 +21,11 @@ const AssistantPage = lazy(() => import('@/pages/AssistantPage').then((m) => ({ 
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage').then((m) => ({ default: m.NotificationsPage })));
 const GmailPage = lazy(() => import('@/pages/GmailPage').then((m) => ({ default: m.GmailPage })));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
+
+/** A page that exists only once its backend feature does (see lib/features.ts). */
+function gated(feature: Feature, route: RouteObject): RouteObject {
+  return { element: <FeatureRoute feature={feature} />, children: [route] };
+}
 
 export const routes: RouteObject[] = [
   {
@@ -44,16 +50,16 @@ export const routes: RouteObject[] = [
           {
             element: <AppLayout />,
             children: [
-              { path: '/dashboard', element: <DashboardPage /> },
-              { path: '/products', element: <ProductsPage /> },
-              { path: '/products/:id', element: <ProductDetailsPage /> },
+              gated('dashboard', { path: '/dashboard', element: <DashboardPage /> }),
+              gated('products', { path: '/products', element: <ProductsPage /> }),
+              gated('products', { path: '/products/:id', element: <ProductDetailsPage /> }),
               { path: '/documents', element: <DocumentsPage /> },
               { path: '/documents/:id', element: <DocumentDetailPage /> },
-              { path: '/warranties', element: <WarrantiesPage /> },
-              { path: '/services', element: <ServicesPage /> },
-              { path: '/assistant', element: <AssistantPage /> },
-              { path: '/notifications', element: <NotificationsPage /> },
-              { path: '/gmail', element: <GmailPage /> },
+              gated('warranties', { path: '/warranties', element: <WarrantiesPage /> }),
+              gated('services', { path: '/services', element: <ServicesPage /> }),
+              gated('assistant', { path: '/assistant', element: <AssistantPage /> }),
+              gated('notifications', { path: '/notifications', element: <NotificationsPage /> }),
+              gated('gmail', { path: '/gmail', element: <GmailPage /> }),
               { path: '/profile', element: <ProfilePage /> },
             ],
           },

@@ -7,8 +7,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * Tests run against a throwaway PostgreSQL 17 + pgvector container (needs Docker),
- * never against your local database.
+ * Tests run against a throwaway PostgreSQL 17 in Docker, never against your local
+ * database. (The pgvector image is plain PostgreSQL plus the extension that AI
+ * search will need in a later step.)
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
