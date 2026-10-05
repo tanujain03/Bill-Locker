@@ -30,9 +30,21 @@ marks the full entity design. Never commit, merge to `main` or push unless asked
   per product, `@OneToOne`; dates in `WarrantyDates`, status computed, never stored),
   "Confirm & Save" (`POST /api/documents/{id}/confirm` → CONFIRMED + product), the
   warranties list and the dashboard summary.
+  Step 6 = `service_records` (next service = the latest record's date), `notifications`
+  (bell; `ReminderJob` daily 08:00 + at start-up → `ReminderService` rules, deduped by
+  `dedupeKey`; `DOCUMENT_PROCESSED` after reading) and plain-English search
+  (`POST /api/ai/search`: `SearchInterpreter` rules → `SearchFilters` → `SearchService`
+  filters the user's products in Java, never SQL; an AI model can replace only the rules).
+  Step 7 = ZXing `CodeReader` (barcodes/QR → `ExtractionResult.codes`; GST e-invoice QR and
+  serial barcodes correct the text's details at 0.95) and Gmail import (`gmail` package:
+  OAuth 2 with state + PKCE, refresh token AES-GCM-encrypted by `TokenCipher`,
+  `GmailScanWorker` background scan, `EmailClassifier` rules, attachments imported as
+  documents with `source = GMAIL`). Google calls go through the `GoogleApi` interface;
+  tests use `FakeGoogleApi`. Real Google needs the user's OAuth client (guide §4).
   Packages: `security`, `auth`, `user`, `document`, `processing`, `product`, `warranty`,
-  `dashboard`, `common`. Guides: `docs/step-3-backend-basics.md`,
-  `docs/step-4-reading-documents.md`, `docs/step-5-products-and-warranties.md`.
+  `dashboard`, `service`, `notification`, `search`, `gmail`, `common`. Guides: `docs/step-3-backend-basics.md`,
+  `docs/step-4-reading-documents.md`, `docs/step-5-products-and-warranties.md`,
+  `docs/step-6-services-reminders-search.md`, `docs/step-7-codes-and-gmail.md`.
 - `docs/database-design.md` — the **target** design (13 tables). Its entity classes
   and tests are at tag `step-2-database`; bring parts back one feature at a time.
   Hibernate `ddl-auto=update` creates the tables. No migration scripts or Flyway: the
@@ -52,14 +64,18 @@ marks the full entity design. Never commit, merge to `main` or push unless asked
 ## Backend commands (run inside `backend/`)
 
 - `.\mvnw.cmd spring-boot:run` (Git Bash: `./mvnw`) or IntelliJ's **Backend** run
-  configuration. Reads `backend/.env` (git-ignored; keys in `.env.example`:
-  `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET`). Never put
+  configuration. Reads `backend/.env` (git-ignored; keys in `backend/.env.example`:
+  `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET`, and for Gmail
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_TOKEN_KEY`, `FRONTEND_URL`). Never put
   real values in `application.properties` or commit them.
 - `.\mvnw.cmd test` — MockMvc API tests against Testcontainers (`pgvector/pgvector:pg17`,
   needs Docker); never touches the local database. Keep all tests green.
 - IntelliJ's run uses devtools: recompiling (e.g. `mvnw compile`) restarts a running app;
   after a `pom.xml` change that restart fails until the user clicks "Load Maven Changes"
-  and re-runs — tell them.
+  and re-runs — tell them. While their app runs, build with
+  `-Dmaven.compiler.useIncrementalCompilation=false` (recompiles only changed files):
+  Maven's default incremental build deletes all classes first, devtools restarts in the
+  gap without `SecurityConfig`, Spring's default Basic-auth 401s sign the browser out.
 
 ## Backend conventions
 
@@ -94,10 +110,11 @@ marks the full entity design. Never commit, merge to `main` or push unless asked
 - `frontend/.env.development.local` (git-ignored) sets `VITE_API_MOCKING=false`, so
   `npm run dev` proxies `/api` to `http://localhost:8080`. `true` means the mock demo.
 - `frontend/src/lib/features.ts`: `BACKEND_FEATURES` lists what the real backend has
-  (now `documentProcessing`, `products`, `warranties`, `dashboard`). Unbuilt features
-  are hidden: nav, top bar, routes redirect to `homePath()`, and parts of pages
-  (`isFeatureEnabled('gmail' | 'services' | 'assistant' | 'search')`; hooks like
-  `useGmailConnection(enabled)` / `useServiceRecords(id, enabled)` skip the request).
+  (all but `assistant` since step 7). Unbuilt features are hidden: nav, top
+  bar, routes redirect to `homePath()`, and parts of pages (`isFeatureEnabled(…)`; hooks
+  like `useGmailConnection(enabled)` / `useServiceRecords(id, enabled)` skip the request).
+  UI wording says "AI" only where an AI model will really answer (assistant, Gmail);
+  rule-based parts say "Ask" / "Smart search" / "Found N of M details".
   Add a feature there when its endpoints land. Tests force mock mode
   (`vite.config.ts` `test.env`).
 
@@ -127,11 +144,12 @@ marks the full entity design. Never commit, merge to `main` or push unless asked
 - Files exporting React components must export only components (react-refresh lint);
   put shared constants/helpers in sibling `.ts` files.
 
-## Backend roadmap (from the spec; done: auth + JWT, uploads, error handler, OCR + rules, products + warranties + dashboard)
+## Backend roadmap (from the spec; done: auth + JWT, uploads, error handler, OCR + rules, products + warranties + dashboard, service records + reminders + rule-based search, barcodes/QR + Gmail import)
 
-Next candidates (no AI needed): **reminders/notifications** (daily `@Scheduled` job) and
-**service records**; then **AI extraction** (better product names, category suggestion;
-rules stay as a check). Later: MinIO storage, provider-agnostic AI (`AIService`,
+Next candidates: **AI** (extraction, the assistant `/api/ai/chat`, an LLM for search's
+understanding step and email sorting; rules stay as a check), email bodies → PDF for
+Gmail, email reminders, demo-account seed, Swagger, login rate limiting, Docker Compose.
+Later: MinIO storage, provider-agnostic AI (`AIService`,
 `DocumentExtractionService`, `EmbeddingService`, `RagService`; Gemini first; prompts in
 `ai/prompts/`), pgvector RAG, scheduled reminders, Gmail OAuth (read-only scope,
 encrypted refresh tokens, callback redirects to `/gmail?status=connected|error`),

@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import project.bill_locker.common.ApiException;
+import project.bill_locker.gmail.GmailMessage;
+import project.bill_locker.notification.NotificationService;
 import project.bill_locker.product.Product;
 import project.bill_locker.product.ProductService;
 import project.bill_locker.user.User;
@@ -22,17 +24,22 @@ import project.bill_locker.user.UserService;
 @Service
 public class DocumentService {
 
+	/** The same limit as uploads (spring.servlet.multipart.max-file-size). */
+	private static final long MAX_IMPORT_BYTES = 10L * 1024 * 1024;
+
 	private final DocumentRepository documents;
 	private final DocumentFileRepository documentFiles;
 	private final UserService userService;
 	private final ProductService productService;
+	private final NotificationService notificationService;
 
 	public DocumentService(DocumentRepository documents, DocumentFileRepository documentFiles, UserService userService,
-			ProductService productService) {
+			ProductService productService, NotificationService notificationService) {
 		this.documents = documents;
 		this.documentFiles = documentFiles;
 		this.userService = userService;
 		this.productService = productService;
+		this.notificationService = notificationService;
 	}
 
 	/**
@@ -61,6 +68,27 @@ public class DocumentService {
 		documents.save(document);
 		documentFiles.save(new DocumentFile(document, content));
 		return DocumentSummary.from(document);
+	}
+
+	/**
+	 * An attachment imported from Gmail: checked like an upload (real PDF or image, at most
+	 * 10 MB), stored, and then read by the background reader like one. Anything else is
+	 * skipped (empty result).
+	 */
+	@Transactional
+	public Optional<DocumentSummary> importFromGmail(GmailMessage message, String originalName, byte[] content) {
+		String fileName = cleanFileName(originalName);
+		Optional<AllowedFileType> type = AllowedFileType.detect(content)
+				.filter(detected -> detected.extensions.contains(extensionOf(fileName)));
+		if (type.isEmpty() || content.length > MAX_IMPORT_BYTES) {
+			return Optional.empty();
+		}
+		DocumentType hint = message.getDetectedType() != null ? message.getDetectedType() : DocumentType.OTHER;
+		Document document = new Document(message.getUser(), fileName, type.get().mimeType, content.length, hint);
+		document.importedFrom(message);
+		documents.save(document);
+		documentFiles.save(new DocumentFile(document, content));
+		return Optional.of(DocumentSummary.from(document));
 	}
 
 	@Transactional(readOnly = true)
@@ -145,9 +173,13 @@ public class DocumentService {
 		documents.findById(documentId).ifPresent(document -> document.moveToStage(stage));
 	}
 
+	/** Saves what was read and tells the user (a "Document ready for review" notification). */
 	@Transactional
 	public void finishProcessing(UUID documentId, String text, ExtractionResult details) {
-		documents.findById(documentId).ifPresent(document -> document.finishProcessing(text, details));
+		documents.findById(documentId).ifPresent(document -> {
+			document.finishProcessing(text, details);
+			notificationService.documentProcessed(document);
+		});
 	}
 
 	@Transactional

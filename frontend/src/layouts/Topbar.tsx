@@ -10,7 +10,7 @@ import { Avatar } from '@/components/ui/misc';
 import { useAuth } from '@/lib/auth-context';
 import { homePath, isFeatureEnabled } from '@/lib/features';
 
-/** Natural-language search: sends the query to the AI search on the products page. */
+/** Plain-English search: sends the question to the smart search on the products page. */
 function GlobalSearch() {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +42,7 @@ function GlobalSearch() {
   return (
     <form onSubmit={submit} role="search" className="relative hidden w-full max-w-xl md:block">
       <label htmlFor="global-search" className="sr-only">
-        Search your purchases with AI
+        Search your purchases
       </label>
       <Sparkles className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-brand-500" aria-hidden />
       <input

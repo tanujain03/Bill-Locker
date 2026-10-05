@@ -6,7 +6,7 @@ import project.bill_locker.product.Product;
 
 /**
  * A document as the API returns it in lists (docs/api-contract.md §8,
- * "DocumentSummary"). Gmail import comes in a later step, so the source is always "UPLOAD".
+ * "DocumentSummary").
  */
 public record DocumentSummary(
 		UUID id,
@@ -18,7 +18,7 @@ public record DocumentSummary(
 		long fileSize,
 		ProcessingStatus processingStatus,
 		ProcessingStage processingStage,
-		String source,
+		DocumentSource source,
 		String errorMessage,
 		Instant createdAt,
 		Instant updatedAt) {
@@ -28,7 +28,7 @@ public record DocumentSummary(
 		return new DocumentSummary(document.getId(), product == null ? null : product.getId(),
 				product == null ? null : product.getName(), document.getDocumentType(), document.getFileName(),
 				document.getMimeType(), document.getFileSize(), document.getProcessingStatus(),
-				document.getProcessingStage(), "UPLOAD", document.getErrorMessage(), document.getCreatedAt(),
+				document.getProcessingStage(), document.getSource(), document.getErrorMessage(), document.getCreatedAt(),
 				document.getUpdatedAt());
 	}
 }

@@ -13,11 +13,13 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 import project.bill_locker.common.AuditableEntity;
+import project.bill_locker.gmail.GmailMessage;
 import project.bill_locker.product.Product;
 import project.bill_locker.user.User;
 
@@ -45,6 +47,21 @@ public class Document extends AuditableEntity {
 	@JoinColumn(name = "product_id", foreignKey = @ForeignKey(name = "fk_documents_product"))
 	@OnDelete(action = OnDeleteAction.SET_NULL)
 	private Product product;
+
+	/**
+	 * UPLOAD or GMAIL. The column default fills in UPLOAD for the documents that existed
+	 * before this column did (Hibernate can only add a NOT NULL column with a default).
+	 */
+	@Enumerated(EnumType.STRING)
+	@ColumnDefault("'UPLOAD'")
+	@Column(name = "source", nullable = false, length = 10)
+	private DocumentSource source = DocumentSource.UPLOAD;
+
+	/** The email it was imported from. Disconnecting Gmail deletes that email's row, but keeps the bill (SET NULL). */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "gmail_message_id", foreignKey = @ForeignKey(name = "fk_documents_gmail_message"))
+	@OnDelete(action = OnDeleteAction.SET_NULL)
+	private GmailMessage gmailMessage;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "document_type", nullable = false, length = 20)
@@ -121,6 +138,12 @@ public class Document extends AuditableEntity {
 	/** E.g. "Add document" on a product's page: the bill belongs to that product. */
 	public void attachTo(Product product) {
 		this.product = product;
+	}
+
+	/** An attachment imported from Gmail. */
+	public void importedFrom(GmailMessage message) {
+		this.source = DocumentSource.GMAIL;
+		this.gmailMessage = message;
 	}
 
 	/** "Confirm & Save": the user checked the details and saved them as this product. */

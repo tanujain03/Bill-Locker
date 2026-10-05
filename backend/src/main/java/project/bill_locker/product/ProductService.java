@@ -13,6 +13,8 @@ import project.bill_locker.common.ApiException;
 import project.bill_locker.document.Document;
 import project.bill_locker.document.DocumentRepository;
 import project.bill_locker.document.DocumentRepository.ProductDocumentCount;
+import project.bill_locker.service.ServiceRecord;
+import project.bill_locker.service.ServiceRecordRepository;
 import project.bill_locker.user.UserService;
 import project.bill_locker.warranty.WarrantyStatus;
 
@@ -26,13 +28,15 @@ public class ProductService {
 	private final ProductRepository products;
 	private final CategoryRepository categories;
 	private final DocumentRepository documents;
+	private final ServiceRecordRepository serviceRecords;
 	private final UserService userService;
 
 	public ProductService(ProductRepository products, CategoryRepository categories, DocumentRepository documents,
-			UserService userService) {
+			ServiceRecordRepository serviceRecords, UserService userService) {
 		this.products = products;
 		this.categories = categories;
 		this.documents = documents;
+		this.serviceRecords = serviceRecords;
 		this.userService = userService;
 	}
 
@@ -50,11 +54,16 @@ public class ProductService {
 		String pattern = search == null || search.isBlank() ? null : "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
 		Map<UUID, Long> documentCounts = documents.countPerProduct(userId).stream()
 				.collect(Collectors.toMap(ProductDocumentCount::getProductId, ProductDocumentCount::getDocuments));
+		Map<UUID, ServiceRecord> latestServices = serviceRecords.latestPerProduct(userId);
 		LocalDate today = LocalDate.now();
 		return products.findForUser(userId, categoryId, pattern).stream()
 				// The status depends on today's date, so this filter runs in Java rather than in SQL.
 				.filter(product -> warrantyStatus == null || statusOf(product, today) == warrantyStatus)
-				.map(product -> ProductResponse.from(product, documentCounts.getOrDefault(product.getId(), 0L), today))
+				.map(product -> {
+					ServiceRecord latest = latestServices.get(product.getId());
+					return ProductResponse.from(product, documentCounts.getOrDefault(product.getId(), 0L),
+							latest == null ? null : latest.getNextServiceDate(), today);
+				})
 				.toList();
 	}
 
@@ -78,8 +87,9 @@ public class ProductService {
 	}
 
 	/**
-	 * Deletes the product and its warranty. Its documents are kept, just unlinked: the
-	 * database sets their product_id to null (ON DELETE SET NULL). Never lose a bill.
+	 * Deletes the product with its warranty, service records and notifications (ON DELETE
+	 * CASCADE). Its documents are kept, just unlinked: the database sets their product_id
+	 * to null (ON DELETE SET NULL). Never lose a bill.
 	 */
 	@Transactional
 	public void delete(UUID userId, UUID productId) {
@@ -114,7 +124,10 @@ public class ProductService {
 	}
 
 	public ProductResponse toResponse(Product product) {
-		return ProductResponse.from(product, documents.countByProductId(product.getId()), LocalDate.now());
+		LocalDate nextServiceDate = serviceRecords.findFirstByProductIdOrderByServiceDateDescCreatedAtDesc(product.getId())
+				.map(ServiceRecord::getNextServiceDate)
+				.orElse(null);
+		return ProductResponse.from(product, documents.countByProductId(product.getId()), nextServiceDate, LocalDate.now());
 	}
 
 	private static WarrantyStatus statusOf(Product product, LocalDate today) {

@@ -22,12 +22,15 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
  * Base class for API tests. {@link MockMvc} sends requests through the real
  * security filters and controllers (without opening a network port), and the
  * data goes to a throwaway PostgreSQL started by {@link TestcontainersConfiguration}.
- * The background document reader is switched off, so tests that need it run it
- * themselves at a known moment.
+ * The background workers (document reader, reminder job, Gmail scanner) are switched
+ * off, so tests that need them run them themselves at a known moment. Gmail is a fake
+ * ({@link FakeGoogleApi}), with made-up client settings.
  */
-@SpringBootTest(properties = "app.processing.enabled=false")
+@SpringBootTest(properties = {"app.processing.enabled=false", "app.reminders.enabled=false",
+		"app.gmail.scan-enabled=false", "app.gmail.client-id=test-client-id", "app.gmail.client-secret=test-secret",
+		"app.gmail.token-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=", "app.gmail.frontend-url=http://localhost:5173"})
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, FakeGoogleApi.class})
 public abstract class ApiTest {
 
 	protected static final String PASSWORD = "Str0ngPass";

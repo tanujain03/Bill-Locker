@@ -41,7 +41,7 @@ export function GmailMessageRow({ message, onImport, onIgnore, busy = false }: G
             tone={likelyBill ? 'brand' : 'neutral'}
             size="sm"
             icon={<Sparkles className="size-3" aria-hidden />}
-            title="How likely the AI thinks this email contains a purchase document"
+            title="How likely this email contains a purchase document"
           >
             {likelyBill && message.detectedType
               ? `${DOCUMENT_TYPE_LABELS[message.detectedType]} · ${percent}% match`

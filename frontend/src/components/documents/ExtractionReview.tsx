@@ -29,6 +29,7 @@ import { formatCurrency, formatDate } from '@/utils/format';
 import { DOCUMENT_TYPE_LABELS } from '@/utils/labels';
 import { formatWarrantyPeriod } from '@/utils/warranty';
 import { ConfidenceBadge } from './ConfidenceBadge';
+import { ScannedCodes } from './ScannedCodes';
 import {
   confidenceLevel,
   REVIEW_FIELDS,
@@ -258,6 +259,8 @@ export function ExtractionReview({ document }: ExtractionReviewProps) {
           )}
         </CardBody>
       </Card>
+
+      {extraction?.codes && extraction.codes.length > 0 && <ScannedCodes codes={extraction.codes} />}
 
       {document.extractedText && (
         <details className="group rounded-2xl border border-slate-200 bg-white shadow-card">

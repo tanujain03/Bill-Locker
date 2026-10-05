@@ -25,8 +25,11 @@ describe('features against the real backend', () => {
     expect(isFeatureEnabled('products')).toBe(true);
     expect(isFeatureEnabled('warranties')).toBe(true);
     expect(isFeatureEnabled('dashboard')).toBe(true);
-    expect(isFeatureEnabled('services')).toBe(false);
-    expect(isFeatureEnabled('gmail')).toBe(false);
+    expect(isFeatureEnabled('services')).toBe(true);
+    expect(isFeatureEnabled('notifications')).toBe(true);
+    expect(isFeatureEnabled('search')).toBe(true);
+    expect(isFeatureEnabled('gmail')).toBe(true);
+    expect(isFeatureEnabled('assistant')).toBe(false);
     expect(homePath()).toBe('/dashboard');
   });
 

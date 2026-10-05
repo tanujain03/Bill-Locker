@@ -7,8 +7,8 @@ import java.util.UUID;
 import project.bill_locker.warranty.WarrantySummary;
 
 /**
- * A product as the API returns it (docs/api-contract.md §5, "Product"). Service
- * records come in a later step, so nextServiceDate is always null for now.
+ * A product as the API returns it (docs/api-contract.md §5, "Product").
+ * {@code nextServiceDate} comes from the product's most recent service record.
  */
 public record ProductResponse(
 		UUID id,
@@ -30,7 +30,7 @@ public record ProductResponse(
 		Instant createdAt,
 		Instant updatedAt) {
 
-	static ProductResponse from(Product product, long documentCount, LocalDate today) {
+	static ProductResponse from(Product product, long documentCount, LocalDate nextServiceDate, LocalDate today) {
 		Category category = product.getCategory();
 		return new ProductResponse(product.getId(),
 				category == null ? null : category.getId(),
@@ -40,6 +40,6 @@ public record ProductResponse(
 				product.getPurchaseDate(), product.getPurchasePrice(), product.getCurrency(), product.getSeller(),
 				product.getInvoiceNumber(),
 				product.getWarranty() == null ? null : WarrantySummary.of(product.getWarranty(), today),
-				null, documentCount, product.getCreatedAt(), product.getUpdatedAt());
+				nextServiceDate, documentCount, product.getCreatedAt(), product.getUpdatedAt());
 	}
 }

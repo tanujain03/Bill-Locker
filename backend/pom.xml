@@ -34,6 +34,7 @@
 		     5.19.0 bundles Tesseract 5.5.2 built with an older compiler that works with it. -->
 		<tess4j.version>5.19.0</tess4j.version>
 		<twelvemonkeys.version>3.15.2</twelvemonkeys.version>
+		<zxing.version>3.5.3</zxing.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -76,6 +77,12 @@
 			<groupId>com.twelvemonkeys.imageio</groupId>
 			<artifactId>imageio-webp</artifactId>
 			<version>${twelvemonkeys.version}</version>
+		</dependency>
+		<!-- Reads barcodes and QR codes (plain Java, no native code) -->
+		<dependency>
+			<groupId>com.google.zxing</groupId>
+			<artifactId>core</artifactId>
+			<version>${zxing.version}</version>
 		</dependency>
 
 		<dependency>

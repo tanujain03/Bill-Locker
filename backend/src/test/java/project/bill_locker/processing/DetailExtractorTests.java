@@ -2,10 +2,15 @@ package project.bill_locker.processing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import project.bill_locker.document.DocumentType;
 import project.bill_locker.document.ExtractionResult;
+import project.bill_locker.document.ScannedCode;
+import project.bill_locker.document.ScannedCode.EInvoice;
+import project.bill_locker.document.ScannedCode.Kind;
 
 /** The rules that find details in text, tried on typical bills. */
 class DetailExtractorTests {
@@ -161,6 +166,50 @@ class DetailExtractorTests {
 
 		assertThat(result.brand()).isEqualTo("CoolHome");
 		assertThat(result.productName()).isEqualTo("CoolHome Double Door Refrigerator");
+	}
+
+	@Test
+	void codesCorrectWhatOcrMisread() {
+		ScannedCode serialBarcode = new ScannedCode("CODE_128", Kind.BARCODE, "CHF2026-847291", null);
+		ScannedCode eInvoiceQr = new ScannedCode("QR_CODE", Kind.GST_E_INVOICE, "header.payload.signature",
+				new EInvoice("INV-2026-0915-1042", "2026-09-15", new BigDecimal("50738.82"), "29ABCDE1234F1Z5"));
+
+		ExtractionResult result = extractor.extract("""
+				Invoice No: 1NV-2O26-O915-1042
+				Serial No: CHF2O26-847291
+				Grand Total 50,738.82
+				""", List.of(serialBarcode, eInvoiceQr));
+
+		assertThat(result.serialNumber()).as("the barcode, not OCR's O-for-0").isEqualTo("CHF2026-847291");
+		assertThat(result.invoiceNumber()).isEqualTo("INV-2026-0915-1042");
+		assertThat(result.purchaseDate()).isEqualTo("2026-09-15");
+		assertThat(result.purchasePrice()).isEqualByComparingTo("50738.82");
+		assertThat(result.currency()).isEqualTo("INR");
+		assertThat(result.documentType()).isEqualTo(DocumentType.INVOICE);
+		assertThat(result.confidence()).containsEntry("serialNumber", 0.95).containsEntry("invoiceNumber", 0.95);
+		assertThat(result.codes()).containsExactly(serialBarcode, eInvoiceQr);
+	}
+
+	@Test
+	void aLoneBarcodeNextToTheWordSerialIsOnlyASuggestion() {
+		ExtractionResult result = extractor.extract("Serial number sticker", List.of(
+				new ScannedCode("CODE_128", Kind.BARCODE, "SN98765432", null)));
+
+		assertThat(result.serialNumber()).isEqualTo("SN98765432");
+		assertThat(result.confidence()).containsEntry("serialNumber", 0.7);
+	}
+
+	@Test
+	void readsRupeeAmountsWrittenWithRs() {
+		ExtractionResult result = extractor.extract("""
+				Invoice Number : SN-DEL-77821
+				Samsung 253 L Double Door Refrigerator (RT28C3053S8) Rs. 24,990.00 1 Rs. 24,990.00
+				TOTAL: Rs.24,990.00
+				""");
+
+		assertThat(result.productName()).as("the prices are not part of the name")
+				.isEqualTo("Samsung 253 L Double Door Refrigerator (RT28C3053S8)");
+		assertThat(result.purchasePrice()).as("Rs. right before the digits").isEqualByComparingTo("24990.00");
 	}
 
 	@Test

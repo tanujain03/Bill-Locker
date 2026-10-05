@@ -2,6 +2,8 @@ package project.bill_locker.dashboard;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,6 +21,9 @@ import project.bill_locker.document.ProcessingStatus;
 import project.bill_locker.product.Category;
 import project.bill_locker.product.Product;
 import project.bill_locker.product.ProductRepository;
+import project.bill_locker.service.ServiceRecord;
+import project.bill_locker.service.ServiceRecordRepository;
+import project.bill_locker.service.ServiceRecordResponse;
 import project.bill_locker.warranty.WarrantyResponse;
 import project.bill_locker.warranty.WarrantyService;
 import project.bill_locker.warranty.WarrantyStatus;
@@ -32,14 +37,19 @@ public class DashboardService {
 
 	/** Warranties ending within this many days are listed as "upcoming". */
 	private static final int UPCOMING_DAYS = 90;
+	/** Services due within this many days (or overdue) are listed as "upcoming". */
+	private static final int UPCOMING_SERVICE_DAYS = 60;
 	private static final int RECENT_DOCUMENTS = 5;
 
 	private final ProductRepository products;
 	private final DocumentRepository documents;
+	private final ServiceRecordRepository serviceRecords;
 
-	public DashboardService(ProductRepository products, DocumentRepository documents) {
+	public DashboardService(ProductRepository products, DocumentRepository documents,
+			ServiceRecordRepository serviceRecords) {
 		this.products = products;
 		this.documents = documents;
+		this.serviceRecords = serviceRecords;
 	}
 
 	@Transactional(readOnly = true)
@@ -62,7 +72,7 @@ public class DashboardService {
 				countByStatus(warranties),
 				spendingByCategory(userProducts),
 				upcomingExpirations(warranties),
-				List.of(),
+				upcomingServices(serviceRecords.latestPerProduct(userId).values(), today),
 				userDocuments.stream().limit(RECENT_DOCUMENTS).map(DocumentSummary::from).toList());
 	}
 
@@ -104,6 +114,20 @@ public class DashboardService {
 		}
 		return byName.values().stream()
 				.sorted(Comparator.comparing(CategorySpending::amount).reversed())
+				.toList();
+	}
+
+	/**
+	 * One per product: the next service from its most recent record, if it is due within
+	 * 60 days or already overdue. Soonest first.
+	 */
+	private static List<ServiceRecordResponse> upcomingServices(Collection<ServiceRecord> latestRecords,
+			LocalDate today) {
+		return latestRecords.stream()
+				.filter(record -> record.getNextServiceDate() != null
+						&& ChronoUnit.DAYS.between(today, record.getNextServiceDate()) <= UPCOMING_SERVICE_DAYS)
+				.sorted(Comparator.comparing(ServiceRecord::getNextServiceDate))
+				.map(ServiceRecordResponse::from)
 				.toList();
 	}
 

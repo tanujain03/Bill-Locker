@@ -71,6 +71,23 @@ class DocumentProcessingApiTests extends ApiTest {
 				.andExpect(jsonPath("$.code").value("DOCUMENT_NOT_READY"));
 	}
 
+	@Test
+	void aBarcodeOnThePhotoGivesTheExactSerialNumber() throws Exception {
+		String token = registerAndGetToken(uniqueEmail("barcode"));
+		byte[] sticker = TestFiles.pngWithCode(com.google.zxing.BarcodeFormat.CODE_128, "CHF2026-847291",
+				"Serial No: CHF2026-847291");
+		String id = upload(token, "sticker.png", "image/png", sticker);
+
+		processor.processPendingDocuments();
+
+		mvc.perform(get("/api/documents/" + id).header(AUTHORIZATION, bearer(token)))
+				.andExpect(jsonPath("$.processingStatus").value("PROCESSED"))
+				.andExpect(jsonPath("$.extraction.serialNumber").value("CHF2026-847291"))
+				.andExpect(jsonPath("$.extraction.confidence.serialNumber").value(0.95))
+				.andExpect(jsonPath("$.extraction.codes[0].kind").value("BARCODE"))
+				.andExpect(jsonPath("$.extraction.codes[0].format").value("CODE_128"));
+	}
+
 	private String upload(String token, String fileName, String contentType, byte[] content) throws Exception {
 		String response = mvc.perform(multipart("/api/documents/upload")
 						.file(new MockMultipartFile("file", fileName, contentType, content))

@@ -47,6 +47,20 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 		long getDocuments();
 	}
 
+	/** Which of the user's documents came from which shortlisted email. */
+	@Query("""
+			select d.gmailMessage.id as messageId, d.id as documentId from Document d
+			where d.user.id = :userId and d.gmailMessage is not null
+			""")
+	List<GmailDocumentLink> findGmailLinks(@Param("userId") UUID userId);
+
+	interface GmailDocumentLink {
+
+		UUID getMessageId();
+
+		UUID getDocumentId();
+	}
+
 	/** The next document waiting to be read: the oldest one with this status (for the background reader). */
 	Optional<Document> findFirstByProcessingStatusOrderByCreatedAtAsc(ProcessingStatus status);
 

@@ -1,5 +1,6 @@
 package project.bill_locker.processing;
 
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,13 +13,14 @@ import project.bill_locker.document.DocumentService;
 import project.bill_locker.document.ExtractionResult;
 import project.bill_locker.document.FileToProcess;
 import project.bill_locker.document.ProcessingStage;
+import project.bill_locker.document.ScannedCode;
 
 /**
  * The background reader. Uploading only stores the file (fast); every 2 seconds this
  * worker takes the documents waiting in status UPLOADED and reads them:
  *
  * <pre>
- * UPLOADED → PROCESSING (stage OCR: get the text → stage EXTRACTION: find the details) → PROCESSED
+ * UPLOADED → PROCESSING (stage OCR: get the text and codes → stage EXTRACTION: find the details) → PROCESSED
  *                                                                                    ↘ FAILED (errorMessage)
  * </pre>
  *
@@ -31,13 +33,15 @@ public class DocumentProcessor {
 
 	private final DocumentService documents;
 	private final TextReader textReader;
+	private final CodeReader codeReader;
 	private final DetailExtractor detailExtractor;
 	private final boolean enabled;
 
-	public DocumentProcessor(DocumentService documents, TextReader textReader, DetailExtractor detailExtractor,
-			@Value("${app.processing.enabled:true}") boolean enabled) {
+	public DocumentProcessor(DocumentService documents, TextReader textReader, CodeReader codeReader,
+			DetailExtractor detailExtractor, @Value("${app.processing.enabled:true}") boolean enabled) {
 		this.documents = documents;
 		this.textReader = textReader;
+		this.codeReader = codeReader;
 		this.detailExtractor = detailExtractor;
 		this.enabled = enabled;
 	}
@@ -66,15 +70,16 @@ public class DocumentProcessor {
 		long startedAt = System.currentTimeMillis();
 		try {
 			ReadText read = textReader.read(file.data(), file.mimeType());
-			if (read.text().isBlank()) {
+			List<ScannedCode> codes = codeReader.read(file.data(), file.mimeType());
+			if (read.text().isBlank() && codes.isEmpty()) {
 				documents.failProcessing(file.documentId(),
 						"No text was found. Try a sharper photo in good light, or the original PDF.");
 				return;
 			}
 			documents.moveToStage(file.documentId(), ProcessingStage.EXTRACTION);
-			ExtractionResult details = detailExtractor.extract(read.text());
+			ExtractionResult details = detailExtractor.extract(read.text(), codes);
 			documents.finishProcessing(file.documentId(), read.text(), details);
-			log.info("Read document {} using {} in {} ms", file.documentId(), read.method(),
+			log.info("Read document {} using {} and {} code(s) in {} ms", file.documentId(), read.method(), codes.size(),
 					System.currentTimeMillis() - startedAt);
 		}
 		catch (UnreadableDocumentException ex) {

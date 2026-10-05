@@ -30,7 +30,7 @@ const AI_EXAMPLES = [
 export function ProductsPage() {
   useDocumentTitle('My Products');
   const [params, setParams] = useSearchParams();
-  // Plain-English questions need the AI search; without it the box is a keyword search.
+  // Plain-English questions need the smart search (`search`); without it the box is a keyword search.
   const aiSearch = isFeatureEnabled('search');
   const aiQuery = aiSearch ? (params.get('ai')?.trim() ?? '') : '';
   const [input, setInput] = useState(aiQuery);
@@ -122,7 +122,7 @@ export function ProductsPage() {
           </div>
           {aiSearch && (
             <Button type="submit" size="lg" className="h-11" leftIcon={<Sparkles className="size-4" aria-hidden />} disabled={!input.trim()}>
-              Ask AI
+              Ask
             </Button>
           )}
         </div>
@@ -199,7 +199,7 @@ export function ProductsPage() {
                   title="No products match"
                   description={
                     keyword
-                      ? `Nothing matches “${keyword}”.${aiSearch ? ' Press “Ask AI” to search in plain English.' : ''}`
+                      ? `Nothing matches “${keyword}”.${aiSearch ? ' Press “Ask” to search in plain English.' : ''}`
                       : 'Try a different filter.'
                   }
                   action={
@@ -263,19 +263,19 @@ interface AiSearchResultsProps {
   categories: Parameters<typeof describeSearchFilters>[1];
 }
 
-/** Shows how the AI understood the question (transparency) and the database results. */
+/** Shows how the question was understood (transparency) and the products found. */
 function AiSearchResults({ query, onClear, categories }: AiSearchResultsProps) {
   const search = useAiSearch(query);
 
   return (
-    <section aria-label="AI search results" className="space-y-4">
+    <section aria-label="Smart search results" className="space-y-4">
       <Card className="border-brand-100 bg-gradient-to-br from-brand-50/80 to-white p-4 sm:p-5">
         <div className="flex items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white">
             <Sparkles className="size-[18px]" aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium tracking-wide text-brand-700 uppercase">AI search</p>
+            <p className="text-xs font-medium tracking-wide text-brand-700 uppercase">Smart search</p>
             <p className="mt-0.5 font-semibold text-slate-900">“{query}”</p>
             {search.isPending ? (
               <p className="mt-2 text-sm text-slate-500">Understanding your question…</p>
@@ -304,7 +304,7 @@ function AiSearchResults({ query, onClear, categories }: AiSearchResultsProps) {
         <ProductGridSkeleton />
       ) : search.isError ? (
         <Card>
-          <ErrorState title="AI search failed" error={search.error} onRetry={() => void search.refetch()} />
+          <ErrorState title="Search failed" error={search.error} onRetry={() => void search.refetch()} />
         </Card>
       ) : search.data.results.length === 0 ? (
         <Card>

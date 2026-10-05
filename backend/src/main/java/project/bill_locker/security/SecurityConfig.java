@@ -55,6 +55,9 @@ public class SecurityConfig {
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS.toArray(String[]::new)).permitAll()
+						// Google redirects the browser here after the Gmail consent page: no login token is
+						// possible, so GmailService checks the one-time "state" instead.
+						.requestMatchers(HttpMethod.GET, "/api/integrations/gmail/callback").permitAll()
 						.requestMatchers("/error").permitAll()
 						.anyRequest().authenticated())
 				// Read "Authorization: Bearer <token>" and verify it with jwtDecoder() below.

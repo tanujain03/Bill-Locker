@@ -5,12 +5,14 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import project.bill_locker.ApiTest;
 import project.bill_locker.TestFiles;
 import project.bill_locker.processing.DocumentProcessor;
@@ -31,9 +33,16 @@ class DashboardApiTests extends ApiTest {
 		createProduct(token, """
 				{"name": "LG Refrigerator", "categoryId": "%s", "purchasePrice": 30000, "purchaseDate": "%s", "warrantyMonths": 12}
 				""".formatted(categoryId(token, "home-appliances"), today.minusYears(3)));
-		createProduct(token, """
+		String headphones = createProduct(token, """
 				{"name": "Sony Headphones", "categoryId": "%s", "purchasePrice": 4990, "purchaseDate": "%s", "warrantyMonths": 12}
 				""".formatted(categoryId(token, "audio"), today.minusMonths(1)));
+		mvc.perform(post("/api/service-records")
+						.header(AUTHORIZATION, bearer(token))
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{"productId": "%s", "serviceDate": "%s", "serviceType": "INSPECTION", "nextServiceDate": "%s"}
+								""".formatted(headphones, today.minusDays(1), today.plusDays(20))))
+				.andExpect(status().isCreated());
 		createProduct(token, """
 				{"name": "Old Chair", "purchasePrice": 1000}
 				""");
@@ -60,7 +69,8 @@ class DashboardApiTests extends ApiTest {
 				.andExpect(jsonPath("$.spendingByCategory[0].amount").value(62990.0))
 				.andExpect(jsonPath("$.upcomingExpirations[*].productName", contains("Dell Laptop")))
 				.andExpect(jsonPath("$.upcomingExpirations[0].status").value("EXPIRING_SOON"))
-				.andExpect(jsonPath("$.upcomingServices", empty()))
+				.andExpect(jsonPath("$.upcomingServices[*].productName", contains("Sony Headphones")))
+				.andExpect(jsonPath("$.upcomingServices[0].nextServiceDate").value(today.plusDays(20).toString()))
 				.andExpect(jsonPath("$.recentDocuments[*].fileName", contains("blank.png", "invoice.pdf")));
 	}
 

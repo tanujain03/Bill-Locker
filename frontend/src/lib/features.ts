@@ -27,6 +27,10 @@ const BACKEND_FEATURES: ReadonlySet<Feature> = new Set<Feature>([
   'products', // step 5: products, categories, and "Confirm & Save" of a read document
   'warranties', // step 5: warranty status and the warranties page
   'dashboard', // step 5: the dashboard summary
+  'services', // step 6: service records and next-service dates
+  'notifications', // step 6: the bell, daily reminders and "document ready" notices
+  'search', // step 6: plain-English search (rules for now, AI later)
+  'gmail', // step 7: import bills from Gmail
 ]);
 
 export function isFeatureEnabled(feature: Feature): boolean {

@@ -6,8 +6,9 @@ updates the tables in PostgreSQL from these classes
 (`spring.jpa.hibernate.ddl-auto=update`). There are no SQL migration scripts.
 The schema backs the REST contract in [`api-contract.md`](api-contract.md).
 
-> **What exists today (step 5):** `users`, `documents`, `document_files`,
-> `categories`, `products` and `warranties`.
+> **What exists today (step 7):** `users`, `documents`, `document_files`,
+> `categories`, `products`, `warranties`, `service_records`, `notifications`,
+> `gmail_connections`, `gmail_oauth_states` and `gmail_messages`.
 > - The file bytes are in `document_files.data` (bytea); see
 >   [`step-3-backend-basics.md`](step-3-backend-basics.md) §3.
 > - Step 4 added `processing_stage`, `error_message`, `extracted_text` and
@@ -18,6 +19,13 @@ The schema backs the REST contract in [`api-contract.md`](api-contract.md).
 >   Differences from the target below: one warranty per product (unique
 >   `uk_warranties_product`), no `warranty_type`/`coverage_note` yet, and no
 >   `(user_id, category_id)` index yet.
+> - Step 6 added `service_records` and `notifications`; see
+>   [`step-6-services-reminders-search.md`](step-6-services-reminders-search.md) §6.
+>   Compared with the target: no `document_id` (receipt) on service records, no
+>   `read_at` on notifications, and no `users.time_zone` (reminders use the server's date).
+> - Step 7 added the Gmail tables and `documents.source` / `documents.gmail_message_id`;
+>   see [`step-7-codes-and-gmail.md`](step-7-codes-and-gmail.md) §6. Compared with the
+>   target: no `token_key_version`, `granted_scopes` or `last_history_id` on connections.
 >
 > Everything below §1 is the **target design**. Its entity classes and tests are
 > saved at the git tag `step-2-database` and come back one feature at a time. When a

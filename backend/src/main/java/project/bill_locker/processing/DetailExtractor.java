@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -16,9 +17,13 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import project.bill_locker.document.DocumentType;
 import project.bill_locker.document.ExtractionResult;
+import project.bill_locker.document.ScannedCode;
+import project.bill_locker.document.ScannedCode.EInvoice;
+import project.bill_locker.document.ScannedCode.Kind;
 
 /**
- * Finds bill details in plain text with simple rules (regular expressions).
+ * Finds bill details in plain text with simple rules (regular expressions), and lets the
+ * document's barcodes and QR codes correct them (step 7).
  *
  * <p>Rules are good at values that come with a label ("Invoice No: …", "Brand : …",
  * "Grand Total …", "2 Years Warranty") and at dates. Without a "Product :" label they
@@ -31,20 +36,29 @@ import project.bill_locker.document.ExtractionResult;
 public class DetailExtractor {
 
 	public ExtractionResult extract(String text) {
+		return extract(text, List.of());
+	}
+
+	/**
+	 * Finds the details in the text, then lets the document's barcodes and QR codes
+	 * ({@link CodeReader}) correct them: a code is read exactly, OCR is not.
+	 */
+	public ExtractionResult extract(String text, List<ScannedCode> codes) {
 		List<String> lines = text.lines().map(String::strip).filter(line -> !line.isEmpty()).toList();
+		EInvoice eInvoice = codes.stream().map(ScannedCode::invoice).filter(Objects::nonNull).findFirst().orElse(null);
 
 		// A value written as "Label : value" wins; the other rules are fallbacks.
-		Found<DocumentType> documentType = guessDocumentType(text);
+		Found<DocumentType> documentType = eInvoice != null ? new Found<>(DocumentType.INVOICE, CODE) : guessDocumentType(text);
 		Found<String> brand = firstFound(findLabelled(lines, BRAND_LABEL), findKnownBrand(text));
 		Found<String> productName = firstFound(findLabelled(lines, PRODUCT_LABEL), guessProductLine(lines, brand.value()));
-		Found<String> model = findCode(text, MODEL);
-		Found<String> serialNumber = findCode(text, SERIAL_NUMBER);
-		Found<LocalDate> purchaseDate = findPurchaseDate(lines);
+		Found<String> model = matchingBarcode(findCode(text, MODEL), codes);
+		Found<String> serialNumber = findSerialNumber(text, codes);
+		Found<LocalDate> purchaseDate = firstFound(eInvoiceDate(eInvoice), findPurchaseDate(lines));
 		// The product's own price when the bill states it ("Price : 42,999"), otherwise the bill total.
-		Found<BigDecimal> total = firstFound(findLabelledAmount(lines, PRICE_LABEL), findTotal(lines));
-		Found<String> currency = findCurrency(text);
+		Found<BigDecimal> total = firstFound(findLabelledAmount(lines, PRICE_LABEL), eInvoiceTotal(eInvoice), findTotal(lines));
+		Found<String> currency = eInvoice != null ? new Found<>("INR", CODE) : findCurrency(text);
 		Found<String> seller = findSeller(lines);
-		Found<String> invoiceNumber = findInvoiceNumber(text);
+		Found<String> invoiceNumber = firstFound(eInvoiceNumber(eInvoice), findInvoiceNumber(text));
 		Found<Integer> warrantyMonths = findWarrantyMonths(text);
 
 		Map<String, Double> confidence = new LinkedHashMap<>();
@@ -63,7 +77,66 @@ public class DetailExtractor {
 		String isoDate = purchaseDate.value() == null ? null : purchaseDate.value().toString();
 		return new ExtractionResult(documentType.value(), productName.value(), brand.value(), model.value(),
 				serialNumber.value(), isoDate, total.value(), currency.value(), seller.value(), invoiceNumber.value(),
-				warrantyMonths.value(), null, confidence);
+				warrantyMonths.value(), null, confidence, codes);
+	}
+
+	// ---- Barcodes and QR codes (step 7) ------------------------------------------------
+	// A code is read exactly, so a value from a code is trusted most.
+
+	private static final double CODE = 0.95;
+	/** Shop product codes (EAN/UPC): the same on every box, so never a serial number. */
+	private static final Pattern MENTIONS_SERIAL = Pattern.compile("(?i)\\b(serial|s\\s*/\\s*n|imei)\\b");
+
+	private static Found<String> eInvoiceNumber(EInvoice eInvoice) {
+		return eInvoice == null || eInvoice.invoiceNumber() == null ? Found.nothing() : new Found<>(eInvoice.invoiceNumber(), CODE);
+	}
+
+	private static Found<LocalDate> eInvoiceDate(EInvoice eInvoice) {
+		return eInvoice == null || eInvoice.invoiceDate() == null
+				? Found.nothing()
+				: new Found<>(LocalDate.parse(eInvoice.invoiceDate()), CODE);
+	}
+
+	private static Found<BigDecimal> eInvoiceTotal(EInvoice eInvoice) {
+		return eInvoice == null || eInvoice.total() == null ? Found.nothing() : new Found<>(eInvoice.total(), CODE);
+	}
+
+	/**
+	 * A barcode with the same characters as a code read by OCR (look-alikes such as O and
+	 * 0 counted as equal) is that code, exactly: "CHF2O26-847291" becomes "CHF2026-847291".
+	 */
+	private static Found<String> matchingBarcode(Found<String> fromText, List<ScannedCode> codes) {
+		if (fromText.value() == null) {
+			return fromText;
+		}
+		String wanted = lookAlike(fromText.value());
+		return codes.stream()
+				.filter(code -> code.kind() == Kind.BARCODE || code.kind() == Kind.TEXT)
+				.filter(code -> lookAlike(code.value()).equals(wanted))
+				.findFirst()
+				.map(code -> new Found<>(code.value(), CODE))
+				.orElse(fromText);
+	}
+
+	/** The OCR serial corrected by its barcode; if OCR found none, the only serial-like barcode (please verify). */
+	private static Found<String> findSerialNumber(String text, List<ScannedCode> codes) {
+		Found<String> fromText = matchingBarcode(findCode(text, SERIAL_NUMBER), codes);
+		if (fromText.value() != null || !MENTIONS_SERIAL.matcher(text).find()) {
+			return fromText;
+		}
+		List<ScannedCode> candidates = codes.stream()
+				.filter(code -> code.kind() == Kind.BARCODE)
+				.filter(code -> containsDigit(code.value()))
+				.toList();
+		return candidates.size() == 1 ? new Found<>(candidates.getFirst().value(), 0.7) : fromText;
+	}
+
+	/** OCR often swaps O/0, I/L/1, S/5, B/8 and Z/2, so compare codes as if those were the same. */
+	static String lookAlike(String code) {
+		return code.toUpperCase(Locale.ROOT)
+				.replace('O', '0').replace('I', '1').replace('L', '1')
+				.replace('S', '5').replace('B', '8').replace('Z', '2')
+				.replaceAll("[^A-Z0-9]", "");
 	}
 
 	/** A value found by a rule, and how sure the rule is about it (0 to 1). */
@@ -278,7 +351,9 @@ public class DetailExtractor {
 
 	/** 8999 · 8,999.00 · 1,23,456.50 (Indian grouping) */
 	private static final Pattern AMOUNT = Pattern.compile(
-			"(?<![\\d.,])(\\d{1,3}(?:,\\d{2,3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)(?![\\d,]|\\.\\d)");
+			// Not inside another number: no digit or comma just before, and no "9." (a decimal point) —
+			// but "Rs.24,990" is fine: there the dot belongs to "Rs."
+			"(?<![\\d,])(?<!\\d\\.)(\\d{1,3}(?:,\\d{2,3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)(?![\\d,]|\\.\\d)");
 	private static final Pattern GRAND_TOTAL = Pattern.compile(
 			"(?i)grand\\s*total|total\\s*amount|amount\\s*payable|(net|total)\\s*payable|invoice\\s*(total|value|amount)|amount\\s*due|net\\s*amount");
 	private static final Pattern TOTAL = Pattern.compile("(?i)\\btotal\\b");
@@ -456,7 +531,7 @@ public class DetailExtractor {
 			String name = line
 					.replaceFirst("(?i)^(product(\\s*name)?|item|description|particulars)\\s*[:\\-]\\s*", "") // "Product: …"
 					.replaceFirst("^\\d{1,3}[.)]?\\s+", "") // a row number at the start
-					.replaceAll("(\\s+[₹$]?[\\d,.%]+)+$", "") // quantity and prices at the end
+					.replaceAll("(?i)(\\s+(₹|\\$|rs\\.?|inr)?\\s?[\\d,.%]+)+$", "") // quantity and prices (₹ 1,499 / Rs. 1,499) at the end
 					.strip();
 			if (name.length() >= brand.length() + 3) {
 				return new Found<>(shorten(name), 0.5);

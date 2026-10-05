@@ -64,6 +64,24 @@ export interface ExtractionResult {
   suggestedCategorySlug: string | null;
   /** 0..1 per field; absent when the provider gives no score. */
   confidence: Partial<Record<ExtractionField, number>>;
+  /** Barcodes and QR codes found on the document (read exactly). Absent/null before step 7. */
+  codes?: ScannedCode[] | null;
+}
+
+export type ScannedCodeKind = 'GST_E_INVOICE' | 'LINK' | 'BARCODE' | 'TEXT';
+
+/** A barcode or QR code on a document. `invoice` is set for a GST e-invoice QR code. */
+export interface ScannedCode {
+  /** Symbology, e.g. `QR_CODE` or `CODE_128`. */
+  format: string;
+  kind: ScannedCodeKind;
+  value: string;
+  invoice: {
+    invoiceNumber: string | null;
+    invoiceDate: ISODate | null;
+    total: number | null;
+    sellerGstin: string | null;
+  } | null;
 }
 
 export interface DocumentDetail extends DocumentSummary {

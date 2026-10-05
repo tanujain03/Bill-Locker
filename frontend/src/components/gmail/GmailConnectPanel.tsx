@@ -10,7 +10,7 @@ import { isSafeAuthorizationUrl } from './gmail-utils';
 
 const PROMISES = [
   { icon: EyeOff, title: 'Read-only access', text: 'Bill Locker can never send, delete or change your emails.' },
-  { icon: ScanSearch, title: 'Only bills surface', text: 'AI shortlists invoices, receipts and warranty cards — nothing else is shown.' },
+  { icon: ScanSearch, title: 'Only bills surface', text: 'Bill Locker shortlists invoices, receipts and warranty cards — nothing else is shown.' },
   { icon: Hand, title: 'You stay in control', text: 'Nothing is imported until you choose it, and every extraction waits for your review.' },
   { icon: Unplug, title: 'Disconnect anytime', text: 'Access tokens are kept encrypted on the server and revoked when you disconnect.' },
 ];
@@ -49,8 +49,8 @@ export function GmailConnectPanel() {
               Let Bill Locker find the bills already sitting in your inbox
             </h2>
             <p className="mt-2 max-w-xl text-sm text-slate-600 sm:text-base">
-              Order confirmations, invoices and warranty certificates usually arrive by email. Connect Gmail and AI
-              gathers them for you — ready to review and save.
+              Order confirmations, invoices and warranty certificates usually arrive by email. Connect Gmail and Bill
+              Locker gathers them for you — ready to review and save.
             </p>
 
             <ul className="mt-6 grid gap-4 sm:grid-cols-2">

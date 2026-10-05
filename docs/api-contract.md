@@ -8,7 +8,7 @@ and the UI works unchanged.
 
 TypeScript definitions of every payload live in `frontend/src/types/`.
 
-### Implemented by the Spring Boot backend so far (step 5)
+### Implemented by the Spring Boot backend so far (step 7)
 
 | Endpoint | Notes |
 |---|---|
@@ -16,18 +16,24 @@ TypeScript definitions of every payload live in `frontend/src/types/`.
 | `POST /api/documents/upload`, `GET /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/download`, `DELETE /api/documents/{id}` | Complete; files are stored in PostgreSQL |
 | `POST /api/documents/{id}/reprocess` | Complete |
 | `POST /api/documents/{id}/confirm` | Complete (step 5) |
-| Processing lifecycle (§8) | A background reader moves documents UPLOADED → PROCESSING (`OCR`, `EXTRACTION`) → **PROCESSED** (this backend's "needs review"; it never uses `REVIEW_REQUIRED`), or FAILED with `errorMessage`. `extractedText` and `extraction` come from PDF text or OCR plus rule-based detail finding (no AI yet); `suggestedCategorySlug` is always `null`. No `DOCUMENT_PROCESSED` notifications yet |
+| Processing lifecycle (§8) | A background reader moves documents UPLOADED → PROCESSING (`OCR`, `EXTRACTION`) → **PROCESSED** (this backend's "needs review"; it never uses `REVIEW_REQUIRED`), or FAILED with `errorMessage`. `extractedText` and `extraction` come from PDF text or OCR plus rule-based detail finding (no AI yet); `suggestedCategorySlug` is always `null`. A `DOCUMENT_PROCESSED` notification is sent (step 6) |
 | `GET /api/categories` | Complete (step 5) |
-| `GET /api/products`, `POST /api/products`, `GET`/`PUT`/`DELETE /api/products/{id}` | Complete (step 5). Every product has a `warranty` object (status `UNKNOWN` without months or purchase date). `nextServiceDate` is always `null` (no service records yet) |
+| `GET /api/products`, `POST /api/products`, `GET`/`PUT`/`DELETE /api/products/{id}` | Complete (step 5). Every product has a `warranty` object (status `UNKNOWN` without months or purchase date) |
 | `GET /api/warranties?status=` | Complete (step 5) |
-| `GET /api/dashboard/summary` | Complete (step 5). `upcomingServices` is always `[]` |
+| `GET /api/dashboard/summary` | Complete (step 5) |
+| `/api/service-records` (§9) | Complete (step 6) |
+| `/api/notifications` (§10) | Complete (step 6). The reminder job runs daily at 08:00 and at start-up. No `GMAIL_BILLS_FOUND` yet |
+| `POST /api/ai/search` (§12) | Complete (step 6), but **rules** (not an LLM) turn the question into `SearchFilters`; unused filters are omitted from the JSON |
+| `ExtractionResult.codes` (§8) | Step 7: barcodes and QR codes found on the document (see below); they also correct the extracted values |
+| Gmail import (§13) | Complete (step 7), with two limits: **rules** (not an LLM) classify the emails, and only emails with a PDF/image attachment are shortlisted (no email-body PDFs yet). Errors: `503 GMAIL_NOT_CONFIGURED` when the Google client isn't set up, `502 GMAIL_UNAVAILABLE` when Gmail can't be reached during an import |
 
-Service records, notifications, the AI assistant and search, and Gmail import are
-still mock-only. Against the real backend the frontend hides those features
+Only the AI assistant (`/api/ai/chat`) is still mock-only. Against the real backend the frontend hides those features
 (`frontend/src/lib/features.ts`, `BACKEND_FEATURES`). How it works is explained in
 [`step-3-backend-basics.md`](step-3-backend-basics.md),
-[`step-4-reading-documents.md`](step-4-reading-documents.md) and
-[`step-5-products-and-warranties.md`](step-5-products-and-warranties.md).
+[`step-4-reading-documents.md`](step-4-reading-documents.md),
+[`step-5-products-and-warranties.md`](step-5-products-and-warranties.md),
+[`step-6-services-reminders-search.md`](step-6-services-reminders-search.md) and
+[`step-7-codes-and-gmail.md`](step-7-codes-and-gmail.md).
 
 ---
 
@@ -67,6 +73,8 @@ to users (no stack traces, SQL or internal details).
 | 401 | `UNAUTHORIZED` (missing/expired token), `INVALID_CREDENTIALS` (login) |
 | 404 | `PRODUCT_NOT_FOUND`, `DOCUMENT_NOT_FOUND`, `SERVICE_RECORD_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `GMAIL_MESSAGE_NOT_FOUND` |
 | 409 | `EMAIL_ALREADY_REGISTERED`, `DOCUMENT_NOT_READY`, `DOCUMENT_ALREADY_CONFIRMED`, `GMAIL_NOT_CONNECTED` |
+| 502 | `GMAIL_UNAVAILABLE` |
+| 503 | `GMAIL_NOT_CONFIGURED` |
 | 413 | `FILE_TOO_LARGE` |
 | 415 | `UNSUPPORTED_FILE_TYPE` |
 | 429 | `RATE_LIMITED` |
@@ -278,6 +286,11 @@ UPLOADED → PROCESSING (stage OCR → EXTRACTION → INDEXING) → REVIEW_REQUI
 The UI shows ≥ 0.85 as "High confidence", 0.60–0.85 as "Please verify", < 0.60 as
 "Low confidence" and `null` values as "Not found". Omit a field's confidence if
 the provider gives none.
+
+`codes` (optional, may be `null`) lists the barcodes and QR codes on the document:
+`{ "format": "QR_CODE", "kind": "GST_E_INVOICE" | "LINK" | "BARCODE" | "TEXT", "value": "…",
+"invoice": { "invoiceNumber", "invoiceDate", "total", "sellerGstin" } | null }`. `invoice`
+is set for a GST e-invoice QR code. The UI makes only `http(s)` values clickable.
 
 | Method & path | Result |
 |---|---|

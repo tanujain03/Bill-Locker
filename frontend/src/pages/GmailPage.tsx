@@ -1,5 +1,5 @@
 import { ArrowRight, Download, Inbox } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { GmailAccountCard } from '@/components/gmail/GmailAccountCard';
 import { GmailConnectPanel } from '@/components/gmail/GmailConnectPanel';
@@ -22,11 +22,15 @@ export function GmailPage() {
   const connection = useGmailConnection();
   const [params, setParams] = useSearchParams();
   const toast = useToast();
+  const handledRedirect = useRef<string | null>(null);
 
   // The backend's OAuth callback redirects here with ?status=connected|error.
   useEffect(() => {
     const status = params.get('status');
     if (!status) return;
+    // React runs effects twice in development (StrictMode): show the message only once.
+    if (handledRedirect.current === params.toString()) return;
+    handledRedirect.current = params.toString();
     if (status === 'connected') toast.success('Gmail connected', 'We’re scanning your inbox for bills now.');
     else toast.error('Gmail was not connected', params.get('reason') ?? 'Access was denied or the request expired.');
     setParams({}, { replace: true });
@@ -38,7 +42,7 @@ export function GmailPage() {
     <>
       <PageHeader
         title="Gmail Import"
-        description="Let AI find bills, invoices and warranty cards in your inbox — no manual uploads needed."
+        description="Find the bills, invoices and warranty cards already in your inbox — no manual uploads needed."
       />
       {connection.isPending ? (
         <Skeleton className="h-64 rounded-2xl" />
@@ -74,7 +78,7 @@ function ConnectedView({ connection }: { connection: GmailConnection }) {
       const result = await importMessages.mutateAsync(ids);
       toast.show({
         tone: 'success',
-        title: `${pluralize(result.documents.length, 'bill')} sent for AI processing`,
+        title: `${pluralize(result.documents.length, 'bill')} sent for reading`,
         description: 'You’ll be notified when they’re ready for review.',
       });
     } catch (error) {
@@ -102,7 +106,7 @@ function ConnectedView({ connection }: { connection: GmailConnection }) {
       <Card>
         <CardHeader
           title="Bills found in your inbox"
-          description="AI shortlisted these emails. Import the ones you want — every extraction still waits for your review."
+          description="These emails look like bills. Import the ones you want — every bill still waits for your review."
           action={
             tab === 'NEW' &&
             bulkCandidates.length > 1 && (
