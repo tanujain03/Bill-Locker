@@ -4,15 +4,16 @@ This is the full REST API Bill Locker is heading towards. The backend and the
 frontend are rebuilt from scratch on the `restart` branch, one task at a time;
 each task implements a part of this contract.
 
-### Implemented so far (restart branch, task 1)
+### Implemented so far (restart branch, tasks 1–2)
 
 | Endpoint | Notes |
 |---|---|
 | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` | Complete, except login rate limiting |
 | `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` | Complete. The reset link is emailed over SMTP (`MAIL_*` settings); without them it is written to the backend log |
+| `/api/documents/...` (upload, extract, list + search, get, save, download, delete) | Complete, see section 8. Reading uses Google Gemini (`GEMINI_API_KEY`) |
 
-Everything else is not built yet. How task 1 works is explained in
-[`task-1-auth.md`](task-1-auth.md).
+Everything else is not built yet. How tasks 1 and 2 work is explained in
+[`task-1-auth.md`](task-1-auth.md) and [`task-2-documents.md`](task-2-documents.md).
 
 ---
 
@@ -67,8 +68,8 @@ it clears the token and sends the user to `/login`.
 | Enum | Values |
 |---|---|
 | `WarrantyStatus` | `ACTIVE`, `EXPIRING_SOON`, `EXPIRED`, `UNKNOWN` |
-| `DocumentType` | `INVOICE`, `WARRANTY_CARD`, `SERVICE_RECEIPT`, `REPAIR_RECEIPT`, `OTHER` |
-| `ProcessingStatus` | `UPLOADED`, `PROCESSING`, `PROCESSED`, `REVIEW_REQUIRED`, `CONFIRMED`, `FAILED` |
+| `DocumentType` | `INVOICE`, `WARRANTY_CARD`, `RECEIPT`, `OTHER` (built in task 2) |
+| `DocumentStatus` | `UPLOADED`, `EXTRACTED`, `SAVED` (built in task 2) |
 | `ProcessingStage` | `OCR`, `EXTRACTION`, `INDEXING` (optional detail while `PROCESSING`) |
 | `DocumentSource` | `UPLOAD`, `GMAIL` |
 | `ServiceType` | `ROUTINE_MAINTENANCE`, `REPAIR`, `INSTALLATION`, `INSPECTION`, `OTHER` |
@@ -212,97 +213,47 @@ Warranty maths is deterministic Java code — never the LLM:
 
 ## 8. Documents
 
-### Upload — `POST /api/documents/upload` (multipart/form-data)
-| Part | Required | Notes |
-|---|---|---|
-| `file` | yes | PDF, JPEG, PNG or WEBP; ≤ 10 MB |
-| `documentType` | no | `DocumentType` hint chosen by the user (AI respects it) |
-| `productId` | no | attach to an existing (owned) product |
+Built in task 2 (details in [`task-2-documents.md`](task-2-documents.md)). The
+fields follow `invoice_warranty_fields.csv`: bill-level fields on the document,
+product + warranty fields per item.
 
-Server-side validation: MIME type **and** extension allow-list, magic-byte check,
-size limit, sanitised file name (no paths), stored under a random key in object
-storage — never executed. Errors: `400 FILE_REQUIRED`, `413 FILE_TOO_LARGE`,
-`415 UNSUPPORTED_FILE_TYPE`, `404 PRODUCT_NOT_FOUND`.
-
-Response `201 DocumentSummary` with `processingStatus: "UPLOADED"`; processing
-continues asynchronously.
-
-### Processing lifecycle
-```
-UPLOADED → PROCESSING (stage OCR → EXTRACTION → INDEXING) → REVIEW_REQUIRED → CONFIRMED
-                                   ↘ FAILED (errorMessage) ──(reprocess)──↗
-```
-- The UI polls `GET /api/documents/{id}` every 1.5 s while `UPLOADED`/`PROCESSING`,
-  and shows: Uploading → Reading (OCR) → Analyzing with AI → Ready for review.
-  `processingStage` is optional but makes the progress accurate.
-- When extraction finishes: set `REVIEW_REQUIRED` (or `PROCESSED`; both mean "needs
-  review") and create a `DOCUMENT_PROCESSED` notification.
-- On failure: `FAILED` + a user-readable `errorMessage`.
-
-### `DocumentSummary`
-```json
-{
-  "id": "…", "productId": null, "productName": null,
-  "documentType": "INVOICE", "fileName": "Philips_Air_Fryer_Invoice.pdf",
-  "mimeType": "application/pdf", "fileSize": 73402,
-  "processingStatus": "REVIEW_REQUIRED", "processingStage": null,
-  "source": "UPLOAD", "errorMessage": null,
-  "createdAt": "…", "updatedAt": "…"
-}
-```
-
-### `DocumentDetail` = `DocumentSummary` + `extraction` + `extractedText`
-`extraction`/`extractedText` are `null` until processing finishes.
-
-```json
-// ExtractionResult — missing values are null, never guessed
-{
-  "documentType": "INVOICE",
-  "productName": "Philips Air Fryer HD9252/90",
-  "brand": "Philips",
-  "model": "HD9252/90",
-  "serialNumber": null,
-  "purchaseDate": "2026-09-27",
-  "purchasePrice": 8999,
-  "currency": "INR",
-  "seller": "Metro Electronics, Bengaluru",
-  "invoiceNumber": "ME/2026-27/006745",
-  "warrantyMonths": 24,
-  "suggestedCategorySlug": "kitchen",
-  "confidence": { "productName": 0.96, "model": 0.8, "serialNumber": 0, "warrantyMonths": 0.74 }
-}
-```
-The UI shows ≥ 0.85 as "High confidence", 0.60–0.85 as "Please verify", < 0.60 as
-"Low confidence" and `null` values as "Not found". Omit a field's confidence if
-the provider gives none.
+`DocumentStatus`: `UPLOADED` (stored, not read) → `EXTRACTED` (AI filled it, needs
+review) → `SAVED` (user saved it). `DocumentType` (task 2): `INVOICE`,
+`WARRANTY_CARD`, `RECEIPT`, `OTHER`.
 
 | Method & path | Result |
 |---|---|
-| `GET /api/documents?productId=&status=&documentType=` | `DocumentSummary[]`, newest first |
+| `POST /api/documents/upload` (multipart part `file`) | `201 DocumentDetail`. PDF/JPEG/PNG/WebP by magic bytes, ≤ 10 MB, file name stripped of paths. `400 FILE_EMPTY`, `400 FILE_TOO_LARGE`, `400 INVALID_FILE_TYPE` |
+| `POST /api/documents/{id}/extract` | Reads the file with AI (synchronous), replaces details + items, status `EXTRACTED` → `DocumentDetail`. `503 AI_NOT_CONFIGURED`, `502 EXTRACTION_FAILED` (document unchanged) |
+| `GET /api/documents?q=&type=&status=` | `DocumentSummary[]`, newest first. `q`: file name, document number, seller, product name (case-insensitive) |
 | `GET /api/documents/{id}` | `DocumentDetail` |
-| `GET /api/documents/{id}/download` | the file bytes, `Content-Type` = stored MIME type, `Content-Disposition: inline; filename="…"` (fetched with the Bearer header and previewed via an object URL) |
-| `POST /api/documents/{id}/confirm` | see below |
-| `POST /api/documents/{id}/reprocess` | `DocumentSummary` (back to `UPLOADED`) |
-| `DELETE /api/documents/{id}` | `204` (removes the file from storage and its RAG chunks; products stay) |
-
-### Confirm — `POST /api/documents/{id}/confirm`
-Nothing extracted by the AI becomes application data until the user confirms.
+| `PUT /api/documents/{id}` | Saves reviewed details; `items` replaces the list; status `SAVED` → `DocumentDetail`. `400 VALIDATION_ERROR` + `fieldErrors` (e.g. `items[0].warrantyEndDate`) |
+| `GET /api/documents/{id}/download` | the file bytes, `Content-Type` = stored type, `Content-Disposition: inline; filename="…"` (fetched with the Bearer header, previewed via an object URL) |
+| `DELETE /api/documents/{id}` | `204` (file and items too) |
 
 ```json
+// DocumentDetail
 {
-  "documentType": "INVOICE",
-  "productId": null,
-  "product": { /* ProductInput — the values the user reviewed/edited */ }
+  "id": "…", "fileName": "croma.pdf", "contentType": "application/pdf", "sizeBytes": 73402,
+  "status": "EXTRACTED", "documentUrl": "/api/documents/…/download",
+  "documentType": "INVOICE", "documentNumber": "INV-1029",
+  "sellerName": "Croma", "sellerAddress": "…", "sellerContact": "…",
+  "buyerName": "…", "buyerAddress": "…", "buyerEmail": "…",
+  "purchaseDate": "2026-01-10", "taxAmount": 228.66, "totalAmount": 1499.00,
+  "items": [{
+    "productName": "Phone", "modelNumber": "M-1", "serialNumber": "SN-1", "unitPrice": 1199,
+    "warrantyPeriodMonths": 12, "warrantyStartDate": "2026-01-10", "warrantyEndDate": "2027-01-09",
+    "warrantyProvider": "Samsung"
+  }],
+  "createdAt": "…", "updatedAt": "…"
 }
 ```
-- `productId: null` → create a product (+ warranty with `sourceDocumentId`).
-- `productId: "<owned id>"` → update that product with `product` (full replace —
-  the UI pre-fills it with the saved values and only fills empty ones from the document).
-- Link the document to the product and set it to `CONFIRMED`.
-- Allowed from `REVIEW_REQUIRED`, `PROCESSED` and `FAILED` (manual entry).
-  `409 DOCUMENT_NOT_READY` while processing, `409 DOCUMENT_ALREADY_CONFIRMED` if done.
+`DocumentSummary`: `id, fileName, contentType, sizeBytes, status, documentType,
+documentNumber, sellerName, purchaseDate, totalAmount, itemCount, firstProductName, createdAt`.
+`PUT` body = the details part of `DocumentDetail` (`documentType` … `items`), all optional.
 
-Response `{ "document": DocumentSummary, "product": Product }`.
+Later tasks: linking documents to products/warranties, Gmail as a source, AI search
+over documents.
 
 ---
 

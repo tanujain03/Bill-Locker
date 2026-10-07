@@ -40,30 +40,47 @@ export class ApiError extends Error {
 
 const SERVER_DOWN = 'Can’t reach the server. Is the backend running on port 8080?';
 
+/**
+ * Calls the backend and returns its JSON answer. `body` is sent as JSON, except a
+ * FormData (a file upload), which the browser sends as multipart/form-data.
+ */
 export async function api<T>(path: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
+  const response = await send(path, options);
+  const data = await response.json().catch(() => null); // null when the body isn't JSON (e.g. 204)
+  if (!response.ok) throw toApiError(response.status, data);
+  return data as T;
+}
+
+/** Downloads a file (e.g. a stored bill) as a Blob, with the login token. */
+export async function fetchBlob(path: string): Promise<Blob> {
+  const response = await send(path, {});
+  if (!response.ok) throw toApiError(response.status, await response.json().catch(() => null));
+  return response.blob();
+}
+
+async function send(path: string, options: { method?: string; body?: unknown }): Promise<Response> {
   const headers: Record<string, string> = {};
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const isForm = options.body instanceof FormData;
+  // For FormData the browser sets Content-Type itself (it includes the part boundary).
+  if (options.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   const token = tokenStore.get();
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  let response: Response;
   try {
-    response = await fetch(`/api${path}`, {
+    return await fetch(`/api${path}`, {
       method: options.method ?? (options.body !== undefined ? 'POST' : 'GET'),
       headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: isForm ? (options.body as FormData) : options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
   } catch {
     throw new ApiError(0, 'NETWORK_ERROR', SERVER_DOWN);
   }
+}
 
-  const data = await response.json().catch(() => null); // null when the body isn't JSON
-  if (!response.ok) {
-    // No JSON body usually means Vite couldn't reach Spring Boot at all.
-    if (!data) throw new ApiError(response.status, 'NETWORK_ERROR', SERVER_DOWN);
-    throw new ApiError(response.status, data.code, data.message, data.fieldErrors);
-  }
-  return data as T;
+function toApiError(status: number, data: { code: string; message: string; fieldErrors?: Record<string, string> } | null) {
+  // No JSON body usually means Vite couldn't reach Spring Boot at all.
+  if (!data) return new ApiError(status, 'NETWORK_ERROR', SERVER_DOWN);
+  return new ApiError(status, data.code, data.message, data.fieldErrors);
 }
 
 /** A message that is safe to show for any thrown value. */

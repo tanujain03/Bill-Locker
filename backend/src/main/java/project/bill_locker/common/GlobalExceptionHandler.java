@@ -12,6 +12,7 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /**
  * Catches exceptions thrown by any controller or service and turns them into the
@@ -41,6 +42,12 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	ResponseEntity<ApiErrorBody> handleUnreadableBody(HttpMessageNotReadableException ex) {
 		return respond(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "The request body is not valid JSON.", null);
+	}
+
+	/** An upload bigger than spring.servlet.multipart.max-file-size (10 MB). */
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	ResponseEntity<ApiErrorBody> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+		return respond(HttpStatus.BAD_REQUEST, "FILE_TOO_LARGE", "Files can be at most 10 MB.", null);
 	}
 
 	/** Anything else. Spring's own errors (unknown URL, wrong HTTP method…) keep their status. */

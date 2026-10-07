@@ -24,6 +24,13 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   (one-time link, SHA-256 hash stored, 30 min; emailed over SMTP by `EmailResetLinkSender`
   when `MAIL_USERNAME` is set (Gmail + App Password), else logged by `LogResetLinkSender`;
   chosen in `ResetLinkSenderConfig`). Guide: `docs/task-1-auth.md`.
+- Task 2: documents (`/documents`, `/documents/:id`): upload (PDF/JPEG/PNG/WebP by magic bytes,
+  10 MB, bytes in `document_files`), read with Google Gemini free tier (`POST /{id}/extract`,
+  synchronous, AI call outside the DB transaction; `DetailExtractor` interface,
+  `GeminiDetailExtractor` via `RestClient` (`GEMINI_MODEL` may list backup models, tried on 503/429), `GeminiAnswerParser` forgives messy values), review
+  form with the CSV fields (`invoice_warranty_fields.csv`: bill fields on `documents`, products
+  on `document_items`), copy per field / product / all, save + edit (`PUT`), search + filters,
+  download, delete. Status UPLOADED → EXTRACTED → SAVED. Guide: `docs/task-2-documents.md`.
 
 ## Repository
 
@@ -34,8 +41,8 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   the signed-in user; `components/RouteGuards.tsx` (`RequireAuth`, `GuestOnly`).
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
   Packages: `security` (SecurityConfig, JWT), `user`, `auth` (incl. password reset),
-  `common` (BaseEntity, ApiException, GlobalExceptionHandler). Tables: `users`,
-  `password_reset_tokens`.
+  `common` (BaseEntity, ApiException, GlobalExceptionHandler), `document` (+ `document.ai`).
+  Tables: `users`, `password_reset_tokens`, `documents`, `document_items`, `document_files`.
 - `docs/api-contract.md` — the full target REST API; its top lists what is built so far.
   `docs/database-design.md` — the target design (13 tables); entity classes at tag
   `step-2-database`. Hibernate `ddl-auto=update` creates tables. No migration scripts or
@@ -56,11 +63,12 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
 - `.\mvnw.cmd spring-boot:run` (Git Bash: `./mvnw`) or IntelliJ's **Backend** run config.
   Reads `backend/.env` (git-ignored; keys in `backend/.env.example`: `DATABASE_URL`,
   `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET`, `FRONTEND_URL`, `MAIL_HOST`, `MAIL_PORT`,
-  `MAIL_USERNAME`, `MAIL_PASSWORD`). Never put real
+  `MAIL_USERNAME`, `MAIL_PASSWORD`, `GEMINI_API_KEY`, optional `GEMINI_MODEL`). Never put real
   values in `application.properties` or commit them.
 - `.\mvnw.cmd test` — MockMvc API tests against Testcontainers (`pgvector/pgvector:pg17`,
   needs Docker); never touches the local database. Keep all tests green. Tests swap
-  `ResetLinkSender` for `RecordingResetLinkSender` to read reset links.
+  `ResetLinkSender` for `RecordingResetLinkSender` to read reset links. They swap
+  `DetailExtractor` for `FakeDetailExtractor`: Gemini is never called in tests.
 - IntelliJ's run uses devtools: recompiling (e.g. `mvnw compile`/`test`) restarts a
   running app. While it runs, build with `-Dmaven.compiler.useIncrementalCompilation=false`
   (Maven's default deletes all classes first, and devtools restarts in the gap).
@@ -99,7 +107,7 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
 
 ## Roadmap (from the README, one task at a time when the user asks)
 
-Documents upload → reading bills (OCR / extraction) → products + warranties + dashboard →
+Documents upload + reading bills (done, task 2) → products + warranties + dashboard →
 services, reminders, search → Gmail import → AI assistant. Also later: send reset emails in the
 background, login rate limiting, Swagger, Docker Compose.
 Never build anything that submits brand forms for the user or gets around CAPTCHAs.

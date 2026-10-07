@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router';
 import { GuestOnly, RequireAuth } from './components/RouteGuards';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { DocumentPage } from './pages/DocumentPage';
+import { DocumentsPage } from './pages/DocumentsPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -24,6 +26,8 @@ export function App() {
       {/* Only for signed-in users; others are sent to /login. */}
       <Route element={<RequireAuth />}>
         <Route path="/home" element={<HomePage />} />
+        <Route path="/documents" element={<DocumentsPage />} />
+        <Route path="/documents/:id" element={<DocumentPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

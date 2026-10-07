@@ -20,7 +20,7 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import({TestcontainersConfiguration.class, RecordingResetLinkSender.Config.class})
+@Import({TestcontainersConfiguration.class, RecordingResetLinkSender.Config.class, FakeDetailExtractor.Config.class})
 public abstract class ApiTest {
 
 	protected static final String PASSWORD = "Str0ngPass";

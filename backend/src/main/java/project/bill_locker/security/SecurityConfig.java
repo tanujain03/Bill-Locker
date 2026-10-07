@@ -27,23 +27,12 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenResolv
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 
-/**
- * Who may call what, and how a request proves who is calling.
- *
- * <p>Every HTTP request passes through this filter chain before it reaches a
- * controller. The endpoints in {@link #PUBLIC_ENDPOINTS} are open to everyone. Every
- * other endpoint needs the header {@code Authorization: Bearer <token>} carrying a
- * token this server signed (see {@link TokenService}); without one the request
- * stops here with 401.
- */
 @Configuration
 @EnableConfigurationProperties(JwtProperties.class)
 public class SecurityConfig {
 
-	/** Written into every token we issue and checked on every token we receive. */
 	static final String ISSUER = "bill-locker";
 
-	/** You can't have a token yet when you sign up, sign in or forgot your password. */
 	private static final List<String> PUBLIC_ENDPOINTS = List.of(
 			"/api/auth/register",
 			"/api/auth/login",
