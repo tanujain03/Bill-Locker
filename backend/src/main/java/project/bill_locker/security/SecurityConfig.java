@@ -31,9 +31,10 @@ import org.springframework.security.web.SecurityFilterChain;
  * Who may call what, and how a request proves who is calling.
  *
  * <p>Every HTTP request passes through this filter chain before it reaches a
- * controller. Register and login are open to everyone. Every other endpoint needs
- * the header {@code Authorization: Bearer <token>} carrying a token this server
- * signed (see {@link TokenService}); without one the request stops here with 401.
+ * controller. The endpoints in {@link #PUBLIC_ENDPOINTS} are open to everyone. Every
+ * other endpoint needs the header {@code Authorization: Bearer <token>} carrying a
+ * token this server signed (see {@link TokenService}); without one the request
+ * stops here with 401.
  */
 @Configuration
 @EnableConfigurationProperties(JwtProperties.class)
@@ -42,7 +43,12 @@ public class SecurityConfig {
 	/** Written into every token we issue and checked on every token we receive. */
 	static final String ISSUER = "bill-locker";
 
-	private static final List<String> PUBLIC_ENDPOINTS = List.of("/api/auth/register", "/api/auth/login");
+	/** You can't have a token yet when you sign up, sign in or forgot your password. */
+	private static final List<String> PUBLIC_ENDPOINTS = List.of(
+			"/api/auth/register",
+			"/api/auth/login",
+			"/api/auth/forgot-password",
+			"/api/auth/reset-password");
 
 	private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
@@ -104,8 +110,8 @@ public class SecurityConfig {
 	}
 
 	/**
-	 * Reads the token from the Authorization header, except on register and login:
-	 * an old token left in the browser must never stop someone from signing in.
+	 * Reads the token from the Authorization header, except on the public endpoints:
+	 * an old, expired token left in the browser must never stop someone from signing in.
 	 */
 	private static BearerTokenResolver bearerTokenResolver() {
 		DefaultBearerTokenResolver headerResolver = new DefaultBearerTokenResolver();

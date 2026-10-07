@@ -1,28 +1,4 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-
-# Dependencies & build output
 node_modules
 dist
-dist-ssr
-coverage
-*.tsbuildinfo
-# Vite cache (normally inside node_modules/.vite)
 .vite
-
-# Local env overrides (never commit secrets)
-.env.local
-.env.*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+*.local

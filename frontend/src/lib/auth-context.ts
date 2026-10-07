@@ -1,28 +1,25 @@
 import { createContext, useContext } from 'react';
-import type { LoginRequest, RegisterRequest, User } from '@/types';
 
-/**
- * - `loading`: a stored token exists and the current user is being fetched.
- * - `error`: the token exists but `/auth/me` failed for a non-auth reason (e.g. offline).
- */
-export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated' | 'error';
+/** Same shapes as the backend's UserResponse and AuthResponse records. */
+export type User = { id: string; name: string; email: string; createdAt: string };
+export type AuthResponse = { token: string; tokenType: 'Bearer'; expiresAt: string; user: User };
 
-export interface AuthContextValue {
+export type AuthState = {
+  /** The signed-in user, or null when signed out. */
   user: User | null;
-  status: AuthStatus;
-  /** True when the last session ended because the server rejected the token. */
-  sessionExpired: boolean;
-  login: (request: LoginRequest) => Promise<User>;
-  register: (request: RegisterRequest) => Promise<User>;
+  /** True while we check a saved token at start-up (don't redirect yet). */
+  loading: boolean;
+  /** remember = stay signed in after the browser is closed. */
+  login: (email: string, password: string, remember: boolean) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
-  setUser: (user: User) => void;
-  retry: () => void;
-}
+};
 
-export const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthState | null>(null);
 
-export function useAuth(): AuthContextValue {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used inside <AuthProvider>');
-  return context;
+/** Any component can ask "who is signed in?" with useAuth(). */
+export function useAuth(): AuthState {
+  const auth = useContext(AuthContext);
+  if (!auth) throw new Error('useAuth must be used inside <AuthProvider>');
+  return auth;
 }

@@ -6,14 +6,15 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
-import org.hibernate.proxy.HibernateProxy;
 
 /**
- * Primary key and creation time shared by all entities.
- * UUID ids are not guessable and serialise as the string ids the API contract uses.
+ * Columns every table has: a UUID id (not guessable, unlike 1, 2, 3…) and when the
+ * row was created and last changed. {@code @MappedSuperclass} means "not a table of
+ * its own; copy these columns into each entity that extends me".
  */
 @Getter
 @MappedSuperclass
@@ -27,34 +28,19 @@ public abstract class BaseEntity {
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
 
+	@Column(name = "updated_at", nullable = false)
+	private Instant updatedAt;
+
+	/** Hibernate calls this just before the INSERT. */
 	@PrePersist
-	protected void initCreatedAt() {
-		if (createdAt == null) {
-			createdAt = Instant.now();
-		}
+	protected void onInsert() {
+		createdAt = Instant.now();
+		updatedAt = createdAt;
 	}
 
-	/** Id-based equality that also works when one side is a Hibernate proxy. */
-	@Override
-	public boolean equals(Object other) {
-		if (this == other) {
-			return true;
-		}
-		if (other == null || effectiveClass(this) != effectiveClass(other)) {
-			return false;
-		}
-		UUID thisId = getId();
-		return thisId != null && thisId.equals(((BaseEntity) other).getId());
-	}
-
-	@Override
-	public int hashCode() {
-		return effectiveClass(this).hashCode();
-	}
-
-	private static Class<?> effectiveClass(Object object) {
-		return object instanceof HibernateProxy proxy
-				? proxy.getHibernateLazyInitializer().getPersistentClass()
-				: object.getClass();
+	/** …and this just before an UPDATE. */
+	@PreUpdate
+	protected void onUpdate() {
+		updatedAt = Instant.now();
 	}
 }

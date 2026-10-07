@@ -1,22 +1,32 @@
-import { QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
-import { RouterProvider } from 'react-router';
-import { AuthProvider } from '@/components/auth/AuthProvider';
-import { ToastProvider } from '@/components/ui/ToastProvider';
-import { createQueryClient } from '@/lib/query-client';
-import { createAppRouter } from '@/router';
+import { Navigate, Route, Routes } from 'react-router';
+import { GuestOnly, RequireAuth } from './components/RouteGuards';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
+import { HomePage } from './pages/HomePage';
+import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
+/** Which page shows for which URL. */
 export function App() {
-  const [queryClient] = useState(createQueryClient);
-  const [router] = useState(createAppRouter);
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <AuthProvider>
-          <RouterProvider router={router} />
-        </AuthProvider>
-      </ToastProvider>
-    </QueryClientProvider>
+    <Routes>
+      {/* Signed-in users skip these and go to /home. The first page is sign in. */}
+      <Route element={<GuestOnly />}>
+        <Route path="/" element={<LoginPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+      </Route>
+
+      {/* Open to everyone: a reset link must work even if you're signed in. */}
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+      {/* Only for signed-in users; others are sent to /login. */}
+      <Route element={<RequireAuth />}>
+        <Route path="/home" element={<HomePage />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

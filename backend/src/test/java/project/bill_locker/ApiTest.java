@@ -11,6 +11,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * Base class for API tests. {@link MockMvc} sends requests through the real
@@ -19,7 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, RecordingResetLinkSender.Config.class})
 public abstract class ApiTest {
 
 	protected static final String PASSWORD = "Str0ngPass";
@@ -27,11 +28,14 @@ public abstract class ApiTest {
 	@Autowired
 	protected MockMvc mvc;
 
+	/** POSTs a JSON body to an open (no token) endpoint. */
+	protected ResultActions postJson(String url, String json) throws Exception {
+		return mvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(json));
+	}
+
 	/** Registers a new account and returns its login token. */
 	protected String registerAndGetToken(String email) throws Exception {
-		String response = mvc.perform(post("/api/auth/register")
-						.contentType(MediaType.APPLICATION_JSON)
-						.content(registerJson("Test User", email, PASSWORD)))
+		String response = postJson("/api/auth/register", registerJson("Test User", email, PASSWORD))
 				.andExpect(status().isCreated())
 				.andReturn().getResponse().getContentAsString();
 		return JsonPath.read(response, "$.token");

@@ -1,28 +1,17 @@
-import '@fontsource-variable/inter';
-import './index.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router';
 import { App } from './App';
-import { config } from './lib/config';
+import { AuthProvider } from './components/AuthProvider';
+import './index.css';
 
-/** Starts the in-browser mock API (Mock Service Worker) when VITE_API_MOCKING=true. */
-async function enableMocking(): Promise<void> {
-  if (!config.apiMocking) return;
-  const { startMockWorker } = await import('./mocks/browser');
-  await startMockWorker();
-}
-
-const container = document.getElementById('root');
-if (!container) throw new Error('Root element #root not found');
-
-enableMocking()
-  .catch((error: unknown) => {
-    console.error('[Bill Locker] Could not start the mock API', error);
-  })
-  .finally(() => {
-    createRoot(container).render(
-      <StrictMode>
+// The whole app lives inside the <div id="root"> in index.html.
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <BrowserRouter>
+      <AuthProvider>
         <App />
-      </StrictMode>,
-    );
-  });
+      </AuthProvider>
+    </BrowserRouter>
+  </StrictMode>,
+);

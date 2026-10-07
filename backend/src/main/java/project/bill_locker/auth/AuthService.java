@@ -59,6 +59,14 @@ public class AuthService {
 		return loggedIn(user);
 	}
 
+	@Transactional(readOnly = true)
+	public UserResponse me(UUID userId) {
+		return users.findById(userId)
+				.map(UserResponse::from)
+				// The token is valid but the account is gone: treat it like being signed out.
+				.orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Please sign in to continue."));
+	}
+
 	private AuthResponse loggedIn(User user) {
 		TokenService.IssuedToken token = tokenService.issueFor(user.getId());
 		return new AuthResponse(token.value(), "Bearer", token.expiresAt(), UserResponse.from(user));

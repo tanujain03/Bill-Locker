@@ -12,40 +12,44 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import project.bill_locker.security.CurrentUser;
 import project.bill_locker.user.UserResponse;
-import project.bill_locker.user.UserService;
 
-/**
- * Account endpoints (docs/api-contract.md §3). A controller only translates HTTP
- * to Java and back; the actual work happens in the services.
- */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
 	private final AuthService authService;
-	private final UserService userService;
+	private final PasswordResetService passwordResetService;
 
-	public AuthController(AuthService authService, UserService userService) {
+	public AuthController(AuthService authService, PasswordResetService passwordResetService) {
 		this.authService = authService;
-		this.userService = userService;
+		this.passwordResetService = passwordResetService;
 	}
 
-	/** {@code POST /api/auth/register} — open to everyone (see SecurityConfig). */
 	@PostMapping("/register")
 	@ResponseStatus(HttpStatus.CREATED)
 	public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
 		return authService.register(request);
 	}
 
-	/** {@code POST /api/auth/login} — open to everyone. */
 	@PostMapping("/login")
 	public AuthResponse login(@Valid @RequestBody LoginRequest request) {
 		return authService.login(request);
 	}
 
-	/** {@code GET /api/auth/me} — who the token belongs to; the frontend calls it when it starts. */
 	@GetMapping("/me")
 	public UserResponse me(@AuthenticationPrincipal Jwt jwt) {
-		return userService.getProfile(CurrentUser.id(jwt));
+		return authService.me(CurrentUser.id(jwt));
+	}
+
+	@PostMapping("/forgot-password")
+	public MessageResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+		passwordResetService.requestReset(request.email());
+		return new MessageResponse("If an account exists for this email, we've sent a link to reset the password.");
+	}
+
+	@PostMapping("/reset-password")
+	public MessageResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+		passwordResetService.resetPassword(request.token(), request.password());
+		return new MessageResponse("Your password has been changed. You can sign in now.");
 	}
 }

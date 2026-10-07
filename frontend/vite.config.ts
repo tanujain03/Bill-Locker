@@ -1,46 +1,15 @@
-/// <reference types="vitest/config" />
-import { fileURLToPath, URL } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-  // Where `/api` is proxied during `npm run dev` when the mock API is turned off.
-  const proxyTarget = env.VITE_PROXY_TARGET || 'http://localhost:8080';
-
-  return {
-    plugins: [react(), tailwindcss()],
-    resolve: {
-      alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: {
+    port: 5173,
+    // The browser calls /api/... on :5173 and Vite forwards it to Spring Boot on :8080.
+    // Same origin for the browser, so no CORS setup is needed on the backend.
+    proxy: {
+      '/api': { target: 'http://localhost:8080', changeOrigin: true },
     },
-    server: {
-      port: 5173,
-      proxy: {
-        '/api': { target: proxyTarget, changeOrigin: true },
-      },
-    },
-    preview: { port: 4173 },
-    build: {
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            react: ['react', 'react-dom', 'react-router'],
-            query: ['@tanstack/react-query', 'axios'],
-            charts: ['recharts'],
-          },
-        },
-      },
-    },
-    test: {
-      environment: 'jsdom',
-      // Tests run against the mock API (MSW), so every feature is available.
-      env: { VITE_API_MOCKING: 'true' },
-      globals: true,
-      setupFiles: ['./src/test/setup.ts'],
-      css: false,
-      restoreMocks: true,
-      testTimeout: 20_000,
-    },
-  };
+  },
 });

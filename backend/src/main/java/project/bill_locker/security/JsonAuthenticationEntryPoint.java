@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * (missing, expired or changed). The frontend then sends the user to the login page.
  */
 @Component
-class  JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
+class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
 	private static final String BODY =
 			"{\"success\":false,\"code\":\"UNAUTHORIZED\",\"message\":\"Please sign in to continue.\"}";

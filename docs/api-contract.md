@@ -1,23 +1,18 @@
 # Bill Locker — REST API contract
 
-This is the contract the frontend (`frontend/`) is built against. The in-browser
-mock API (`frontend/src/mocks/handlers.ts`) implements it end to end, so the UI
-can be demoed before the backend exists. **The Spring Boot backend must implement
-the same paths, payloads and error codes** — then set `VITE_API_MOCKING=false`
-and the UI works unchanged.
+This is the full REST API Bill Locker is heading towards. The backend and the
+frontend are rebuilt from scratch on the `restart` branch, one task at a time;
+each task implements a part of this contract.
 
-TypeScript definitions of every payload live in `frontend/src/types/`.
-
-### Implemented by the Spring Boot backend so far (step 3)
+### Implemented so far (restart branch, task 1)
 
 | Endpoint | Notes |
 |---|---|
-| `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `PUT /api/users/me` | Complete, except that login rate limiting is not implemented yet |
-| `POST /api/documents/upload`, `GET /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/download`, `DELETE /api/documents/{id}` | Files are stored in PostgreSQL. No OCR yet, so documents stay `UPLOADED` and `extraction`/`extractedText` are `null`. The `productId` part and filter are ignored (no products yet) |
+| `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` | Complete, except login rate limiting |
+| `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` | Complete. The reset link is emailed over SMTP (`MAIL_*` settings); without them it is written to the backend log |
 
-Everything else is still mock-only. Against the real backend the frontend hides
-those features (`frontend/src/lib/features.ts`, `BACKEND_FEATURES`). How it works
-is explained in [`step-3-backend-basics.md`](step-3-backend-basics.md).
+Everything else is not built yet. How task 1 works is explained in
+[`task-1-auth.md`](task-1-auth.md).
 
 ---
 
@@ -27,7 +22,7 @@ is explained in [`step-3-backend-basics.md`](step-3-backend-basics.md).
 |---|---|
 | Base path | `/api` (the frontend calls `/api/...`; Vite dev proxy / nginx forward it to the backend) |
 | Format | JSON (`application/json`), except file upload (multipart) and download (binary) |
-| Auth | `Authorization: Bearer <JWT>` on every endpoint except `POST /api/auth/register`, `POST /api/auth/login` |
+| Auth | `Authorization: Bearer <JWT>` on every endpoint except `POST /api/auth/register`, `/login`, `/forgot-password` and `/reset-password` |
 | User scoping | The current user comes **only** from the JWT. Never accept a `userId` from the client. Every query filters by it (`WHERE user_id = :currentUser`), including vector search. |
 | Ownership | Accessing another user's product/document/record returns **404** (not 403) so existence isn't leaked |
 | IDs | Opaque strings (UUIDs recommended) |
@@ -53,7 +48,7 @@ to users (no stack traces, SQL or internal details).
 
 | Status | Typical `code` |
 |---|---|
-| 400 | `VALIDATION_ERROR`, `FILE_REQUIRED`, `INVALID_UPLOAD` |
+| 400 | `VALIDATION_ERROR`, `INVALID_RESET_TOKEN`, `FILE_REQUIRED`, `INVALID_UPLOAD` |
 | 401 | `UNAUTHORIZED` (missing/expired token), `INVALID_CREDENTIALS` (login) |
 | 404 | `PRODUCT_NOT_FOUND`, `DOCUMENT_NOT_FOUND`, `SERVICE_RECORD_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `GMAIL_MESSAGE_NOT_FOUND` |
 | 409 | `EMAIL_ALREADY_REGISTERED`, `DOCUMENT_NOT_READY`, `DOCUMENT_ALREADY_CONFIRMED`, `GMAIL_NOT_CONNECTED` |
@@ -106,7 +101,19 @@ Wrong email **or** password → `401 INVALID_CREDENTIALS` "Incorrect email or pa
 The JWT should carry `sub` (user id) and `exp`; the frontend reads `exp` to drop expired tokens early.
 
 ### `GET /api/auth/me` → `User`
-### `PUT /api/users/me` `{ "name": "New Name" }` → `User`
+### `PUT /api/users/me` `{ "name": "New Name" }` → `User` (not built yet)
+
+### `POST /api/auth/forgot-password`
+Request `{ "email": "asha@example.com" }` → always `200 { "message": "If an account exists for this email, we've sent a link to reset the password." }`,
+whether or not the email has an account (no account enumeration). If it has one, any earlier
+link stops working and a new one-time link `<FRONTEND_URL>/reset-password?token=<token>` is sent
+(by email; written to the backend log when no mail account is set up). The link expires after 30 minutes. Only a SHA-256 hash
+of the token is stored (`password_reset_tokens`).
+
+### `POST /api/auth/reset-password`
+Request `{ "token": "<from the link>", "password": "N3wPassword" }` → `200 { "message": "Your password has been changed. You can sign in now." }`.
+- password: same rules as register (`fieldErrors.password` if broken).
+- Unknown, used or expired token → `400 INVALID_RESET_TOKEN`. A token works once.
 
 ---
 
