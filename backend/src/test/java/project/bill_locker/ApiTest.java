@@ -18,12 +18,17 @@ import org.springframework.test.web.servlet.ResultActions;
  * security filters and controllers (without opening a network port), and the
  * data goes to a throwaway PostgreSQL started by {@link TestcontainersConfiguration}.
  */
-@SpringBootTest
+@SpringBootTest(properties = {"app.workers.enabled=false", "app.gmail.client-id=test-client",
+		"app.gmail.client-secret=test-secret", "app.gmail.token-key=" + ApiTest.TEST_TOKEN_KEY})
 @AutoConfigureMockMvc
-@Import({TestcontainersConfiguration.class, RecordingResetLinkSender.Config.class, FakeDetailExtractor.Config.class})
+@Import({TestcontainersConfiguration.class, RecordingResetLinkSender.Config.class, FakeDetailExtractor.Config.class,
+		FakeGoogleApi.Config.class})
 public abstract class ApiTest {
 
 	protected static final String PASSWORD = "Str0ngPass";
+
+	/** 32 bytes of 0x01 in base64: a valid Gmail token key for tests. */
+	protected static final String TEST_TOKEN_KEY = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
 
 	@Autowired
 	protected MockMvc mvc;

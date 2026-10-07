@@ -14,6 +14,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,7 +33,9 @@ import project.bill_locker.user.User;
  * {@link DocumentFile}.
  */
 @Entity
-@Table(name = "documents", indexes = @Index(name = "idx_documents_user", columnList = "user_id"))
+@Table(name = "documents", indexes = {
+		@Index(name = "idx_documents_user", columnList = "user_id"),
+		@Index(name = "idx_documents_read_queued", columnList = "read_queued_at")})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Document extends BaseEntity {
@@ -91,6 +94,20 @@ public class Document extends BaseEntity {
 	@Column(name = "total_amount", precision = 12, scale = 2)
 	private BigDecimal totalAmount;
 
+	// ---- Background reading (see DocumentReadWorker) ----
+
+	/** Set while the document waits for the AI worker; null once read, failed or edited by the user. */
+	@Column(name = "read_queued_at")
+	private Instant readQueuedAt;
+
+	/** Why the last background read failed (shown so the user can retry by hand). */
+	@Column(name = "read_error", length = 500)
+	private String readError;
+
+	/** The Gmail address this bill was imported from; null for manual uploads. */
+	@Column(name = "source_gmail", length = 254)
+	private String sourceGmail;
+
 	/**
 	 * The products on the bill, in the order they appear. orphanRemoval: an item
 	 * taken out of this list is deleted from the table when the document is saved.
@@ -100,6 +117,11 @@ public class Document extends BaseEntity {
 	private List<DocumentItem> items = new ArrayList<>();
 
 	public Document(User user, String fileName, String contentType, long sizeBytes) {
+		this(user, fileName, contentType, sizeBytes, null);
+	}
+
+	public Document(User user, String fileName, String contentType, long sizeBytes, String sourceGmail) {
+		this.sourceGmail = sourceGmail;
 		this.user = user;
 		this.fileName = fileName;
 		this.contentType = contentType;
@@ -128,5 +150,19 @@ public class Document extends BaseEntity {
 			this.items.add(new DocumentItem(this, items.size(), item));
 		}
 		this.status = newStatus;
+		// A manual read or save takes the document out of the reading queue.
+		this.readQueuedAt = null;
+		this.readError = null;
+	}
+
+	void queueForReading() {
+		this.readQueuedAt = Instant.now();
+		this.readError = null;
+	}
+
+	/** The document stays as it was (UPLOADED); only the reason is kept. */
+	void readFailed(String message) {
+		this.readQueuedAt = null;
+		this.readError = message;
 	}
 }

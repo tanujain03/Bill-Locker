@@ -1,7 +1,8 @@
-import { FileText, Search, Upload } from 'lucide-react';
+import { Search, Upload } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { AppHeader } from '../components/AppHeader';
+import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
 import { StatusBadge } from '../components/documents/StatusBadge';
 import { Alert } from '../components/FormParts';
 import { errorMessage } from '../lib/api';
@@ -13,6 +14,7 @@ import {
   type DocumentStatus,
   type DocumentSummary,
 } from '../lib/documents';
+import { usePolling } from '../lib/usePolling';
 
 const ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp';
 
@@ -27,6 +29,8 @@ export function DocumentsPage() {
   const [q, setQ] = useState('');
   const [type, setType] = useState('');
   const [status, setStatus] = useState('');
+  /** '' (all), 'UPLOAD' or 'GMAIL'. Filtered here: the list is already loaded. */
+  const [source, setSource] = useState('');
   const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
 
@@ -50,6 +54,14 @@ export function DocumentsPage() {
       clearTimeout(timer);
     };
   }, [q, type, status]);
+
+  // While a document waits for the background AI read, ask again every 3 s with the same
+  // filters, so "Reading…" turns into "Needs review" without a reload.
+  usePolling(documents?.some((d) => d.readQueued) ?? false, () => {
+    listDocuments({ q, type, status })
+      .then(setDocuments)
+      .catch(() => {}); // the next tick tries again
+  });
 
   async function upload(file: File | undefined) {
     if (!file) return;
@@ -133,6 +145,7 @@ export function DocumentsPage() {
           </label>
           <Select label="Type" value={type} onChange={setType} options={Object.entries(DOCUMENT_TYPE_LABELS)} />
           <Select label="Status" value={status} onChange={setStatus} options={STATUS_OPTIONS} />
+          <Select label="From" value={source} onChange={setSource} options={SOURCE_OPTIONS} />
         </div>
 
         {listError && (
@@ -140,11 +153,21 @@ export function DocumentsPage() {
             <Alert tone="error">{listError}</Alert>
           </div>
         )}
-        {documents && <DocumentList documents={documents} filtered={Boolean(q || type || status)} />}
+        {documents && (
+          <DocumentList
+            documents={documents.filter((d) => !source || (source === 'GMAIL') === Boolean(d.sourceGmail))}
+            filtered={Boolean(q || type || status || source)}
+          />
+        )}
       </main>
     </div>
   );
 }
+
+const SOURCE_OPTIONS: [string, string][] = [
+  ['UPLOAD', 'Uploaded'],
+  ['GMAIL', 'Gmail'],
+];
 
 const STATUS_OPTIONS: [DocumentStatus, string][] = [
   ['UPLOADED', 'Not read yet'],
@@ -185,10 +208,13 @@ function DocumentList({ documents, filtered }: { documents: DocumentSummary[]; f
       {documents.map((d) => (
         <li key={d.id}>
           <Link to={`/documents/${d.id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50">
-            <FileText className="size-5 shrink-0 text-slate-400" aria-hidden />
+            <FileTypeIcon contentType={d.contentType} />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{d.sellerName ?? d.fileName}</p>
-              <p className="truncate text-sm text-slate-500">
+              <div className="flex min-w-0 items-center gap-2">
+                <p className="truncate font-medium">{d.sellerName ?? d.fileName}</p>
+                <SourceBadge sourceGmail={d.sourceGmail} />
+              </div>
+              <p className="mt-0.5 truncate text-sm text-slate-500">
                 {[
                   d.documentType && DOCUMENT_TYPE_LABELS[d.documentType],
                   d.firstProductName && (d.itemCount > 1 ? `${d.firstProductName} +${d.itemCount - 1} more` : d.firstProductName),
@@ -202,7 +228,7 @@ function DocumentList({ documents, filtered }: { documents: DocumentSummary[]; f
             {d.totalAmount != null && (
               <span className="hidden text-sm font-medium tabular-nums sm:block">{formatAmount(d.totalAmount)}</span>
             )}
-            <StatusBadge status={d.status} />
+            <StatusBadge status={d.status} reading={d.readQueued} />
           </Link>
         </li>
       ))}

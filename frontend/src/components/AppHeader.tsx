@@ -23,6 +23,9 @@ export function AppHeader() {
             <NavLink to="/documents" className={linkClass}>
               Documents
             </NavLink>
+            <NavLink to="/gmail" className={linkClass}>
+              Gmail
+            </NavLink>
           </nav>
         </div>
         <button

@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router';
+import { GmailPage } from './pages/GmailPage';
 import { GuestOnly, RequireAuth } from './components/RouteGuards';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { DocumentPage } from './pages/DocumentPage';
@@ -27,6 +28,7 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route path="/home" element={<HomePage />} />
         <Route path="/documents" element={<DocumentsPage />} />
+        <Route path="/gmail" element={<GmailPage />} />
         <Route path="/documents/:id" element={<DocumentPage />} />
       </Route>
 

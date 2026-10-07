@@ -12,6 +12,9 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 	/** Finds a document only if it belongs to this user (anyone else's → empty → 404). */
 	Optional<Document> findByIdAndUserId(UUID id, UUID userId);
 
+	/** The document that has waited longest for the AI worker. */
+	Optional<Document> findFirstByReadQueuedAtIsNotNullOrderByReadQueuedAtAsc();
+
 	/**
 	 * The user's documents, newest first. A null type/status means "any".
 	 * {@code search} is a lower-case LIKE pattern such as "%croma%", or "" for no search;

@@ -2,12 +2,15 @@ package project.bill_locker.document;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -24,6 +27,11 @@ import project.bill_locker.user.UserRepository;
 public class DocumentService {
 
 	static final long MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+	private static final Logger log = LoggerFactory.getLogger(DocumentService.class);
+
+	private static final String AI_NOT_SET_UP =
+			"AI reading is not set up. Add GEMINI_API_KEY to backend/.env, or type the details in yourself.";
 
 	private final DocumentRepository documents;
 	private final DocumentFileRepository files;
@@ -48,15 +56,35 @@ public class DocumentService {
 		if (file.getSize() > MAX_FILE_BYTES) {
 			throw fileTooLarge();
 		}
-		byte[] bytes = readBytes(file);
+		return DocumentDetail.of(create(userId, file.getOriginalFilename(), readBytes(file), null));
+	}
+
+	/**
+	 * Stores a file that did not come from the upload form (the Gmail import) and queues
+	 * it for the background AI reading. Same checks as {@link #upload}.
+	 */
+	@Transactional
+	public DocumentDetail createFromBytes(UUID userId, String fileName, byte[] bytes, String sourceGmail) {
+		if (bytes.length == 0) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "FILE_EMPTY", "The file is empty.");
+		}
+		if (bytes.length > MAX_FILE_BYTES) {
+			throw fileTooLarge();
+		}
+		Document document = create(userId, fileName, bytes, sourceGmail);
+		document.queueForReading();
+		return DocumentDetail.of(document);
+	}
+
+	private Document create(UUID userId, String fileName, byte[] bytes, String sourceGmail) {
 		String contentType = FileType.detect(bytes).orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST,
 				"INVALID_FILE_TYPE", "Please upload a PDF, JPG, PNG or WebP file."));
 
 		// getReferenceById: we only need the user's id for the foreign key, not a SELECT.
 		Document document = documents.save(new Document(users.getReferenceById(userId),
-				cleanFileName(file.getOriginalFilename()), contentType, bytes.length));
+				cleanFileName(fileName), contentType, bytes.length, sourceGmail));
 		files.save(new DocumentFile(document, bytes));
-		return DocumentDetail.of(document);
+		return document;
 	}
 
 	@Transactional(readOnly = true)
@@ -104,9 +132,7 @@ public class DocumentService {
 		} catch (ExtractionException e) {
 			HttpStatus status = ExtractionException.NOT_CONFIGURED.equals(e.getCode())
 					? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.BAD_GATEWAY;
-			String message = ExtractionException.NOT_CONFIGURED.equals(e.getCode())
-					? "AI reading is not set up. Add GEMINI_API_KEY to backend/.env, or type the details in yourself."
-					: e.getMessage();
+			String message = readErrorText(e);
 			throw new ApiException(status, e.getCode(), message);
 		}
 
@@ -115,6 +141,73 @@ public class DocumentService {
 			document.replaceDetails(details, DocumentStatus.EXTRACTED);
 			return DocumentDetail.of(document);
 		});
+	}
+
+	/**
+	 * Reads the document that has waited longest in the queue (same three steps as
+	 * {@link #extract}: no transaction around the slow AI call). Returns false when
+	 * nothing is queued. A failure is stored on the document, never thrown, so one bad
+	 * file cannot block the queue.
+	 */
+	public boolean readNextQueued() {
+		record Job(UUID id, Instant queuedAt, byte[] data, String contentType) {
+		}
+		Job job = transaction.execute(status -> documents.findFirstByReadQueuedAtIsNotNullOrderByReadQueuedAtAsc()
+				.map(d -> new Job(d.getId(), d.getReadQueuedAt(),
+						files.findById(d.getId()).map(DocumentFile::getData).orElse(null), d.getContentType()))
+				.orElse(null));
+		if (job == null) {
+			return false;
+		}
+
+		if (job.data() == null) { // file row missing: nothing to read, so don't retry forever
+			markReadFailed(job.id(), job.queuedAt(), "The file is missing, so it cannot be read.");
+			return true;
+		}
+
+		DocumentDetails details = null;
+		String error = null;
+		try {
+			details = withWarrantyEndDates(extractor.extract(job.data(), job.contentType()));
+		} catch (ExtractionException e) {
+			error = readErrorText(e);
+		} catch (RuntimeException e) {
+			log.warn("Reading document {} failed", job.id(), e);
+			error = "Reading failed. Press Read with AI to try again.";
+		}
+
+		try {
+			storeRead(job.id(), job.queuedAt(), details, error);
+		} catch (RuntimeException e) {
+			// e.g. the AI's text does not fit a column: without this the same document would
+			// be picked (and sent to the AI) again every tick, blocking everything behind it.
+			log.warn("Storing the reading of document {} failed", job.id(), e);
+			markReadFailed(job.id(), job.queuedAt(), "The details could not be stored. Press Read with AI to try again.");
+		}
+		return true;
+	}
+
+	private void storeRead(UUID id, Instant queuedAt, DocumentDetails details, String error) {
+		transaction.executeWithoutResult(status -> documents.findById(id)
+				// Deleted, or the user saved/read it meanwhile (queue time changed): leave it alone.
+				.filter(d -> queuedAt.equals(d.getReadQueuedAt()))
+				.ifPresent(d -> {
+					if (details != null) {
+						d.replaceDetails(details, DocumentStatus.EXTRACTED);
+					} else {
+						d.readFailed(error);
+					}
+				}));
+	}
+
+	/** Takes the document out of the queue with a reason (own transaction, so it can follow a failed one). */
+	private void markReadFailed(UUID id, Instant queuedAt, String message) {
+		storeRead(id, queuedAt, null, message);
+	}
+
+	/** The message the user sees when reading fails (a missing key gets a how-to-fix hint). */
+	private static String readErrorText(ExtractionException e) {
+		return ExtractionException.NOT_CONFIGURED.equals(e.getCode()) ? AI_NOT_SET_UP : e.getMessage();
 	}
 
 	@Transactional

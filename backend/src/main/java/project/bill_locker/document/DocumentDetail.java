@@ -28,7 +28,10 @@ public record DocumentDetail(
 		BigDecimal totalAmount,
 		List<DocumentItemView> items,
 		Instant createdAt,
-		Instant updatedAt) {
+		Instant updatedAt,
+		boolean readQueued,
+		String readError,
+		String sourceGmail) {
 
 	static DocumentDetail of(Document d) {
 		return new DocumentDetail(d.getId(), d.getFileName(), d.getContentType(), d.getSizeBytes(), d.getStatus(),
@@ -38,6 +41,7 @@ public record DocumentDetail(
 				d.getBuyerName(), d.getBuyerAddress(), d.getBuyerEmail(),
 				d.getPurchaseDate(), d.getTaxAmount(), d.getTotalAmount(),
 				d.getItems().stream().map(DocumentItemView::of).toList(),
-				d.getCreatedAt(), d.getUpdatedAt());
+				d.getCreatedAt(), d.getUpdatedAt(),
+				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail());
 	}
 }

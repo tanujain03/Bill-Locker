@@ -18,6 +18,7 @@ import { AppHeader } from '../components/AppHeader';
 import { CopyButton } from '../components/documents/CopyButton';
 import { DetailsForm } from '../components/documents/DetailsForm';
 import { DocumentPreview } from '../components/documents/DocumentPreview';
+import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
 import { StatusBadge } from '../components/documents/StatusBadge';
 import { Alert } from '../components/FormParts';
 import { ApiError, errorMessage } from '../lib/api';
@@ -30,6 +31,7 @@ import {
   saveDocument,
   type DocumentDetail,
 } from '../lib/documents';
+import { usePolling } from '../lib/usePolling';
 
 type Message = { tone: 'error' | 'success' | 'info'; text: string };
 
@@ -95,6 +97,21 @@ export function DocumentPage() {
       .catch((error) => setMessage({ tone: 'error', text: errorMessage(error) }));
     // Runs again only when the id changes (read and searchParams are left out on purpose).
   }, [id]);
+
+  // Queued for the background AI read (e.g. imported from Gmail): ask again every 3 s.
+  // Only a document the user hasn't edited is replaced, so typing is never lost.
+  const waiting = Boolean(document?.readQueued) && !dirty;
+  usePolling(Boolean(document?.readQueued), () => {
+    getDocument(id)
+      .then((d) => {
+        if (d.readQueued || dirty) return;
+        show(d);
+        if (d.status === 'EXTRACTED') {
+          setMessage({ tone: 'info', text: 'Details read by AI. Please check them, fix anything wrong, then save.' });
+        }
+      })
+      .catch(() => {}); // the next tick tries again
+  });
 
   /**
    * A new AI reading is stored straight away, so ask first when it would replace
@@ -208,13 +225,18 @@ export function DocumentPage() {
         ) : (
           <>
             <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-              <div className="min-w-0">
-                <h1 className="truncate text-2xl font-semibold tracking-tight">
-                  {document.sellerName ?? document.fileName}
-                </h1>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                  <StatusBadge status={document.status} />
-                  {document.sellerName && <span className="truncate">{document.fileName}</span>}
+              <div className="flex min-w-0 items-center gap-3">
+                <FileTypeIcon contentType={document.contentType} />
+                <div className="min-w-0">
+                  <h1 className="truncate text-2xl font-semibold tracking-tight">
+                    {document.sellerName ?? document.fileName}
+                  </h1>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                    <StatusBadge status={document.status} reading={document.readQueued} />
+                    {/* Where it came from, with the Gmail address in full here. */}
+                    <SourceBadge sourceGmail={document.sourceGmail} showAccount />
+                    {document.sellerName && <span className="truncate">{document.fileName}</span>}
+                  </div>
                 </div>
               </div>
 
@@ -251,6 +273,12 @@ export function DocumentPage() {
               </div>
             )}
 
+            {document.readError && document.status === 'UPLOADED' && !document.readQueued && busy !== 'reading' && (
+              <div className="mt-4">
+                <Alert tone="error">{document.readError}</Alert>
+              </div>
+            )}
+
             <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
               {/* The file stays in view while you scroll the details, so you can compare. */}
               <div className="lg:sticky lg:top-4 lg:self-start">
@@ -258,7 +286,7 @@ export function DocumentPage() {
               </div>
 
               <form noValidate onSubmit={save} className="relative">
-                {busy === 'reading' && (
+                {(busy === 'reading' || waiting) && (
                   <div className="absolute inset-0 z-20 flex items-start justify-center rounded-xl bg-white/80 pt-24 backdrop-blur-[1px]">
                     <p
                       role="status"

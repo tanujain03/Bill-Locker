@@ -50,6 +50,8 @@ public class SecurityConfig {
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(HttpMethod.POST, PUBLIC_ENDPOINTS.toArray(String[]::new)).permitAll()
+						// Google's redirect carries no login token (the one-time state says who it is).
+						.requestMatchers(HttpMethod.GET, "/api/integrations/gmail/callback").permitAll()
 						.requestMatchers("/error").permitAll()
 						.anyRequest().authenticated())
 				// Read "Authorization: Bearer <token>" and verify it with jwtDecoder() below.

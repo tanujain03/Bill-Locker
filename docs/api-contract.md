@@ -4,16 +4,18 @@ This is the full REST API Bill Locker is heading towards. The backend and the
 frontend are rebuilt from scratch on the `restart` branch, one task at a time;
 each task implements a part of this contract.
 
-### Implemented so far (restart branch, tasks 1–2)
+### Implemented so far (restart branch, tasks 1–3)
 
 | Endpoint | Notes |
 |---|---|
 | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` | Complete, except login rate limiting |
 | `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` | Complete. The reset link is emailed over SMTP (`MAIL_*` settings); without them it is written to the backend log |
 | `/api/documents/...` (upload, extract, list + search, get, save, download, delete) | Complete, see section 8. Reading uses Google Gemini (`GEMINI_API_KEY`) |
+| `/api/integrations/gmail/...` (connect, callback, scan, emails, import / ignore / restore files, disconnect) | Complete, see section 13. Several Gmail addresses per user; needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_TOKEN_KEY`. Imported files are read by AI in the background |
 
-Everything else is not built yet. How tasks 1 and 2 work is explained in
-[`task-1-auth.md`](task-1-auth.md) and [`task-2-documents.md`](task-2-documents.md).
+Everything else is not built yet. How tasks 1, 2 and 3 work is explained in
+[`task-1-auth.md`](task-1-auth.md), [`task-2-documents.md`](task-2-documents.md) and
+[`task-3-gmail.md`](task-3-gmail.md).
 
 ---
 
@@ -51,12 +53,13 @@ to users (no stack traces, SQL or internal details).
 |---|---|
 | 400 | `VALIDATION_ERROR`, `INVALID_RESET_TOKEN`, `FILE_REQUIRED`, `INVALID_UPLOAD` |
 | 401 | `UNAUTHORIZED` (missing/expired token), `INVALID_CREDENTIALS` (login) |
-| 404 | `PRODUCT_NOT_FOUND`, `DOCUMENT_NOT_FOUND`, `SERVICE_RECORD_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `GMAIL_MESSAGE_NOT_FOUND` |
-| 409 | `EMAIL_ALREADY_REGISTERED`, `DOCUMENT_NOT_READY`, `DOCUMENT_ALREADY_CONFIRMED`, `GMAIL_NOT_CONNECTED` |
+| 404 | `PRODUCT_NOT_FOUND`, `DOCUMENT_NOT_FOUND`, `SERVICE_RECORD_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `GMAIL_ACCOUNT_NOT_FOUND`, `GMAIL_FILE_NOT_FOUND` |
+| 409 | `EMAIL_ALREADY_REGISTERED`, `DOCUMENT_NOT_READY`, `DOCUMENT_ALREADY_CONFIRMED`, `GMAIL_SCAN_RUNNING` |
 | 413 | `FILE_TOO_LARGE` |
 | 415 | `UNSUPPORTED_FILE_TYPE` |
 | 429 | `RATE_LIMITED` |
 | 500 | `SERVER_ERROR` |
+| 503 | `AI_NOT_CONFIGURED`, `GMAIL_NOT_CONFIGURED` |
 
 The frontend treats any `401` on an authenticated call as "session expired":
 it clears the token and sends the user to `/login`.
@@ -74,8 +77,9 @@ it clears the token and sends the user to `/login`.
 | `DocumentSource` | `UPLOAD`, `GMAIL` |
 | `ServiceType` | `ROUTINE_MAINTENANCE`, `REPAIR`, `INSTALLATION`, `INSPECTION`, `OTHER` |
 | `NotificationType` | `WARRANTY_EXPIRING`, `WARRANTY_EXPIRED`, `SERVICE_DUE`, `DOCUMENT_PROCESSED`, `GMAIL_BILLS_FOUND` |
-| `GmailSyncStatus` | `IDLE`, `SYNCING`, `ERROR` |
-| `GmailMessageStatus` | `NEW`, `IMPORTED`, `IGNORED` |
+| `GmailScanStatus` | `IDLE`, `QUEUED`, `SCANNING`, `ERROR` (built in task 3) |
+| `GmailFileStatus` | `NEW`, `IGNORED`, `IMPORTING`, `IMPORTED`, `FAILED` (built in task 3) |
+| `EmailKind` | `INVOICE`, `WARRANTY`, `SERVICE`, `RECEIPT`, `ORDER`, `UNSURE` (built in task 3) |
 
 ---
 
@@ -249,11 +253,19 @@ review) → `SAVED` (user saved it). `DocumentType` (task 2): `INVOICE`,
 }
 ```
 `DocumentSummary`: `id, fileName, contentType, sizeBytes, status, documentType,
-documentNumber, sellerName, purchaseDate, totalAmount, itemCount, firstProductName, createdAt`.
+documentNumber, sellerName, purchaseDate, totalAmount, itemCount, firstProductName, createdAt,
+readQueued, readError, sourceGmail`.
 `PUT` body = the details part of `DocumentDetail` (`documentType` … `items`), all optional.
 
-Later tasks: linking documents to products/warranties, Gmail as a source, AI search
-over documents.
+Added in task 3 (on both `DocumentDetail` and `DocumentSummary`):
+
+| Field | Meaning |
+|---|---|
+| `readQueued` | `true` while the document waits for the background AI read (set for Gmail imports). The UI shows "Reading…" and asks again every 3 s. A manual `extract` or `PUT` sets it back to `false` |
+| `readError` | Why the last background read failed (e.g. no `GEMINI_API_KEY`); the status stays `UPLOADED` and the user can press Read with AI. `null` otherwise |
+| `sourceGmail` | The Gmail address the file was imported from, `null` for uploads |
+
+Later tasks: linking documents to products/warranties, AI search over documents.
 
 ---
 
@@ -348,57 +360,107 @@ question was understood.
 
 ## 13. Gmail import
 
-Lets users import bills from their inbox instead of uploading files. Google tokens
-never reach the browser.
+Built in task 3 (details in [`task-3-gmail.md`](task-3-gmail.md)). Lets users import
+bills from one or more Gmail inboxes instead of uploading files. Scope
+`gmail.readonly` only. Google tokens never reach the browser. Scanning, importing and
+reading the imported documents run in background workers; the endpoints only change
+rows and answer at once.
+
+Enums: `GmailScanStatus` (`IDLE`, `QUEUED`, `SCANNING`, `ERROR`), `GmailFileStatus`
+(`NEW`, `IGNORED`, `IMPORTING`, `IMPORTED`, `FAILED`), `EmailKind` (`INVOICE`,
+`WARRANTY`, `SERVICE`, `RECEIPT`, `ORDER`, `UNSURE`), `ScanRange` (`SIX_MONTHS`,
+`ONE_YEAR`, `TWO_YEARS`, `FIVE_YEARS`), `EmailView` (`TO_REVIEW`, `IGNORED`,
+`IMPORTED`).
 
 ### OAuth flow
 ```
-UI  ── POST /api/integrations/gmail/connect ──▶ backend: create OAuth `state` bound to the user
-UI  ◀─ { authorizationUrl } ─────────────────── (Google consent URL, scope gmail.readonly,
-                                                 access_type=offline, prompt=consent)
+UI  ── POST /api/integrations/gmail/connect ──▶ backend: one-time `state` (hash stored) + PKCE
+                                                 verifier + browser nonce (hash stored)
+UI  ◀─ { authorizationUrl } + Set-Cookie: gmail_connect=<nonce>; HttpOnly; SameSite=Lax;
+        Path=/api/integrations/gmail; Max-Age=600
 UI  ── window.location = authorizationUrl ────▶ Google consent screen
-Google ── GET /api/integrations/gmail/callback?code&state ──▶ backend: verify state, exchange
-                                                 code, store refresh token encrypted, start a scan
-backend ── 302 ──▶ {FRONTEND_URL}/gmail?status=connected   (or ?status=error&reason=…)
+Google ── GET /api/integrations/gmail/callback?code&state ──▶ backend: state used once, cookie
+                                                 must match, exchange code, store refresh token
+                                                 encrypted, queue a scan
+backend ── 302 ──▶ {FRONTEND_URL}/gmail?connected=<address>   (or ?error=denied|expired|failed)
 ```
-The callback is a browser redirect without a JWT — the user is resolved from the
-server-side `state`. The frontend only follows `authorizationUrl` if it is on
-`accounts.google.com` or the app's own origin.
+- The callback is a browser redirect without a JWT; the user comes from the
+  server-side `state` (valid 10 minutes, deleted atomically when used).
+- It also needs the `gmail_connect` cookie of the browser that clicked Connect, so
+  someone else's Connect link can't attach your mailbox to their account. Missing or
+  different cookie, unknown, used or expired state → `?error=expired`. The cookie is
+  always cleared.
+- It **always** answers `302` to the Gmail page, never an error page: `?error=denied`
+  (you refused or Google sent an error), `?error=expired` (above), `?error=failed`
+  (anything else).
+- A user may connect several addresses; the same address again replaces its token.
+- The frontend only follows `authorizationUrl` if it is on `accounts.google.com`.
 
 ### Scan
-Search recent mail (e.g. `newer_than:1y (invoice OR receipt OR bill OR "order confirmation" OR warranty)`),
-let the AI classify each candidate (`detectedType`, `confidence`), and store the
-shortlist. Nothing is imported automatically.
+`after:<date> has:attachment (invoice OR receipt OR bill OR warranty OR guarantee OR service OR "order confirmation" OR "tax invoice")`,
+newest 200 emails per scan, emails already stored are skipped. A file is offered when it
+is a PDF/JPEG/PNG/WebP (by type, or extension for `application/octet-stream`), not
+inline, has a file name, is ≤ 10 MB, and an image is ≥ 20 KB. Emails are classified by
+keyword rules into `EmailKind`; junk without an "invoice" file is dropped. Only sender,
+subject, Gmail's preview, date and file names are stored, never the body. Nothing is
+imported automatically. The first scan after connecting covers `ONE_YEAR`.
+
+Google errors: 401, `invalid_grant` and 403 (other than the rate-limit / API-disabled
+reasons) mean access was removed (`lastError`: "Gmail access was removed. Connect this
+account again."); other 403s, 429, 5xx and network errors are temporary ("Gmail could
+not be reached. Try Scan again later.").
 
 ### Endpoints
+All need the Bearer token except the callback. Another user's account or file → `404`.
+Connect, scan, import, ignore, restore and disconnect answer `503 GMAIL_NOT_CONFIGURED` when the server has no Google
+settings (`GET /api/integrations/gmail` still answers, with `configured: false`, and `GET .../emails` lists what exists).
+
 | Method & path | Result |
 |---|---|
-| `GET /api/integrations/gmail` | `GmailConnection` — `{ connected, email, connectedAt, lastSyncedAt, autoSync, syncStatus, lastError }` (polled every 1.5 s while `SYNCING`) |
-| `POST /api/integrations/gmail/connect` | `{ "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?..." }` |
-| `GET /api/integrations/gmail/callback` | OAuth redirect target (backend only) → 302 to the frontend |
-| `POST /api/integrations/gmail/sync` | `GmailConnection` with `syncStatus: "SYNCING"`; `409 GMAIL_NOT_CONNECTED` |
-| `PUT /api/integrations/gmail/settings` | `{ "autoSync": true }` → `GmailConnection` (daily background scan) |
-| `GET /api/integrations/gmail/messages` | `GmailMessage[]` |
-| `POST /api/integrations/gmail/import` | `{ "messageIds": ["…"] }` → `{ "documents": DocumentSummary[] }` — each attachment (or the email body rendered to PDF when there's no attachment) enters the normal document pipeline with `source: "GMAIL"` |
-| `POST /api/integrations/gmail/messages/{id}/ignore` | `GmailMessage` with `status: "IGNORED"` |
-| `DELETE /api/integrations/gmail` | `204` — revoke the Google token, delete stored tokens and the shortlist (imported documents stay) |
+| `GET /api/integrations/gmail` | `GmailOverview` (polled every 3 s while an account is `QUEUED` / `SCANNING`) |
+| `POST /api/integrations/gmail/connect` | `{ "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?..." }` + the `gmail_connect` cookie. `503 GMAIL_NOT_CONFIGURED` |
+| `GET /api/integrations/gmail/callback` | OAuth redirect target (backend only, public) → `302` as above |
+| `POST /api/integrations/gmail/accounts/{id}/scan` `{ "range": "ONE_YEAR" }` | `GmailAccountView` with `scanStatus: "QUEUED"`. `404 GMAIL_ACCOUNT_NOT_FOUND`, `409 GMAIL_SCAN_RUNNING` (already `QUEUED` / `SCANNING`), `400 VALIDATION_ERROR` (bad range), `503` |
+| `GET /api/integrations/gmail/emails?view=TO_REVIEW` | `GmailEmailView[]`, newest first. Each email lists only its files in that view. `TO_REVIEW` = files `NEW` + `IMPORTING` + `FAILED`, `IGNORED` = `IGNORED`, `IMPORTED` = `IMPORTED`. `400 INVALID_VIEW` |
+| `POST /api/integrations/gmail/files/import` `{ "fileIds": ["…"] }` | `GmailFileView[]` (same order). `NEW`, `IGNORED`, `FAILED` and `IMPORTED`-with-a-deleted-document files become `IMPORTING`; other files are returned unchanged. A background worker downloads each and creates a document (status `UPLOADED`, `readQueued: true`, `sourceGmail`) that is then read by AI. `400 VALIDATION_ERROR`, `404 GMAIL_FILE_NOT_FOUND`, `503` |
+| `POST /api/integrations/gmail/files/ignore` `{ "fileIds": [...] }` | `GmailFileView[]`: `NEW` / `FAILED` → `IGNORED` |
+| `POST /api/integrations/gmail/files/restore` `{ "fileIds": [...] }` | `GmailFileView[]`: `IGNORED` → `NEW` |
+| `DELETE /api/integrations/gmail/accounts/{id}` | `204` — revoke the Google token (best effort), delete the account, its emails and files (imported documents stay). `404 GMAIL_ACCOUNT_NOT_FOUND` |
+
+`fileIds` holds 1–100 ids (`400 VALIDATION_ERROR` otherwise). All ids are checked first:
+if any is not the caller's, the answer is `404 GMAIL_FILE_NOT_FOUND` and nothing changes.
 
 ```json
-// GmailMessage
+// GmailOverview
 {
-  "id": "…",
+  "configured": true,
+  "accounts": [{
+    "id": "…", "email": "asha@gmail.com", "scanStatus": "IDLE",
+    "lastScannedAt": "2026-10-07T09:12:00Z", "lastError": null, "connectedAt": "2026-10-07T09:10:00Z"
+  }],
+  "counts": { "toReview": 4, "ignored": 1, "imported": 7 }
+}
+
+// GmailEmailView
+{
+  "id": "…", "accountEmail": "asha@gmail.com",
   "fromName": "Amazon.in", "fromEmail": "auto-confirm@amazon.in",
   "subject": "Your Amazon.in order of Sony WH-1000XM5 Wireless Headphones",
   "snippet": "The tax invoice for order #408-… is attached.",
-  "receivedAt": "…",
-  "attachments": [{ "fileName": "Invoice_408-5561234-9912.pdf", "mimeType": "application/pdf", "size": 84213 }],
-  "detectedType": "INVOICE",
-  "confidence": 0.97,
-  "status": "NEW",
-  "documentIds": []
+  "receivedAt": "2026-10-05T08:00:00Z",
+  "kind": "INVOICE",
+  "files": [{
+    "id": "…", "fileName": "Invoice_408-5561234-9912.pdf", "contentType": "application/pdf",
+    "sizeBytes": 84213, "status": "IMPORTED", "error": null,
+    "document": { "id": "…", "status": "UPLOADED", "readQueued": true }
+  }]
 }
 ```
-The UI offers "Import all" only for emails with `confidence ≥ 0.6`.
+`GmailFileView` is the `files[]` item. `document` is `null` until the file is imported
+(and again after that document is deleted); `error` is set when `status` is `FAILED`
+("This file is no longer in Gmail.", "This file isn't a PDF or image Bill Locker can read.", …).
+`GmailAccountView` is the `accounts[]` item. A `scanStatus` of `ERROR` comes with a
+`lastError` the user can act on.
 
 ---
 

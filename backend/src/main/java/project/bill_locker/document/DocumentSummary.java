@@ -19,12 +19,16 @@ public record DocumentSummary(
 		BigDecimal totalAmount,
 		int itemCount,
 		String firstProductName,
-		Instant createdAt) {
+		Instant createdAt,
+		boolean readQueued,
+		String readError,
+		String sourceGmail) {
 
 	static DocumentSummary of(Document d) {
 		var items = d.getItems();
 		return new DocumentSummary(d.getId(), d.getFileName(), d.getContentType(), d.getSizeBytes(), d.getStatus(),
 				d.getDocumentType(), d.getDocumentNumber(), d.getSellerName(), d.getPurchaseDate(), d.getTotalAmount(),
-				items.size(), items.isEmpty() ? null : items.getFirst().getProductName(), d.getCreatedAt());
+				items.size(), items.isEmpty() ? null : items.getFirst().getProductName(), d.getCreatedAt(),
+				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail());
 	}
 }

@@ -42,6 +42,12 @@ export type DocumentDetail = DocumentDetails & {
   sizeBytes: number;
   status: DocumentStatus;
   documentUrl: string;
+  /** Waiting for the background AI read. */
+  readQueued: boolean;
+  /** Why the last background read failed (status stays UPLOADED). */
+  readError: string | null;
+  /** The Gmail address an imported document came from; null for uploads. */
+  sourceGmail: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -59,6 +65,9 @@ export type DocumentSummary = {
   totalAmount: number | null;
   itemCount: number;
   firstProductName: string | null;
+  readQueued: boolean;
+  readError: string | null;
+  sourceGmail: string | null;
   createdAt: string;
 };
 
