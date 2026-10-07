@@ -1,12 +1,14 @@
 import { Navigate, Route, Routes } from 'react-router';
+import { AppLayout } from './components/AppLayout';
 import { GmailPage } from './pages/GmailPage';
 import { GuestOnly, RequireAuth } from './components/RouteGuards';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { DocumentPage } from './pages/DocumentPage';
 import { DocumentsPage } from './pages/DocumentsPage';
-import { HomePage } from './pages/HomePage';
+import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { WarrantiesPage } from './pages/WarrantiesPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
 /** Which page shows for which URL. */
@@ -26,10 +28,14 @@ export function App() {
 
       {/* Only for signed-in users; others are sent to /login. */}
       <Route element={<RequireAuth />}>
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/documents" element={<DocumentsPage />} />
-        <Route path="/gmail" element={<GmailPage />} />
-        <Route path="/documents/:id" element={<DocumentPage />} />
+        {/* Every signed-in page sits in the same frame: navigation on the left. */}
+        <Route element={<AppLayout />}>
+          <Route path="/home" element={<DashboardPage />} />
+          <Route path="/documents" element={<DocumentsPage />} />
+          <Route path="/gmail" element={<GmailPage />} />
+          <Route path="/warranties" element={<WarrantiesPage />} />
+          <Route path="/documents/:id" element={<DocumentPage />} />
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

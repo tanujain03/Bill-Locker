@@ -35,4 +35,26 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 			""")
 	List<Document> search(@Param("userId") UUID userId, @Param("type") DocumentType type,
 			@Param("status") DocumentStatus status, @Param("search") String search);
+
+	/**
+	 * The user's saved bills with their products, in one query ("join fetch"), for the
+	 * dashboard and the warranties page. Only saved bills: their details were checked.
+	 */
+	@Query("""
+			select distinct d from Document d left join fetch d.items
+			where d.user.id = :userId and d.status = project.bill_locker.document.DocumentStatus.SAVED
+			""")
+	List<Document> findSavedWithItems(@Param("userId") UUID userId);
+
+	// ---- Counts and lists for the dashboard ----
+
+	long countByUserIdAndStatus(UUID userId, DocumentStatus status);
+
+	/** Waiting for the background AI read. */
+	long countByUserIdAndReadQueuedAtIsNotNull(UUID userId);
+
+	/** The background AI read failed and nobody has read it since. */
+	long countByUserIdAndStatusAndReadErrorIsNotNullAndReadQueuedAtIsNull(UUID userId, DocumentStatus status);
+
+	List<Document> findTop5ByUserIdOrderByCreatedAtDesc(UUID userId);
 }

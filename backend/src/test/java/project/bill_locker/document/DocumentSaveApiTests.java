@@ -138,4 +138,19 @@ class DocumentSaveApiTests extends DocumentApiTestBase {
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.code").value("DOCUMENT_NOT_FOUND"));
 	}
+
+	@Test
+	void saveFillsEmptyWarrantyEnd() throws Exception {
+		String token = registerAndGetToken(uniqueEmail("fill-end"));
+		String id = uploadPdf(token, "bill.pdf");
+		String json = """
+				{"items": [{"productName": "Phone", "warrantyPeriodMonths": 12, "warrantyStartDate": "2026-01-10"}]}
+				""";
+
+		save(token, id, json)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.items[0].warrantyEndDate").value("2027-01-09"));
+		mvc.perform(get("/api/documents/" + id).header("Authorization", bearer(token)))
+				.andExpect(jsonPath("$.items[0].warrantyEndDate").value("2027-01-09"));
+	}
 }

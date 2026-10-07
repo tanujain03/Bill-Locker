@@ -4,7 +4,7 @@ This is the full REST API Bill Locker is heading towards. The backend and the
 frontend are rebuilt from scratch on the `restart` branch, one task at a time;
 each task implements a part of this contract.
 
-### Implemented so far (restart branch, tasks 1–3)
+### Implemented so far (restart branch, tasks 1–4)
 
 | Endpoint | Notes |
 |---|---|
@@ -12,10 +12,12 @@ each task implements a part of this contract.
 | `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` | Complete. The reset link is emailed over SMTP (`MAIL_*` settings); without them it is written to the backend log |
 | `/api/documents/...` (upload, extract, list + search, get, save, download, delete) | Complete, see section 8. Reading uses Google Gemini (`GEMINI_API_KEY`) |
 | `/api/integrations/gmail/...` (connect, callback, scan, emails, import / ignore / restore files, disconnect) | Complete, see section 13. Several Gmail addresses per user; needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_TOKEN_KEY`. Imported files are read by AI in the background |
+| `GET /api/warranties`, `GET /api/dashboard` | Complete, see sections 6 and 7. Computed from **saved** bills' product lines (no product/warranty tables yet) |
 
-Everything else is not built yet. How tasks 1, 2 and 3 work is explained in
-[`task-1-auth.md`](task-1-auth.md), [`task-2-documents.md`](task-2-documents.md) and
-[`task-3-gmail.md`](task-3-gmail.md).
+Everything else is not built yet. How tasks 1–4 work is explained in
+[`task-1-auth.md`](task-1-auth.md), [`task-2-documents.md`](task-2-documents.md),
+[`task-3-gmail.md`](task-3-gmail.md) and [`task-4-dashboard.md`](task-4-dashboard.md).
+A query parameter of the wrong kind (e.g. `?status=BAD`) answers `400 VALIDATION_ERROR`.
 
 ---
 
@@ -182,36 +184,58 @@ date of the product's most recent service record.
 
 ## 6. Warranties
 
-Warranty maths is deterministic Java code — never the LLM:
+Built on `restart` (task 4) from the product lines of **saved** bills. Warranty maths is
+plain Java (`WarrantyRules`), never the AI:
 
-- `expiryDate = startDate.plusMonths(warrantyMonths).minusDays(1)` (e.g. 2026-09-15 + 24 months → **2028-09-14**)
-- `daysRemaining = expiryDate − today` (whole days, negative once expired)
-- `status`: `UNKNOWN` if months or start date is missing (or months = 0); `EXPIRED` if `daysRemaining < 0`;
-  `EXPIRING_SOON` if `0 ≤ daysRemaining ≤ 30`; otherwise `ACTIVE`.
+- end date = the printed `warrantyEndDate`, or else `start.plusMonths(months).minusDays(1)`
+  when both are set and months > 0 (2026-01-10 + 12 months → **2027-01-09**), or else unknown
+- `daysLeft = endDate − today` (whole days, negative once expired, `null` when unknown)
+- `status`: `NO_INFO` when unknown; `EXPIRED` if `daysLeft < 0`; `EXPIRING_SOON` if
+  `0 ≤ daysLeft ≤ 30`; otherwise `ACTIVE`.
 
-### `GET /api/warranties?status=` → `Warranty[]` (soonest expiry first, unknown last)
-`Warranty` = the product's warranty summary plus `productId`, `productName`,
-`productBrand`, `categoryName`, `categorySlug`, `sourceDocumentId`.
+### `GET /api/warranties?status=&q=`
+```json
+{
+  "counts": { "all": 7, "active": 3, "expiringSoon": 2, "expired": 1, "noInfo": 1 },
+  "items": [{
+    "documentId": "…", "productName": "LG Air Conditioner", "modelNumber": null, "serialNumber": null,
+    "sellerName": "Reliance Digital", "warrantyProvider": "LG", "purchaseDate": "2026-03-21",
+    "startDate": null, "endDate": "2026-10-19", "daysLeft": 12, "status": "EXPIRING_SOON"
+  }]
+}
+```
+`status` (optional) filters the items only; `q` (optional, case-insensitive: product,
+model, serial, seller, warranty provider) filters items **and** counts. Order: expiring
+soon and active by end date ascending, expired most recent first, no info by purchase date
+descending. Bad `status` → 400.
 
 ---
 
 ## 7. Dashboard
 
-### `GET /api/dashboard/summary`
+### `GET /api/dashboard`
 ```json
 {
-  "totalProducts": 9,
-  "totalDocuments": 13,
-  "documentsToReview": 1,
-  "totalSpending": 395348,
-  "currency": "INR",
-  "warranties": { "total": 9, "active": 4, "expiringSoon": 2, "expired": 2, "unknown": 1 },
-  "spendingByCategory": [{ "categoryName": "Home Appliances", "categorySlug": "home-appliances", "amount": 163470 }],
-  "upcomingExpirations": [ /* Warranty[], 0–90 days left, soonest first */ ],
-  "upcomingServices": [ /* ServiceRecord[], next service within 60 days or overdue, one per product */ ],
-  "recentDocuments": [ /* DocumentSummary[], 5 newest */ ]
+  "savedBills": 24, "savedBillsThisMonth": 4,
+  "products": 31, "productsWithWarranty": 27,
+  "totalSpent": 412350.00, "spentThisMonth": 38200.00,
+  "attention": { "toReview": 2, "readFailed": 1, "reading": 0 },
+  "warranties": { "active": 18, "expiringSoon": 3, "expired": 6, "noInfo": 4 },
+  "expiringSoon": [ /* Warranty items as in section 6, the 5 nearest EXPIRING_SOON */ ],
+  "spendingByMonth": [ { "month": "2025-11", "amount": 0.00, "bills": 0 } /* … 12 entries, current month last */ ],
+  "billsWithoutDateOrTotal": 2,
+  "topShops": [ { "name": "Croma", "amount": 120000.00, "bills": 5 } ],
+  "recentBills": [ /* DocumentSummary[], the 5 newest, any status */ ]
 }
 ```
+- Money, products and warranties: **saved** bills only. `this month` = purchase date in the
+  current month. `attention` counts all the user's documents: `toReview` = EXTRACTED,
+  `readFailed` = UPLOADED with a background-read error, `reading` = queued for the AI.
+- `spendingByMonth`: by purchase date; bills outside the 12 months or without a date or total
+  are left out (`billsWithoutDateOrTotal` counts the latter).
+- `topShops`: up to 5, grouped by seller name ignoring case and outer spaces, shown with the
+  spelling of the most recent bill.
+- An empty account answers zeros and empty lists.
 
 ---
 

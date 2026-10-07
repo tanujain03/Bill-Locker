@@ -24,7 +24,7 @@ public record DocumentSummary(
 		String readError,
 		String sourceGmail) {
 
-	static DocumentSummary of(Document d) {
+	public static DocumentSummary of(Document d) {
 		var items = d.getItems();
 		return new DocumentSummary(d.getId(), d.getFileName(), d.getContentType(), d.getSizeBytes(), d.getStatus(),
 				d.getDocumentType(), d.getDocumentNumber(), d.getSellerName(), d.getPurchaseDate(), d.getTotalAmount(),

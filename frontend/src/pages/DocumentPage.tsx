@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
-import { AppHeader } from '../components/AppHeader';
 import { CopyButton } from '../components/documents/CopyButton';
 import { DetailsForm } from '../components/documents/DetailsForm';
 import { DocumentPreview } from '../components/documents/DocumentPreview';
@@ -205,7 +204,6 @@ export function DocumentPage() {
 
   return (
     <div className="min-h-dvh">
-      <AppHeader />
       <main className="mx-auto max-w-7xl px-4 py-6">
         <Link
           to="/documents"

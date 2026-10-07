@@ -180,7 +180,8 @@ x-goog-api-key: <GEMINI_API_KEY>          ← a header, so the key never appears
   500 characters is cut; an amount with more than 10 digits (a misreading) → empty. Only an
   answer that isn't JSON at all fails the read.
 - If a product has a warranty start and length but no end date, the service works
-  it out: start 10 Jan 2026 + 12 months → ends 9 Jan 2027.
+  it out, after an AI read and (since task 4) on save: start 10 Jan 2026 + 12 months →
+  ends 9 Jan 2027.
 - Errors become messages you can act on: HTTP 429 → "free Gemini limit is used
   up…", 400 → "couldn't open this file", 401/403/404 → "check GEMINI_API_KEY and
   GEMINI_MODEL", 503 → "Gemini is busy", anything else or

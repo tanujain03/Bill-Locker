@@ -21,6 +21,7 @@ import project.bill_locker.common.ApiException;
 import project.bill_locker.document.ai.DetailExtractor;
 import project.bill_locker.document.ai.ExtractionException;
 import project.bill_locker.user.UserRepository;
+import project.bill_locker.warranty.WarrantyRules;
 
 /** The rules for documents: what may be uploaded, who may see what. */
 @Service
@@ -111,8 +112,8 @@ public class DocumentService {
 	public DocumentDetail save(UUID userId, UUID id, SaveDocumentRequest request) {
 		Document document = findOwned(userId, id);
 		DocumentDetails details = request.toDetails();
-		checkWarrantyDates(details);
-		document.replaceDetails(details, DocumentStatus.SAVED);
+		checkWarrantyDates(details); // checks what the user typed, before we fill anything in
+		document.replaceDetails(withWarrantyEndDates(details), DocumentStatus.SAVED);
 		return DocumentDetail.of(document);
 	}
 
@@ -238,16 +239,18 @@ public class DocumentService {
 	}
 
 	/**
-	 * Bills often print "Warranty: 12 months" but no end date. Then we work it out:
-	 * a 12-month warranty starting 10 Jan 2026 covers up to and including 9 Jan 2027.
+	 * Bills often print "Warranty: 12 months" but no end date. Then we work it out
+	 * (WarrantyRules: a 12-month warranty starting 10 Jan 2026 covers up to and
+	 * including 9 Jan 2027). Runs on AI reads and on save, so a typed-in bill gets
+	 * its end date too.
 	 */
 	private static DocumentDetails withWarrantyEndDates(DocumentDetails d) {
 		List<DocumentItemView> items = d.items().stream().map(item -> {
-			if (item.warrantyEndDate() != null || item.warrantyStartDate() == null
-					|| item.warrantyPeriodMonths() == null) {
+			LocalDate end = WarrantyRules.effectiveEnd(item.warrantyEndDate(), item.warrantyStartDate(),
+					item.warrantyPeriodMonths());
+			if (end == null || end.equals(item.warrantyEndDate())) {
 				return item;
 			}
-			LocalDate end = item.warrantyStartDate().plusMonths(item.warrantyPeriodMonths()).minusDays(1);
 			return new DocumentItemView(item.productName(), item.modelNumber(), item.serialNumber(), item.unitPrice(),
 					item.warrantyPeriodMonths(), item.warrantyStartDate(), end, item.warrantyProvider());
 		}).toList();

@@ -1,7 +1,6 @@
-import { Search, Upload } from 'lucide-react';
+import { CalendarDays, Search, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
-import { Link, useNavigate } from 'react-router';
-import { AppHeader } from '../components/AppHeader';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
 import { StatusBadge } from '../components/documents/StatusBadge';
 import { Alert } from '../components/FormParts';
@@ -10,6 +9,7 @@ import {
   DOCUMENT_TYPE_LABELS,
   formatAmount,
   listDocuments,
+  monthLabel,
   uploadDocument,
   type DocumentStatus,
   type DocumentSummary,
@@ -26,11 +26,27 @@ export function DocumentsPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  const [q, setQ] = useState('');
-  const [type, setType] = useState('');
-  const [status, setStatus] = useState('');
+  // The filters live in the URL (?q=&type=&status=&source=&month=), so a link from the
+  // dashboard opens the list already filtered, and Back/refresh keep the filters.
+  const [params, setParams] = useSearchParams();
+  const q = params.get('q') ?? '';
+  const type = params.get('type') ?? '';
+  const status = params.get('status') ?? '';
   /** '' (all), 'UPLOAD' or 'GMAIL'. Filtered here: the list is already loaded. */
-  const [source, setSource] = useState('');
+  const source = params.get('source') ?? '';
+  /** 'YYYY-MM': bills bought in that month (filtered here, like source). */
+  const monthParam = params.get('month') ?? '';
+  const month = /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : ''; // ignore a malformed ?month=
+  const setFilter = (name: string) => (value: string) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value) next.set(name, value);
+        else next.delete(name);
+        return next;
+      },
+      { replace: true }, // typing in the search box shouldn't fill the Back history
+    );
   const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
 
@@ -85,7 +101,6 @@ export function DocumentsPage() {
 
   return (
     <div className="min-h-dvh">
-      <AppHeader />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
         <p className="mt-1 text-slate-600">Upload invoices, warranty cards and receipts. We read the details for you.</p>
@@ -138,15 +153,28 @@ export function DocumentsPage() {
             <input
               type="search"
               value={q}
-              onChange={(e) => setQ(e.target.value)}
+              onChange={(e) => setFilter('q')(e.target.value)}
               placeholder="Search seller, product, number or file name"
               className="block w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-9 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
             />
           </label>
-          <Select label="Type" value={type} onChange={setType} options={Object.entries(DOCUMENT_TYPE_LABELS)} />
-          <Select label="Status" value={status} onChange={setStatus} options={STATUS_OPTIONS} />
-          <Select label="From" value={source} onChange={setSource} options={SOURCE_OPTIONS} />
+          <Select label="Type" value={type} onChange={setFilter('type')} options={Object.entries(DOCUMENT_TYPE_LABELS)} />
+          <Select label="Status" value={status} onChange={setFilter('status')} options={STATUS_OPTIONS} />
+          <Select label="From" value={source} onChange={setFilter('source')} options={SOURCE_OPTIONS} />
         </div>
+
+        {month && (
+          // Set by a bar of the dashboard's spending chart; one click removes it.
+          <button
+            type="button"
+            onClick={() => setFilter('month')('')}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100"
+          >
+            <CalendarDays className="size-4" aria-hidden />
+            Bought in {monthLabel(month)}
+            <X className="size-4" aria-label="Remove month filter" />
+          </button>
+        )}
 
         {listError && (
           <div className="mt-4">
@@ -155,8 +183,12 @@ export function DocumentsPage() {
         )}
         {documents && (
           <DocumentList
-            documents={documents.filter((d) => !source || (source === 'GMAIL') === Boolean(d.sourceGmail))}
-            filtered={Boolean(q || type || status || source)}
+            documents={documents.filter(
+              (d) =>
+                (!source || (source === 'GMAIL') === Boolean(d.sourceGmail)) &&
+                (!month || (d.purchaseDate ?? '').startsWith(month)),
+            )}
+            filtered={Boolean(q || type || status || source || month)}
           />
         )}
       </main>

@@ -1,7 +1,6 @@
 import { Info, Mail, Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { AppHeader } from '../components/AppHeader';
 import { Alert } from '../components/FormParts';
 import { AccountCard } from '../components/gmail/AccountCard';
 import { EmailCard } from '../components/gmail/EmailCard';
@@ -132,7 +131,6 @@ export function GmailPage() {
 
   return (
     <div className="min-h-dvh">
-      <AppHeader />
       <main className="mx-auto max-w-6xl px-4 py-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

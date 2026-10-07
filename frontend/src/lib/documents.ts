@@ -124,6 +124,10 @@ export const saveDocument = (id: string, details: DocumentDetails) =>
 export const deleteDocument = (id: string) => api<null>(`/documents/${id}`, { method: 'DELETE' });
 export const downloadDocument = (id: string) => fetchBlob(`/documents/${id}/download`);
 
+/** "2026-09" → "Sep 2026". */
+export const monthLabel = (month: string) =>
+  new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+
 /** 1499 → "1,499.00" (Indian digit grouping; bills don't tell us the currency yet). */
 export const formatAmount = (amount: number) =>
   amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

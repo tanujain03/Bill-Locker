@@ -12,6 +12,7 @@ import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /**
@@ -37,6 +38,13 @@ public class GlobalExceptionHandler {
 			fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage());
 		}
 		return respond(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Please check the highlighted fields.", fieldErrors);
+	}
+
+	/** A query parameter of the wrong kind, e.g. ?status=BAD: a 400, not a crash. */
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	ResponseEntity<ApiErrorBody> handleBadParameter(MethodArgumentTypeMismatchException ex) {
+		return respond(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Please check the filters.",
+				Map.of(ex.getName(), "Not a valid value."));
 	}
 
 	@ExceptionHandler(HttpMessageNotReadableException.class)

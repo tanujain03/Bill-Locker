@@ -38,6 +38,12 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   queue: `GmailScanWorker`, `GmailImportWorker` and `DocumentReadWorker` run every 3 s from
   `WorkerSchedule`; imported documents are read by Gemini in the background (`documents.read_queued_at`,
   `read_error`, `source_gmail`; "Reading…" in the UI). Guide: `docs/task-3-gmail.md`.
+- Task 4: dashboard (`/home`, `DashboardPage`) + warranties page (`/warranties`), both computed on the
+  backend from **saved** bills' product lines (`GET /api/dashboard`, `GET /api/warranties`; packages
+  `dashboard`, `warranty`; rules in `WarrantyRules`, "today" from a `Clock` bean). Hand-made charts (no
+  library); every card/bar/row links to a filtered list; Documents filters live in the URL
+  (`?q=&type=&status=&source=&month=`). Saving a bill now fills an empty warranty end date.
+  Guide: `docs/task-4-dashboard.md`.
 
 ## Repository
 
@@ -79,6 +85,7 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   `ResetLinkSender` for `RecordingResetLinkSender` to read reset links. They swap
   `DetailExtractor` for `FakeDetailExtractor` and `GoogleApi` for `FakeGoogleApi`: Gemini and Google are
   never called in tests. Tests run with `app.workers.enabled=false` and call the workers' `runOnce()`.
+  `FixedClockConfig` pins "today" to 2026-10-07 (`FixedClockConfig.TODAY`).
 - IntelliJ's run uses devtools: recompiling (e.g. `mvnw compile`/`test`) restarts a
   running app. While it runs, build with `-Dmaven.compiler.useIncrementalCompilation=false`
   (Maven's default deletes all classes first, and devtools restarts in the gap).
@@ -117,7 +124,7 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
 
 ## Roadmap (from the README, one task at a time when the user asks)
 
-Documents upload + reading bills (done, task 2) → products + warranties + dashboard →
-services, reminders, search → AI assistant (Gmail import done, task 3). Also later: send reset emails in the
+Documents upload + reading bills (done, task 2) → dashboard + warranties (done, task 4; separate product
+pages later) → services, reminders, search → AI assistant (Gmail import done, task 3). Also later: send reset emails in the
 background, login rate limiting, Swagger, Docker Compose.
 Never build anything that submits brand forms for the user or gets around CAPTCHAs.

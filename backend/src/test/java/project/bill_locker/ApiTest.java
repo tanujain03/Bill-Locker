@@ -21,7 +21,7 @@ import org.springframework.test.web.servlet.ResultActions;
 @SpringBootTest(properties = {"app.workers.enabled=false", "app.gmail.client-id=test-client",
 		"app.gmail.client-secret=test-secret", "app.gmail.token-key=" + ApiTest.TEST_TOKEN_KEY})
 @AutoConfigureMockMvc
-@Import({TestcontainersConfiguration.class, RecordingResetLinkSender.Config.class, FakeDetailExtractor.Config.class,
+@Import({TestcontainersConfiguration.class, RecordingResetLinkSender.Config.class, FakeDetailExtractor.Config.class, FixedClockConfig.class,
 		FakeGoogleApi.Config.class})
 public abstract class ApiTest {
 

@@ -48,4 +48,13 @@ class DocumentListApiTests extends DocumentApiTestBase {
 				.andExpect(jsonPath("$.length()").value(1))
 				.andExpect(jsonPath("$[0].fileName").value("amazon-bill.pdf"));
 	}
+
+	@Test
+	void badEnumQueryParamIs400() throws Exception {
+		String token = registerAndGetToken(uniqueEmail("bad-filter"));
+
+		mvc.perform(get("/api/documents?status=BAD").header("Authorization", bearer(token)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+	}
 }
