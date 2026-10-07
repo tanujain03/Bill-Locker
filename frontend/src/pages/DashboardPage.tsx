@@ -1,4 +1,4 @@
-import { CircleAlert, Package, ReceiptText, Upload, Wallet, Mail } from 'lucide-react';
+import { CircleAlert, Mail, Package, ReceiptText, Upload, Wallet } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ExpiringList } from '../components/dashboard/ExpiringList';
@@ -8,7 +8,7 @@ import { SpendingChart } from '../components/dashboard/SpendingChart';
 import { StatCard } from '../components/dashboard/StatCard';
 import { TopShops } from '../components/dashboard/TopShops';
 import { WarrantyHealth } from '../components/dashboard/WarrantyHealth';
-import { Alert } from '../components/FormParts';
+import { ErrorState } from '../components/ErrorState';
 import { errorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { getDashboard, type Dashboard } from '../lib/dashboard';
@@ -50,34 +50,21 @@ export function DashboardPage() {
               {greeting()}
               {firstName && `, ${firstName}`}
             </h1>
-            <p className="mt-1 text-slate-600">Here’s how your bills stand today.</p>
+            <p className="mt-1 text-slate-600">Here’s everything happening with your purchases and warranties.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              to="/gmail"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <Mail className="size-4" aria-hidden />
-              Import from Gmail
-            </Link>
-            <Link
-              to="/documents"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700"
-            >
-              <Upload className="size-4" aria-hidden />
-              Upload a bill
-            </Link>
-          </div>
+          {/* "Upload bill" sits in the top bar and the sidebar; Gmail gets its own shortcut here. */}
+          <Link
+            to="/gmail"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-xs hover:bg-slate-50"
+          >
+            <Mail className="size-4" aria-hidden />
+            Import from Gmail
+          </Link>
         </div>
 
         <div className="mt-6">
           {error ? (
-            <div className="space-y-3">
-              <Alert tone="error">{error}</Alert>
-              <button type="button" onClick={load} className="text-sm font-medium text-brand-700 hover:underline">
-                Try again
-              </button>
-            </div>
+            <ErrorState title="Could not load your dashboard" message={error} onRetry={load} />
           ) : !data ? (
             <Skeleton />
           ) : data.savedBills === 0 && data.recentBills.length === 0 ? (

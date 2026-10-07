@@ -1,7 +1,7 @@
 import { ArrowRight, Search, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Alert } from '../components/FormParts';
+import { ErrorState } from '../components/ErrorState';
 import { WarrantyStatusPill } from '../components/warranties/WarrantyStatusPill';
 import { errorMessage } from '../lib/api';
 import { formatDate } from '../lib/document-form';
@@ -105,12 +105,7 @@ export function WarrantiesPage() {
 
         <div className="mt-4">
           {error ? (
-            <div className="space-y-3">
-              <Alert tone="error">{error}</Alert>
-              <button type="button" onClick={load} className="text-sm font-medium text-brand-700 hover:underline">
-                Try again
-              </button>
-            </div>
+            <ErrorState title="Could not load your warranties" message={error} onRetry={load} />
           ) : !list ? (
             <div className="animate-pulse space-y-2" aria-label="Loading warranties">
               {[1, 2, 3, 4].map((n) => (

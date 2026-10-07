@@ -85,7 +85,7 @@ Frontend (`frontend/src/`):
 | `components/warranties/WarrantyStatusPill.tsx` | "12 days left" / "Expired 3 days ago" / "No end date", colour + icon + words |
 | `pages/WarrantiesPage.tsx` | Tabs + search (both in the URL), a table on wide screens and cards on phones |
 | `pages/DocumentsPage.tsx` | Filters now in the URL; the month filter shows a removable "Bought in Sep 2026" chip |
-| `components/AppHeader.tsx` | Dashboard · Documents · Warranties · Gmail (icons only on phones) |
+| `components/AppLayout.tsx`, `UserMenu.tsx`, `ErrorState.tsx` | The frame of every signed-in page: left sidebar (logo, **Upload bill**, Dashboard · Documents · Warranties · Gmail Import, Logout, your name/email) and a top bar (**Upload bill**, account menu with Gmail import and Sign out); below `lg` the sidebar is a ☰ drawer. A parent route in `App.tsx`. `ErrorState` is the "Could not load … / Try again" card. Notifications, reminders, products, services and settings come in later tasks |
 
 ## 4. Endpoints
 
