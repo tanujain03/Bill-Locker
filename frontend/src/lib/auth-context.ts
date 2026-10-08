@@ -13,7 +13,14 @@ export type AuthState = {
   login: (email: string, password: string, remember: boolean) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  /** After the Settings page changed the account (e.g. the name), show the new values everywhere. */
+  updateUser: (user: User) => void;
+  /** Why there is no user any more, for the sign-in page's message. null = never signed in. */
+  signedOutReason: SignedOutReason | null;
 };
+
+/** 'signedOut' = clicked Sign out; 'expired' = the backend stopped accepting the token. */
+export type SignedOutReason = 'signedOut' | 'expired';
 
 export const AuthContext = createContext<AuthState | null>(null);
 

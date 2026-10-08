@@ -38,7 +38,16 @@ export class ApiError extends Error {
   }
 }
 
-const SERVER_DOWN = 'Can’t reach the server. Is the backend running on port 8080?';
+/**
+ * Called when the backend turns down the token we sent (it expired, or was signed with
+ * an old secret). AuthProvider sets this to sign the user out with "session expired".
+ */
+let onSessionExpired: (() => void) | null = null;
+export function setSessionExpiredHandler(handler: (() => void) | null) {
+  onSessionExpired = handler;
+}
+
+const SERVER_DOWN = 'Can’t reach Bill Locker right now. Check your connection and try again.';
 
 /**
  * Calls the backend and returns its JSON answer. `body` is sent as JSON, except a
@@ -66,15 +75,24 @@ async function send(path: string, options: { method?: string; body?: unknown }):
   const token = tokenStore.get();
   if (token) headers.Authorization = `Bearer ${token}`;
 
+  let response: Response;
   try {
-    return await fetch(`/api${path}`, {
+    response = await fetch(`/api${path}`, {
       method: options.method ?? (options.body !== undefined ? 'POST' : 'GET'),
       headers,
       body: isForm ? (options.body as FormData) : options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
   } catch {
+    console.warn('Backend unreachable: is Spring Boot running on port 8080?');
     throw new ApiError(0, 'NETWORK_ERROR', SERVER_DOWN);
   }
+  // 401 although we sent a token = the session is over. (A wrong password at sign-in
+  // is also a 401, but no token is sent then, so it doesn't land here.)
+  if (response.status === 401 && token) {
+    tokenStore.clear();
+    onSessionExpired?.();
+  }
+  return response;
 }
 
 function toApiError(status: number, data: { code: string; message: string; fieldErrors?: Record<string, string> } | null) {

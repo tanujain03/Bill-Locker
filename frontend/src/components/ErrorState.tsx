@@ -1,4 +1,5 @@
 import { RefreshCw, TriangleAlert } from 'lucide-react';
+import { Button } from './Button';
 
 /** A page-sized "something went wrong" card with a way out: Try again. */
 export function ErrorState({ title, message, onRetry }: { title: string; message: string; onRetry: () => void }) {
@@ -12,14 +13,9 @@ export function ErrorState({ title, message, onRetry }: { title: string; message
       </span>
       <h2 className="mt-4 text-lg font-semibold">{title}</h2>
       <p className="mt-1 max-w-md text-sm text-slate-600">{message}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="mt-6 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-      >
-        <RefreshCw className="size-4" aria-hidden />
+      <Button icon={RefreshCw} onClick={onRetry} className="mt-6">
         Try again
-      </button>
+      </Button>
     </div>
   );
 }

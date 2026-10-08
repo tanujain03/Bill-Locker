@@ -1,5 +1,4 @@
-import { UserPlus } from 'lucide-react';
-import { useState, type FormEvent, type MouseEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useLocation } from 'react-router';
 import { AuthLayout } from '../components/AuthLayout';
 import { Alert, PasswordField, SubmitButton, TextField } from '../components/FormParts';
@@ -20,17 +19,6 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  /**
-   * "Forgot password?" takes the email typed above to the next page (in the router's
-   * state, not the URL, so the address never shows up in browser history or logs).
-   */
-  function handleForgotPassword(event: MouseEvent) {
-    if (!email.trim()) {
-      event.preventDefault(); // stay here: there's no email to send a link to yet
-      setFieldErrors({ email: 'Enter your email here first, then click “Forgot password?”' });
-    }
-  }
-
   async function handleSubmit(event: FormEvent) {
     event.preventDefault(); // stop the browser's own full-page form submit
     setBusy(true);
@@ -47,7 +35,11 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout title="Sign in to your locker">
+    <AuthLayout
+      title="Sign in to your locker"
+      // One way to sign up on this screen (the promo panel's button is the big one).
+      footer={<>New here? <Link to="/register" className="font-medium text-brand-700 hover:underline">Create an account</Link></>}
+    >
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {state?.message && !error && <Alert tone="success">{state.message}</Alert>}
         {state?.info && !error && <Alert tone="info">{state.info}</Alert>}
@@ -56,7 +48,7 @@ export function LoginPage() {
           label="Email"
           type="email"
           autoComplete="email"
-          placeholder="Enter your email address…"
+          placeholder="you@example.com"
           value={email}
           onChange={(e) => {
             setEmail(e.target.value);
@@ -67,7 +59,6 @@ export function LoginPage() {
         <PasswordField
           label="Password"
           autoComplete="current-password"
-          placeholder="Enter your password…"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={fieldErrors.password}
@@ -82,31 +73,19 @@ export function LoginPage() {
             />
             Remember me
           </label>
+          {/* Takes the email typed above along (in the router's state, not the URL, so the
+              address never shows up in browser history or logs). It can be changed there. */}
           <Link
             to="/forgot-password"
             state={{ email: email.trim() }}
-            onClick={handleForgotPassword}
             className="text-sm font-medium text-brand-700 hover:underline"
           >
             Forgot password?
           </Link>
         </div>
-        <SubmitButton busy={busy}>Sign in</SubmitButton>
+        <SubmitButton busy={busy} busyText="Signing in…">Sign in</SubmitButton>
       </form>
 
-      <div className="my-6 flex items-center gap-3 text-sm text-slate-500" role="separator">
-        <span className="h-px flex-1 bg-slate-300" />
-        or
-        <span className="h-px flex-1 bg-slate-300" />
-      </div>
-
-      <Link
-        to="/register"
-        className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-600 px-4 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50"
-      >
-        <UserPlus className="size-4" aria-hidden />
-        Create a new account
-      </Link>
     </AuthLayout>
   );
 }

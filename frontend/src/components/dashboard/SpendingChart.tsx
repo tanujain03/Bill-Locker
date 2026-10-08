@@ -58,7 +58,7 @@ export function SpendingChart({ months, withoutDate }: { months: MonthSpend[]; w
         </>
       )}
       {withoutDate > 0 && (
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-slate-600">
           {withoutDate === 1 ? '1 saved bill has' : `${withoutDate} saved bills have`} no date or no total, so
           {withoutDate === 1 ? ' its' : ' their'} money isn’t on the chart.
         </p>

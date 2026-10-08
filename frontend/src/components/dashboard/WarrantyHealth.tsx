@@ -1,4 +1,4 @@
-import { ShieldCheck } from 'lucide-react';
+import { ArrowRight, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router';
 import type { Dashboard } from '../../lib/dashboard';
 import { WARRANTY_STATUS_LABELS, WARRANTY_STATUSES, warrantiesLink, type WarrantyStatus } from '../../lib/warranties';
@@ -58,6 +58,19 @@ export function WarrantyHealth({ counts }: { counts: Dashboard['warranties'] }) 
               );
             })}
           </ul>
+          {/* Products without dates can't warn you; say how to fix that. */}
+          {value.NO_INFO > 0 && (
+            <Link
+              to={warrantiesLink('NO_INFO')}
+              className="mt-3 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100"
+            >
+              <span className="min-w-0 flex-1">
+                {value.NO_INFO === 1 ? '1 product has' : `${value.NO_INFO} products have`} no warranty date.{' '}
+                <span className="font-semibold text-brand-700">Add dates</span> so we can remind you.
+              </span>
+              <ArrowRight className="size-4 shrink-0 text-brand-700" aria-hidden />
+            </Link>
+          )}
         </>
       )}
     </Panel>

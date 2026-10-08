@@ -1,5 +1,6 @@
-import { CircleAlert, CircleCheck, Eye, EyeOff, Info } from 'lucide-react';
+import { Circle, CircleAlert, CircleCheck, Eye, EyeOff, Info } from 'lucide-react';
 import { useId, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { Button } from './Button';
 
 type FieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -63,15 +64,12 @@ export function PasswordField(props: Omit<FieldProps, 'type' | 'trailing'>) {
   );
 }
 
-export function SubmitButton({ busy, children }: { busy: boolean; children: ReactNode }) {
+/** The form's full-width main button. While busy: a spinner and what's happening ("Signing in…"). */
+export function SubmitButton({ busy, busyText, children }: { busy: boolean; busyText: string; children: ReactNode }) {
   return (
-    <button
-      type="submit"
-      disabled={busy}
-      className="w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
-    >
-      {busy ? 'Please wait…' : children}
-    </button>
+    <Button type="submit" variant="primary" full busy={busy}>
+      {busy ? busyText : children}
+    </Button>
   );
 }
 
@@ -91,3 +89,28 @@ const ALERT_TONES = {
   success: { Icon: CircleCheck, colours: 'bg-emerald-50 text-emerald-800 ring-emerald-200' },
   info: { Icon: Info, colours: 'bg-brand-50 text-brand-700 ring-brand-100' },
 };
+
+/** The backend's password rules (ValidPassword.java), ticked off live while typing. */
+const PASSWORD_RULES: [string, (password: string) => boolean][] = [
+  ['8+ characters', (p) => p.length >= 8],
+  ['A letter', (p) => /[A-Za-z]/.test(p)],
+  ['A number', (p) => /\d/.test(p)],
+];
+
+/** Shown under a new-password field instead of a hint line. The backend still checks for real. */
+export function PasswordRules({ password }: { password: string }) {
+  return (
+    <ul className="-mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Password rules">
+      {PASSWORD_RULES.map(([label, test]) => {
+        const ok = test(password);
+        return (
+          <li key={label} className={`inline-flex items-center gap-1 ${ok ? 'text-emerald-700' : 'text-slate-500'}`}>
+            {ok ? <CircleCheck className="size-3.5" aria-hidden /> : <Circle className="size-3.5" aria-hidden />}
+            {label}
+            <span className="sr-only">{ok ? '(done)' : '(not yet)'}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

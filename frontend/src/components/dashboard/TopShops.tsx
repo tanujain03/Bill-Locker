@@ -27,7 +27,7 @@ export function TopShops({ shops }: { shops: ShopSpend[] }) {
                       style={{ width: `${max ? (shop.amount / max) * 100 : 0}%` }}
                     />
                   </span>
-                  <span className="w-14 shrink-0 text-right text-xs text-slate-500">
+                  <span className="w-14 shrink-0 text-right text-xs text-slate-600">
                     {shop.bills === 1 ? '1 bill' : `${shop.bills} bills`}
                   </span>
                 </div>

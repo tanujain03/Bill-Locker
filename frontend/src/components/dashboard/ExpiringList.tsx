@@ -18,7 +18,7 @@ export function ExpiringList({ items }: { items: WarrantyView[] }) {
               <Link to={`/documents/${w.documentId}`} className="flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-slate-50">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{w.productName ?? 'Unnamed product'}</p>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-xs text-slate-600">
                     {[w.sellerName, w.endDate && `Ends ${formatDate(w.endDate)}`].filter(Boolean).join(' · ')}
                   </p>
                 </div>

@@ -1,8 +1,10 @@
-import { CalendarDays, Search, Upload, X } from 'lucide-react';
-import { useEffect, useRef, useState, type DragEvent } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router';
+import { CalendarDays, FilterX, Search, Upload, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router';
 import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
 import { StatusBadge } from '../components/documents/StatusBadge';
+import { Button } from '../components/Button';
+import { UploadButton } from '../components/UploadButton';
 import { Alert } from '../components/FormParts';
 import { errorMessage } from '../lib/api';
 import {
@@ -10,21 +12,15 @@ import {
   formatAmount,
   listDocuments,
   monthLabel,
-  uploadDocument,
   type DocumentStatus,
   type DocumentSummary,
 } from '../lib/documents';
 import { usePolling } from '../lib/usePolling';
-
-const ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp';
+import { usePageTitle } from '../lib/usePageTitle';
 
 /** /documents: upload a bill, and the list of your bills with search and filters. */
 export function DocumentsPage() {
-  const navigate = useNavigate();
-  const fileInput = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
+  usePageTitle('Documents');
 
   // The filters live in the URL (?q=&type=&status=&source=&month=), so a link from the
   // dashboard opens the list already filtered, and Back/refresh keep the filters.
@@ -79,25 +75,10 @@ export function DocumentsPage() {
       .catch(() => {}); // the next tick tries again
   });
 
-  async function upload(file: File | undefined) {
-    if (!file) return;
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const document = await uploadDocument(file);
-      // ?read=1 tells the document page to read it with AI straight away.
-      navigate(`/documents/${document.id}?read=1`);
-    } catch (error) {
-      setUploadError(errorMessage(error));
-      setUploading(false);
-    }
-  }
-
-  function onDrop(event: DragEvent) {
-    event.preventDefault();
-    setDragging(false);
-    upload(event.dataTransfer.files[0]);
-  }
+  const filtered = Boolean(q || type || status || source || month);
+  // First visit (no bills at all): a big "add your first bill" area. After that the list
+  // is what people come for, so uploading shrinks to one slim line above it.
+  const noBillsYet = documents?.length === 0 && !filtered;
 
   return (
     <div className="min-h-dvh">
@@ -105,44 +86,24 @@ export function DocumentsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
         <p className="mt-1 text-slate-600">Upload invoices, warranty cards and receipts. We read the details for you.</p>
 
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
-          className={`mt-6 flex flex-col items-center rounded-2xl border-2 border-dashed px-6 py-10 text-center ${
-            dragging ? 'border-brand-500 bg-brand-50' : 'border-slate-300 bg-white'
-          }`}
-        >
-          <span className="grid size-12 place-items-center rounded-xl bg-brand-50 text-brand-600">
-            <Upload className="size-6" aria-hidden />
-          </span>
-          <p className="mt-3 font-medium">{uploading ? 'Uploading…' : 'Drop a bill here'}</p>
-          <p className="mt-1 text-sm text-slate-500">PDF, JPG, PNG or WebP, up to 10 MB</p>
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => fileInput.current?.click()}
-            className="mt-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
-          >
-            Choose file
-          </button>
-          <input
-            ref={fileInput}
-            type="file"
-            accept={ACCEPT}
-            className="hidden"
-            onChange={(e) => {
-              upload(e.target.files?.[0]);
-              e.target.value = ''; // so choosing the same file again still fires onChange
-            }}
-          />
-        </div>
-        {uploadError && (
-          <div className="mt-4">
-            <Alert tone="error">{uploadError}</Alert>
+        {noBillsYet ? (
+          <div className="mt-6 flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+            <span className="grid size-12 place-items-center rounded-xl bg-brand-50 text-brand-600">
+              <Upload className="size-6" aria-hidden />
+            </span>
+            <p className="mt-3 font-medium">Add your first bill</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Drop a file anywhere on this page, or choose one. PDF, JPG, PNG or WebP, up to 10 MB.
+            </p>
+            <UploadButton className="mt-4">Choose file</UploadButton>
+          </div>
+        ) : (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3">
+            <p className="flex items-center gap-2 text-sm text-slate-600">
+              <Upload className="size-4 shrink-0 text-brand-600" aria-hidden />
+              Drop a bill anywhere on the page to upload it (PDF, JPG, PNG or WebP, up to 10 MB).
+            </p>
+            <UploadButton variant="secondary" />
           </div>
         )}
 
@@ -163,6 +124,11 @@ export function DocumentsPage() {
           <Select label="From" value={source} onChange={setFilter('source')} options={SOURCE_OPTIONS} />
         </div>
 
+        {filtered && (
+          <Button variant="ghost" size="sm" icon={FilterX} onClick={() => setParams({}, { replace: true })} className="mt-3 mr-2">
+            Clear filters
+          </Button>
+        )}
         {month && (
           // Set by a bar of the dashboard's spending chart; one click removes it.
           <button
@@ -181,14 +147,21 @@ export function DocumentsPage() {
             <Alert tone="error">{listError}</Alert>
           </div>
         )}
-        {documents && (
+        {!documents && !listError && (
+          <div className="mt-4 animate-pulse space-y-px overflow-hidden rounded-xl" aria-label="Loading documents">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <div key={n} className="h-16 bg-slate-200" />
+            ))}
+          </div>
+        )}
+        {documents && !noBillsYet && (
           <DocumentList
             documents={documents.filter(
               (d) =>
                 (!source || (source === 'GMAIL') === Boolean(d.sourceGmail)) &&
                 (!month || (d.purchaseDate ?? '').startsWith(month)),
             )}
-            filtered={Boolean(q || type || status || source || month)}
+            filtered={filtered}
           />
         )}
       </main>
@@ -258,7 +231,7 @@ function DocumentList({ documents, filtered }: { documents: DocumentSummary[]; f
               </p>
             </div>
             {d.totalAmount != null && (
-              <span className="hidden text-sm font-medium tabular-nums sm:block">{formatAmount(d.totalAmount)}</span>
+              <span className="shrink-0 text-sm font-medium tabular-nums">{formatAmount(d.totalAmount)}</span>
             )}
             <StatusBadge status={d.status} reading={d.readQueued} />
           </Link>

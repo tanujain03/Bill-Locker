@@ -3,6 +3,7 @@ import { FileTypeIcon } from '../documents/SourceBadge';
 import { Link } from 'react-router';
 import { EMAIL_KIND_LABELS, formatSize, type GmailEmail, type GmailFile } from '../../lib/gmail';
 import { StatusBadge } from '../documents/StatusBadge';
+import { buttonClass } from '../Button';
 
 type Actions = {
   selected: Set<string>;
@@ -30,7 +31,7 @@ export function EmailCard({ email, ...actions }: { email: GmailEmail } & Actions
       </div>
       {/* React escapes text, so API strings are never rendered as HTML. */}
       <p className="mt-1 font-medium break-words">{email.subject || '(no subject)'}</p>
-      <p className="text-xs text-slate-500">via {email.accountEmail}</p>
+      <p className="text-xs text-slate-600">via {email.accountEmail}</p>
       {email.snippet && <p className="mt-1 truncate text-sm text-slate-600">{email.snippet}</p>}
 
       <ul className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
@@ -42,8 +43,9 @@ export function EmailCard({ email, ...actions }: { email: GmailEmail } & Actions
   );
 }
 
-const BUTTON = 'rounded-lg px-2.5 py-1.5 text-sm font-medium disabled:opacity-60';
-const PRIMARY = `${BUTTON} text-brand-700 hover:bg-brand-50`;
+/** Small row buttons: the step forward (Import, Open) has a border, the others are quiet. */
+const PRIMARY = buttonClass({ variant: 'secondary', size: 'sm' });
+const QUIET = buttonClass({ variant: 'ghost', size: 'sm' });
 
 function FileRow({ file, selected, busy, onToggle, onImport, onIgnore, onRestore }: { file: GmailFile } & Actions) {
   // Only files you can act on in bulk get a checkbox.
@@ -64,7 +66,7 @@ function FileRow({ file, selected, busy, onToggle, onImport, onIgnore, onRestore
       )}
       <FileTypeIcon contentType={file.contentType} size="sm" />
       <span className="min-w-0 flex-1 basis-40 truncate text-sm">{file.fileName}</span>
-      <span className="text-xs text-slate-500">{formatSize(file.sizeBytes)}</span>
+      <span className="text-xs text-slate-600">{formatSize(file.sizeBytes)}</span>
 
       {(file.status === 'NEW' || file.status === 'IGNORED') && (
         <>
@@ -75,7 +77,7 @@ function FileRow({ file, selected, busy, onToggle, onImport, onIgnore, onRestore
             type="button"
             disabled={busy}
             onClick={() => (file.status === 'NEW' ? onIgnore : onRestore)([file.id])}
-            className={`${BUTTON} text-slate-700 hover:bg-slate-100`}
+            className={QUIET}
           >
             {file.status === 'NEW' ? 'Ignore' : 'Restore'}
           </button>
@@ -96,7 +98,7 @@ function FileRow({ file, selected, busy, onToggle, onImport, onIgnore, onRestore
           <button type="button" disabled={busy} onClick={() => onImport([file.id])} className={PRIMARY}>
             Retry
           </button>
-          <button type="button" disabled={busy} onClick={() => onIgnore([file.id])} className={`${BUTTON} text-slate-700 hover:bg-slate-100`}>
+          <button type="button" disabled={busy} onClick={() => onIgnore([file.id])} className={QUIET}>
             Ignore
           </button>
         </>

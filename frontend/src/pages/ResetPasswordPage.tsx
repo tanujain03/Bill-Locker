@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { AuthLayout } from '../components/AuthLayout';
-import { Alert, PasswordField, SubmitButton } from '../components/FormParts';
+import { Alert, PasswordField, PasswordRules, SubmitButton } from '../components/FormParts';
 import { api, ApiError, errorMessage } from '../lib/api';
 
 /** Step 2: the page the emailed link opens, /reset-password?token=… */
@@ -61,8 +61,8 @@ export function ResetPasswordPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               error={fieldErrors.password}
-              hint="8+ characters with at least one letter and one number"
             />
+            <PasswordRules password={password} />
             <PasswordField
               label="Confirm new password"
               autoComplete="new-password"
@@ -70,7 +70,7 @@ export function ResetPasswordPage() {
               onChange={(e) => setConfirm(e.target.value)}
               error={fieldErrors.confirm}
             />
-            <SubmitButton busy={busy}>Change password</SubmitButton>
+            <SubmitButton busy={busy} busyText="Changing password…">Change password</SubmitButton>
           </>
         )}
       </form>

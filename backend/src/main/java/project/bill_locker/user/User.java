@@ -32,6 +32,10 @@ public class User extends BaseEntity {
 		this.passwordHash = passwordHash;
 	}
 
+	public void rename(String newName) {
+		this.name = newName;
+	}
+
 	public void changePasswordHash(String newPasswordHash) {
 		this.passwordHash = newPasswordHash;
 	}

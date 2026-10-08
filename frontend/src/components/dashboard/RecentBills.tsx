@@ -23,7 +23,7 @@ export function RecentBills({ bills }: { bills: DocumentSummary[] }) {
                     <p className="truncate text-sm font-medium">{d.sellerName ?? d.fileName}</p>
                     <SourceBadge sourceGmail={d.sourceGmail} />
                   </div>
-                  <p className="truncate text-xs text-slate-500">
+                  <p className="truncate text-xs text-slate-600">
                     {[d.documentType && DOCUMENT_TYPE_LABELS[d.documentType], d.purchaseDate && formatDate(d.purchaseDate)]
                       .filter(Boolean)
                       .join(' · ') || d.fileName}

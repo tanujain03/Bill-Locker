@@ -1,7 +1,9 @@
 import { Info, Mail, Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { Button } from '../components/Button';
 import { Alert } from '../components/FormParts';
+import { Tab, TabList } from '../components/Tabs';
 import { AccountCard } from '../components/gmail/AccountCard';
 import { EmailCard } from '../components/gmail/EmailCard';
 import { errorMessage } from '../lib/api';
@@ -20,7 +22,9 @@ import {
   type GmailOverview,
   type ScanRange,
 } from '../lib/gmail';
+import { useFeedback } from '../lib/feedback-context';
 import { usePolling } from '../lib/usePolling';
+import { usePageTitle } from '../lib/usePageTitle';
 
 const TABS: [EmailView, string, keyof GmailOverview['counts']][] = [
   ['TO_REVIEW', 'To review', 'toReview'],
@@ -30,6 +34,8 @@ const TABS: [EmailView, string, keyof GmailOverview['counts']][] = [
 
 /** /gmail: connect Gmail accounts, scan them, and choose which found bills to import. */
 export function GmailPage() {
+  usePageTitle('Gmail');
+  const { toast } = useFeedback();
   const [params, setParams] = useSearchParams();
   const [overview, setOverview] = useState<GmailOverview | null>(null);
   const [view, setView] = useState<EmailView>('TO_REVIEW');
@@ -88,16 +94,17 @@ export function GmailPage() {
     reload,
   );
 
-  /** Runs an action, then refreshes everything and clears the ticks. */
-  async function act(action: () => Promise<unknown>) {
+  /** Runs an action, refreshes everything, clears the ticks, then says what happened (a toast). */
+  async function act(action: () => Promise<unknown>, done?: string) {
     setBusy(true);
     setError(null);
     try {
       await action();
       setSelected(new Set());
       await reload();
+      if (done) toast(done);
     } catch (e) {
-      setError(errorMessage(e));
+      toast(errorMessage(e), 'error');
     } finally {
       setBusy(false);
     }
@@ -124,10 +131,11 @@ export function GmailPage() {
   }
 
   const ids = [...selected];
-  const run = (fn: (ids: string[]) => Promise<unknown>) => (fileIds: string[]) => act(() => fn(fileIds));
-  const doImport = run(importFiles);
-  const doIgnore = run(ignoreFiles);
-  const doRestore = run(restoreFiles);
+  const run = (fn: (ids: string[]) => Promise<unknown>, done: (files: string) => string) => (fileIds: string[]) =>
+    act(() => fn(fileIds), done(fileIds.length === 1 ? '1 file' : `${fileIds.length} files`));
+  const doImport = run(importFiles, (files) => `Importing ${files}. They’ll show up in Documents.`);
+  const doIgnore = run(ignoreFiles, (files) => `${files} ignored.`);
+  const doRestore = run(restoreFiles, (files) => `${files} moved back to To review.`);
 
   return (
     <div className="min-h-dvh">
@@ -139,16 +147,10 @@ export function GmailPage() {
               Bill Locker looks for bills attached to your emails. Read-only: it never sends, changes or deletes mail.
             </p>
           </div>
-          {overview?.configured && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={connect}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
-            >
-              <Plus className="size-4" aria-hidden />
-              Connect Gmail
-            </button>
+          {overview?.configured && overview.accounts.length > 0 && (
+            <Button variant="secondary" icon={Plus} disabled={busy} onClick={connect}>
+              Connect another
+            </Button>
           )}
         </div>
 
@@ -160,11 +162,8 @@ export function GmailPage() {
         {overview && !overview.configured && (
           <div className="mt-6 flex gap-3 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-700">
             <Info className="mt-0.5 size-5 shrink-0 text-brand-600" aria-hidden />
-            <p>
-              Gmail import isn’t set up yet. Add <code>GOOGLE_CLIENT_ID</code>, <code>GOOGLE_CLIENT_SECRET</code> and{' '}
-              <code>GMAIL_TOKEN_KEY</code> to <code>backend/.env</code>, then restart the backend. For the steps, see
-              docs/task-3-gmail.md.
-            </p>
+            {/* How to switch it on (GOOGLE_* keys in backend/.env) is in docs/task-3-gmail.md, not on screen. */}
+            <p>Gmail import isn’t available right now. You can still upload bills yourself.</p>
           </div>
         )}
 
@@ -180,6 +179,9 @@ export function GmailPage() {
                   Bill Locker reads the sender, subject, a short preview and the names of attached files. Files are
                   downloaded only when you click Import. Access is read-only: it never sends, changes or deletes mail.
                 </p>
+                <Button variant="primary" icon={Plus} disabled={busy} onClick={connect} className="mt-5">
+                  Connect Gmail
+                </Button>
               </div>
             ) : (
               <div className="mt-6 space-y-3">
@@ -189,7 +191,7 @@ export function GmailPage() {
                     account={a}
                     busy={busy}
                     onScan={(range: ScanRange) => act(() => scanAccount(a.id, range))}
-                    onDisconnect={() => act(() => disconnectAccount(a.id))}
+                    onDisconnect={() => act(() => disconnectAccount(a.id), `Disconnected ${a.email}.`)}
                   />
                 ))}
               </div>
@@ -197,23 +199,18 @@ export function GmailPage() {
 
             {overview.accounts.length > 0 && (
               <>
-                <div role="tablist" className="mt-8 flex gap-1 border-b border-slate-200">
-                  {TABS.map(([value, label, count]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      role="tab"
-                      aria-selected={view === value}
-                      onClick={() => setView(value)}
-                      className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
-                        view === value
-                          ? 'border-brand-600 text-brand-700'
-                          : 'border-transparent text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {label} ({overview.counts[count]})
-                    </button>
-                  ))}
+                <div className="mt-8">
+                  <TabList label="Found files">
+                    {TABS.map(([value, label, count]) => (
+                      <Tab
+                        key={value}
+                        label={label}
+                        count={overview.counts[count]}
+                        active={view === value}
+                        onClick={() => setView(value)}
+                      />
+                    ))}
+                  </TabList>
                 </div>
 
                 {emails && emails.length === 0 && (
@@ -247,29 +244,19 @@ export function GmailPage() {
         )}
 
         {ids.length > 0 && (
-          <div className="sticky bottom-0 z-10 -mx-1 mt-6 px-1 pb-4">
+          <div className="sticky bottom-16 z-10 -mx-1 mt-6 px-1 pb-4 sm:bottom-0">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
               <p role="status" className="text-sm font-medium text-slate-700">
                 {ids.length} selected
               </p>
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => doImport(ids)}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
-                >
+                <Button variant="primary" disabled={busy} onClick={() => doImport(ids)}>
                   Import selected{view === 'TO_REVIEW' ? ` (${ids.length})` : ''}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => (view === 'IGNORED' ? doRestore(ids) : doIgnore(ids))}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
-                >
+                </Button>
+                <Button disabled={busy} onClick={() => (view === 'IGNORED' ? doRestore(ids) : doIgnore(ids))}>
                   {view === 'IGNORED' ? 'Restore selected' : 'Ignore selected'}
                   {view === 'TO_REVIEW' ? ` (${ids.length})` : ''}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

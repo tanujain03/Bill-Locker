@@ -1,5 +1,5 @@
-import { ChevronDown, LogOut, Mail } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, LogOut, Settings } from 'lucide-react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../lib/auth-context';
 
@@ -23,36 +23,47 @@ export function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md'
 }
 
 /**
- * The avatar button in the top bar and its little menu: who you are, Gmail import,
- * Sign out. Closes on a click outside, on Escape, and after choosing an item.
+ * The avatar button in the top bar and its menu: who you are, Settings and Sign out —
+ * the only place for the account (the sidebar is just navigation).
+ * A proper menu for the keyboard too: it opens with focus on the first item, ↑ ↓ Home
+ * End move between items, Escape closes it and returns to the button. A click outside
+ * or choosing an item also closes it.
  */
 export function UserMenu() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
+    menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
     const onClick = (e: MouseEvent) => {
       if (!box.current?.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-        button.current?.focus(); // back to where the user was
-      }
-    };
     document.addEventListener('mousedown', onClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onClick);
-      document.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('mousedown', onClick);
   }, [open]);
 
+  function onMenuKey(e: KeyboardEvent) {
+    const items = [...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const go = (i: number) => {
+      e.preventDefault();
+      items[(i + items.length) % items.length]?.focus(); // wraps around at both ends
+    };
+    if (e.key === 'ArrowDown') go(at + 1);
+    else if (e.key === 'ArrowUp') go(at - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(items.length - 1);
+    else if (e.key === 'Escape' || e.key === 'Tab') {
+      setOpen(false);
+      if (e.key === 'Escape') button.current?.focus(); // back to where the user was
+    }
+  }
+
   if (!user) return null;
-  const itemClass = 'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-100';
 
   return (
     <div ref={box} className="relative">
@@ -60,7 +71,7 @@ export function UserMenu() {
         ref={button}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-haspopup="true"
+        aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Account menu for ${user.name}`}
         className="flex items-center gap-2 rounded-xl px-1.5 py-1 hover:bg-slate-100 sm:pr-2.5"
@@ -71,17 +82,36 @@ export function UserMenu() {
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 z-40 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-          <div className="border-b border-slate-100 px-3 pt-1.5 pb-3">
-            <p className="truncate text-sm font-semibold">{user.name}</p>
-            <p className="truncate text-xs text-slate-500">{user.email}</p>
+        <div
+          ref={menu}
+          role="menu"
+          aria-label="Account"
+          onKeyDown={onMenuKey}
+          className="absolute top-full right-0 z-40 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg"
+        >
+          <div className="flex items-center gap-3 border-b border-slate-100 px-3 pt-1.5 pb-3">
+            <Avatar name={user.name} />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{user.name}</p>
+              <p className="truncate text-xs text-slate-600">{user.email}</p>
+            </div>
           </div>
-          <div className="pt-1.5">
-            <Link to="/gmail" onClick={() => setOpen(false)} className={`${itemClass} text-slate-700`}>
-              <Mail className="size-4" aria-hidden />
-              Gmail import
+          <div className="space-y-0.5 pt-1.5">
+            <Link
+              to="/settings"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 outline-none hover:bg-slate-100 focus-visible:bg-slate-100"
+            >
+              <Settings className="size-4" aria-hidden />
+              Settings
             </Link>
-            <button type="button" onClick={logout} className={`${itemClass} text-rose-600 hover:bg-rose-50`}>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={logout}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-rose-600 outline-none hover:bg-rose-50 focus-visible:bg-rose-50"
+            >
               <LogOut className="size-4" aria-hidden />
               Sign out
             </button>

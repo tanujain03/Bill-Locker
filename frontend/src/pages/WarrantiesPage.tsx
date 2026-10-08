@@ -2,8 +2,10 @@ import { ArrowRight, Search, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ErrorState } from '../components/ErrorState';
+import { Tab, TabList } from '../components/Tabs';
 import { WarrantyStatusPill } from '../components/warranties/WarrantyStatusPill';
 import { errorMessage } from '../lib/api';
+import { usePageTitle } from '../lib/usePageTitle';
 import { formatDate } from '../lib/document-form';
 import {
   listWarranties,
@@ -24,6 +26,7 @@ const COUNT_KEY: Record<WarrantyStatus, keyof WarrantyCounts> = {
 
 /** /warranties: every product on your saved bills and how long its warranty lasts. */
 export function WarrantiesPage() {
+  usePageTitle('Warranties');
   // The tab and the search live in the URL, so the dashboard can link straight to a tab.
   const [params, setParams] = useSearchParams();
   const status = (WARRANTY_STATUSES as string[]).includes(params.get('status') ?? '')
@@ -77,8 +80,8 @@ export function WarrantiesPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Warranties</h1>
         <p className="mt-1 text-slate-600">Every product on your saved bills and how long its warranty lasts.</p>
 
-        <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <nav aria-label="Warranty status" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
+        <div className="mt-6 flex flex-col-reverse gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <TabList label="Warranty status">
             <Tab label="All" count={counts?.all} active={!status} onClick={() => setParam('status', undefined)} />
             {WARRANTY_STATUSES.map((s) => (
               <Tab
@@ -89,7 +92,7 @@ export function WarrantiesPage() {
                 onClick={() => setParam('status', s)}
               />
             ))}
-          </nav>
+          </TabList>
           <label className="relative lg:w-80">
             <span className="sr-only">Search warranties</span>
             <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" aria-hidden />
@@ -120,7 +123,7 @@ export function WarrantiesPage() {
               </Link>
             </Empty>
           ) : list.items.length === 0 ? (
-            <Empty>Nothing here.</Empty>
+            <Empty>{urlQuery ? `No products match “${urlQuery}”.` : EMPTY_TAB[status ?? 'ALL']}</Empty>
           ) : (
             <WarrantyRows items={list.items} />
           )}
@@ -130,27 +133,14 @@ export function WarrantiesPage() {
   );
 }
 
-function Tab(props: { label: string; count: number | undefined; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      aria-pressed={props.active}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium ${
-        props.active ? 'bg-brand-600 text-white' : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50'
-      }`}
-    >
-      {props.label}
-      {props.count !== undefined && (
-        <span
-          className={`rounded-full px-1.5 text-xs tabular-nums ${props.active ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}
-        >
-          {props.count}
-        </span>
-      )}
-    </button>
-  );
-}
+/** What an empty tab says: specific, and good news where it is. */
+const EMPTY_TAB: Record<WarrantyStatus | 'ALL', string> = {
+  ALL: 'No products on your saved bills yet.',
+  EXPIRING_SOON: 'Nothing ends in the next 30 days.',
+  ACTIVE: 'No warranties are active right now.',
+  EXPIRED: 'No warranties have ended.',
+  NO_INFO: 'Every product has a warranty date.',
+};
 
 function Empty({ children }: { children: ReactNode }) {
   return (
@@ -228,7 +218,7 @@ function ProductMeta({ warranty: w }: { warranty: WarrantyView }) {
   const meta = [w.modelNumber && `Model ${w.modelNumber}`, w.serialNumber && `S/N ${w.serialNumber}`, w.warrantyProvider]
     .filter(Boolean)
     .join(' · ');
-  return meta ? <p className="truncate text-xs text-slate-500">{meta}</p> : <span />;
+  return meta ? <p className="truncate text-xs text-slate-600">{meta}</p> : <span />;
 }
 
 function BillLink({ id }: { id: string }) {

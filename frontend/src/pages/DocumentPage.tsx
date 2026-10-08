@@ -3,22 +3,22 @@ import {
   CircleAlert,
   CircleCheck,
   CircleDot,
-  Download,
   Eye,
   LoaderCircle,
   RefreshCw,
   Save,
   Sparkles,
-  Trash2,
   Undo2,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { CopyButton } from '../components/documents/CopyButton';
 import { DetailsForm } from '../components/documents/DetailsForm';
 import { DocumentPreview } from '../components/documents/DocumentPreview';
+import { MoreMenu } from '../components/documents/MoreMenu';
 import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
 import { StatusBadge } from '../components/documents/StatusBadge';
+import { Button } from '../components/Button';
 import { Alert } from '../components/FormParts';
 import { ApiError, errorMessage } from '../lib/api';
 import { detailsToText, fromForm, toForm, type FormValues } from '../lib/document-form';
@@ -30,6 +30,8 @@ import {
   saveDocument,
   type DocumentDetail,
 } from '../lib/documents';
+import { useFeedback } from '../lib/feedback-context';
+import { usePageTitle } from '../lib/usePageTitle';
 import { usePolling } from '../lib/usePolling';
 
 type Message = { tone: 'error' | 'success' | 'info'; text: string };
@@ -41,6 +43,7 @@ type Message = { tone: 'error' | 'success' | 'info'; text: string };
 export function DocumentPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const { toast, confirm } = useFeedback();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [document, setDocument] = useState<DocumentDetail | null>(null);
@@ -52,6 +55,8 @@ export function DocumentPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [justSaved, setJustSaved] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  usePageTitle(document ? (document.sellerName ?? document.fileName) : 'Document');
 
   /** Edits on screen that aren't saved yet. */
   const dirty = Boolean(document && form && JSON.stringify(form) !== JSON.stringify(toForm(document)));
@@ -116,15 +121,15 @@ export function DocumentPage() {
    * A new AI reading is stored straight away, so ask first when it would replace
    * something the user made: details they saved, or edits on screen not saved yet.
    */
-  function readAgain() {
+  async function readAgain() {
     if (!document || !form) return;
-    const question =
+    const message =
       document.status === 'SAVED'
-        ? 'This replaces your saved details with a new AI reading. Continue?'
+        ? 'The details you saved will be replaced by a new AI reading.'
         : dirty
-          ? 'This replaces the details you typed (not saved yet) with a new AI reading. Continue?'
+          ? 'The details you typed (not saved yet) will be replaced by a new AI reading.'
           : null;
-    if (question && !confirm(question)) return;
+    if (message && !(await confirm({ title: 'Read the bill again?', message, confirmLabel: 'Read again' }))) return;
     read();
   }
 
@@ -147,8 +152,15 @@ export function DocumentPage() {
     }
   }
 
-  function discard() {
-    if (document && confirm('Undo all changes since the last save?')) show(document);
+  async function discard() {
+    if (!document) return;
+    const ok = await confirm({
+      title: 'Discard your changes?',
+      message: 'Everything you changed since the last save will be undone.',
+      confirmLabel: 'Discard changes',
+      danger: true,
+    });
+    if (ok) show(document);
   }
 
   function editForm(next: FormValues) {
@@ -186,20 +198,39 @@ export function DocumentPage() {
       link.click();
       URL.revokeObjectURL(url);
     } catch (error) {
-      setMessage({ tone: 'error', text: errorMessage(error) });
+      toast(errorMessage(error), 'error');
     }
   }
 
   async function remove() {
-    if (!confirm('Delete this document and its details? This cannot be undone.')) return;
+    if (!document) return;
+    const ok = await confirm({
+      title: 'Delete this document?',
+      message: `“${document.sellerName ?? document.fileName}”, its file and its details are deleted for good. This can’t be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy('deleting');
     try {
       await deleteDocument(id);
       navigate('/documents');
+      toast('Document deleted.'); // shown on the list, where the user now is
     } catch (error) {
-      setMessage({ tone: 'error', text: errorMessage(error) });
+      toast(errorMessage(error), 'error');
       setBusy(null);
     }
+  }
+
+  /** "All documents" with unsaved edits: ask first (the browser's own check only covers closing the tab). */
+  async function leave() {
+    const ok = await confirm({
+      title: 'Leave without saving?',
+      message: 'Your unsaved changes will be lost.',
+      confirmLabel: 'Leave',
+      danger: true,
+    });
+    if (ok) navigate('/documents');
   }
 
   return (
@@ -208,7 +239,9 @@ export function DocumentPage() {
         <Link
           to="/documents"
           onClick={(e) => {
-            if (dirty && !confirm('You have unsaved changes. Leave without saving?')) e.preventDefault();
+            if (!dirty) return;
+            e.preventDefault(); // the dialog decides
+            leave();
           }}
           className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900"
         >
@@ -240,28 +273,22 @@ export function DocumentPage() {
 
               {/* Things you do to the whole document. Save lives at the end of the form. */}
               <div className="flex flex-wrap items-center gap-2">
-                <ToolbarButton onClick={readAgain} disabled={busy !== null}>
-                  {document.status === 'UPLOADED' ? (
-                    <Sparkles className="size-4" aria-hidden />
-                  ) : (
-                    <RefreshCw className="size-4" aria-hidden />
-                  )}
-                  {document.status === 'UPLOADED' ? 'Read with AI' : 'Read again'}
-                </ToolbarButton>
+                {/* Not read yet: reading is the next step, so it's the main (filled) button. */}
+                <Button
+                  variant={document.status === 'UPLOADED' ? 'primary' : 'secondary'}
+                  icon={document.status === 'UPLOADED' ? Sparkles : RefreshCw}
+                  onClick={readAgain}
+                  disabled={busy !== null}
+                  busy={busy === 'reading'}
+                >
+                  {busy === 'reading' ? 'Reading…' : document.status === 'UPLOADED' ? 'Read with AI' : 'Read again'}
+                </Button>
                 {form && (
                   <CopyButton text={detailsToText(form)} label="Copy all details">
                     Copy all
                   </CopyButton>
                 )}
-                <ToolbarButton onClick={download} disabled={busy !== null}>
-                  <Download className="size-4" aria-hidden />
-                  Download
-                </ToolbarButton>
-                <span className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden />
-                <ToolbarButton onClick={remove} disabled={busy !== null} danger>
-                  <Trash2 className="size-4" aria-hidden />
-                  {busy === 'deleting' ? 'Deleting…' : 'Delete'}
-                </ToolbarButton>
+                <MoreMenu disabled={busy !== null} deleting={busy === 'deleting'} onDownload={download} onDelete={remove} />
               </div>
             </div>
 
@@ -354,7 +381,7 @@ function SaveBar(props: {
   const quiet = props.state === 'clean' || props.state === 'saved';
 
   return (
-    <div className="sticky bottom-0 z-10 -mx-1 mt-6 px-1 pb-4">
+    <div className="sticky bottom-16 z-10 -mx-1 mt-6 px-1 pb-4 sm:bottom-0">
       <div
         className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white/95 px-4 py-3 shadow-lg backdrop-blur ${
           props.state === 'error' ? 'border-rose-200' : 'border-slate-200'
@@ -366,32 +393,24 @@ function SaveBar(props: {
         </p>
         <div className="flex items-center gap-2">
           {props.canDiscard && (
-            <button
-              type="button"
-              onClick={props.onDiscard}
-              disabled={props.disabled}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60"
-            >
-              <Undo2 className="size-4" aria-hidden />
+            <Button variant="ghost" icon={Undo2} onClick={props.onDiscard} disabled={props.disabled}>
               Discard
-            </button>
+            </Button>
           )}
-          <button
+          {/* Nothing to save: a quiet button. Something to save: the filled main one. */}
+          <Button
             type="submit"
+            variant={quiet ? 'secondary' : 'primary'}
+            icon={Save}
             disabled={props.disabled}
+            busy={props.state === 'saving'}
             title="Save (Ctrl+S)"
-            className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold disabled:opacity-60 ${
-              quiet
-                ? 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-                : 'bg-brand-600 text-white shadow-sm hover:bg-brand-700'
-            }`}
           >
-            <Save className="size-4" aria-hidden />
             {props.state === 'saving' ? 'Saving…' : 'Save details'}
             <kbd className="hidden rounded border border-current/30 px-1 font-sans text-[10px] font-medium opacity-70 md:inline">
               Ctrl S
             </kbd>
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -413,21 +432,5 @@ function PageSkeleton() {
         </div>
       </div>
     </div>
-  );
-}
-
-function ToolbarButton(props: { onClick: () => void; disabled?: boolean; danger?: boolean; children: ReactNode }) {
-  const colours = props.danger
-    ? 'border-transparent bg-transparent text-rose-700 hover:bg-rose-50'
-    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50';
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      disabled={props.disabled}
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-60 ${colours}`}
-    >
-      {props.children}
-    </button>
   );
 }

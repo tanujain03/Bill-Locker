@@ -128,6 +128,12 @@ export const downloadDocument = (id: string) => fetchBlob(`/documents/${id}/down
 export const monthLabel = (month: string) =>
   new Date(`${month}-01T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 
-/** 1499 → "1,499.00" (Indian digit grouping; bills don't tell us the currency yet). */
-export const formatAmount = (amount: number) =>
-  amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/**
+ * 1499 → "₹1,499.00" (Indian digit grouping). Bills don't store a currency yet, so every
+ * amount is shown in rupees; a Preferences → Currency setting can change this later.
+ */
+const RUPEES = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' });
+/** `whole`: "₹50,893" — for big headline numbers, where paise only add width. */
+const WHOLE_RUPEES = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+export const formatAmount = (amount: number, { whole = false } = {}) =>
+  (whole ? WHOLE_RUPEES : RUPEES).format(amount);

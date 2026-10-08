@@ -1,5 +1,8 @@
 # UI/UX review — Bill Locker
 
+> **Status:** all tasks in the table at the end are done. What changed and how to check
+> each item: [`ui-ux-changes.md`](ui-ux-changes.md).
+
 A designer's pass over the whole signed-in app and the sign-in screens, written for the
 **end user**: someone who just bought a TV, has a pile of bills in Gmail, and wants to
 know "is this still under warranty?" in under 10 seconds.
@@ -230,12 +233,12 @@ This is frontend + backend work. It's a good next task.
 | # | Task | Size | Frontend / backend |
 |---|---|---|---|
 | ✓ | Sidebar = navigation only; account + Upload in top bar | S | FE |
-| 1 | Currency symbol, hide zero sub-lines, equal stat cards | S | FE |
-| 2 | Complete avatar menu + expired-session redirect + "Signed out" notice | S | FE |
-| 3 | `Button`, `ConfirmDialog`, toasts — then use them everywhere | M | FE |
-| 4 | Upload opens the file picker directly / drop anywhere | S | FE |
-| 5 | Profile & Settings page (name, change password, preferences) | M | FE + BE |
-| 6 | Dashboard attention banner + "add warranty dates" nudge | S | FE |
-| 7 | Sign-in page clean-up (one sign-up CTA, forgot-password, checklist) | S | FE |
-| 8 | Top bar: page title, global search, notification bell | L | FE + BE |
-| 9 | Phone bottom tab bar | M | FE |
+| ✓ 1 | Currency symbol, hide zero sub-lines, equal stat cards | S | FE |
+| ✓ 2 | Avatar menu (no duplicate Gmail link, real menu keyboard) + expired-session redirect + "Signed out" notice. Profile/Settings items come with task 5 | S | FE |
+| ✓ 3 | `Button` (+ `buttonClass` for links), confirm dialog + toasts (`useFeedback`), used everywhere | M | FE |
+| ✓ 4 | Upload opens the file picker directly / drop anywhere | S | FE |
+| ✓ 5 | Profile & Settings page (name, change password, preferences) | M | FE + BE |
+| ✓ 6 | Dashboard attention banner + "add warranty dates" nudge | S | FE |
+| ✓ 7 | Sign-in page clean-up (one sign-up CTA, forgot-password, checklist) | S | FE |
+| ✓ 8 | Top bar: page title, global search, notification bell | L | FE + BE |
+| ✓ 9 | Phone bottom tab bar | M | FE |

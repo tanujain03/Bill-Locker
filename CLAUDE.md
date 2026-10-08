@@ -44,6 +44,11 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   library); every card/bar/row links to a filtered list; Documents filters live in the URL
   (`?q=&type=&status=&source=&month=`). Saving a bill now fills an empty warranty end date.
   Guide: `docs/task-4-dashboard.md`.
+- UI/UX pass: icon-rail sidebar (hover opens, pin button; navigation + Settings only), top bar with search
+  (`Ctrl K` → `/documents?q=`), 🔔 (`useAttention`), one-click `UploadButton` + `DropAnywhere`, phone tab bar,
+  `/settings` (`PUT /api/users/me`, `PUT /api/users/me/password`; wrong current password = 400 `WRONG_PASSWORD`,
+  never 401, because any 401 for a sent token signs the browser out as "session expired"), ₹ amounts,
+  `usePageTitle`. Checklist: `docs/ui-ux-changes.md`; reasons: `docs/ui-ux-review.md`.
 
 ## Repository
 
@@ -53,7 +58,7 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   `http://localhost:8080`. `src/lib/auth-context.ts` + `components/AuthProvider.tsx` hold
   the signed-in user; `components/RouteGuards.tsx` (`RequireAuth`, `GuestOnly`).
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
-  Packages: `security` (SecurityConfig, JWT), `user`, `auth` (incl. password reset),
+  Packages: `security` (SecurityConfig, JWT), `user` (incl. Settings endpoints), `auth` (incl. password reset),
   `common` (BaseEntity, ApiException, GlobalExceptionHandler), `document` (+ `document.ai`), `gmail`.
   Tables: `users`, `password_reset_tokens`, `documents`, `document_items`, `document_files`,
   `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`.
@@ -120,6 +125,9 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
 - Pages show backend `fieldErrors` under inputs (`FormParts.tsx` `TextField`) and the
   `message` in an `Alert`. Forms use `noValidate`: the backend is the source of truth.
 - Colours for status always come with an icon + label. Never render API text as HTML.
+- Buttons: `components/Button.tsx` (`<Button variant icon busy>`; `buttonClass()` for a `<Link>` that looks like
+  one); one `primary` per screen. Never `window.confirm`: `const { confirm, toast } = useFeedback()`
+  (`lib/feedback-context.ts`, shown by `FeedbackProvider`); `await confirm({ title, message, confirmLabel, danger })`.
 - lucide-react 1.x renamed icons; the typechecker catches wrong names.
 
 ## Roadmap (from the README, one task at a time when the user asks)

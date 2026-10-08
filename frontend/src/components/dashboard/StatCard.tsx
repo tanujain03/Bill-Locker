@@ -30,9 +30,14 @@ export function StatCard({ icon: Icon, label, value, sub, to, onClick, attention
         <Icon className="size-5" aria-hidden />
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-medium text-slate-500">{label}</span>
+        {/* One line each, so the big numbers line up across all four cards. */}
+        <span className="block truncate text-sm font-medium text-slate-500">{label}</span>
         <span className="mt-0.5 block truncate text-2xl font-semibold tracking-tight tabular-nums">{value}</span>
-        {sub && <span className="mt-0.5 block truncate text-xs text-slate-500">{sub}</span>}
+        {sub && (
+          <span className="mt-0.5 block truncate text-xs text-slate-600" title={sub}>
+            {sub}
+          </span>
+        )}
       </span>
     </>
   );

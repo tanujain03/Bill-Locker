@@ -13,6 +13,7 @@ each task implements a part of this contract.
 | `/api/documents/...` (upload, extract, list + search, get, save, download, delete) | Complete, see section 8. Reading uses Google Gemini (`GEMINI_API_KEY`) |
 | `/api/integrations/gmail/...` (connect, callback, scan, emails, import / ignore / restore files, disconnect) | Complete, see section 13. Several Gmail addresses per user; needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_TOKEN_KEY`. Imported files are read by AI in the background |
 | `GET /api/warranties`, `GET /api/dashboard` | Complete, see sections 6 and 7. Computed from **saved** bills' product lines (no product/warranty tables yet) |
+| `PUT /api/users/me`, `PUT /api/users/me/password` | Complete (Settings page). Change your name; change your password with the current one (`400 WRONG_PASSWORD` + `fieldErrors.currentPassword` when it's wrong — never 401, which the browser treats as "session expired") |
 
 Everything else is not built yet. How tasks 1–4 work is explained in
 [`task-1-auth.md`](task-1-auth.md), [`task-2-documents.md`](task-2-documents.md),
@@ -108,7 +109,12 @@ Wrong email **or** password → `401 INVALID_CREDENTIALS` "Incorrect email or pa
 The JWT should carry `sub` (user id) and `exp`; the frontend reads `exp` to drop expired tokens early.
 
 ### `GET /api/auth/me` → `User`
-### `PUT /api/users/me` `{ "name": "New Name" }` → `User` (not built yet)
+### `PUT /api/users/me` `{ "name": "New Name" }` → `User`
+Same name rules as register (`fieldErrors.name`).
+
+### `PUT /api/users/me/password` `{ "currentPassword": "...", "newPassword": "..." }` → `200 { "message": "Your password has been changed." }`
+- Wrong current password → `400 WRONG_PASSWORD` with `fieldErrors.currentPassword` (not 401: the frontend signs out on any 401).
+- `newPassword`: same rules as register (`fieldErrors.newPassword`). Tokens already issued keep working until they expire.
 
 ### `POST /api/auth/forgot-password`
 Request `{ "email": "asha@example.com" }` → always `200 { "message": "If an account exists for this email, we've sent a link to reset the password." }`,

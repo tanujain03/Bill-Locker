@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { AuthLayout } from '../components/AuthLayout';
-import { Alert, PasswordField, SubmitButton, TextField } from '../components/FormParts';
+import { Alert, PasswordField, PasswordRules, SubmitButton, TextField } from '../components/FormParts';
 import { ApiError, errorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 
@@ -37,7 +37,14 @@ export function RegisterPage() {
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {error && <Alert tone="error">{error}</Alert>}
-        <TextField label="Name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} error={fieldErrors.name} />
+        <TextField
+          label="Your name"
+          autoComplete="name"
+          placeholder="e.g. Tanu Jain"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={fieldErrors.name}
+        />
         <TextField
           label="Email"
           type="email"
@@ -52,9 +59,9 @@ export function RegisterPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={fieldErrors.password}
-          hint="8+ characters with at least one letter and one number"
         />
-        <SubmitButton busy={busy}>Create account</SubmitButton>
+        <PasswordRules password={password} />
+        <SubmitButton busy={busy} busyText="Creating account…">Create account</SubmitButton>
       </form>
     </AuthLayout>
   );

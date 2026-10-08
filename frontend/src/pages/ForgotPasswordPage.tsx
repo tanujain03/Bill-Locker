@@ -1,27 +1,20 @@
 import { useState, type FormEvent } from 'react';
-import { Link, Navigate, useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { AuthLayout } from '../components/AuthLayout';
 import { Alert, SubmitButton, TextField } from '../components/FormParts';
 import { api, ApiError, errorMessage } from '../lib/api';
 
 /**
  * Step 1 of resetting a password: ask for a reset link.
- * The email comes from the sign-in page ("Forgot password?" passes it in the
- * router state) and can't be edited here: the user only clicks the button.
+ * The email typed on the sign-in page comes along ("Forgot password?" passes it in the
+ * router state) and can be changed here.
  */
 export function ForgotPasswordPage() {
-  const email = (useLocation().state as { email?: string } | null)?.email ?? '';
+  const [email, setEmail] = useState((useLocation().state as { email?: string } | null)?.email ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | undefined>();
   const [sentMessage, setSentMessage] = useState<string | null>(null);
-
-  // Opened directly (typed URL, bookmark): there's no email to use, so go and get one.
-  if (!email) {
-    return (
-      <Navigate to="/" replace state={{ info: 'Enter your email, then click “Forgot password?”.' }} />
-    );
-  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -66,12 +59,13 @@ export function ForgotPasswordPage() {
         <TextField
           label="Email"
           type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
           value={email}
-          readOnly // filled in from the sign-in page; to change it, go back to sign in
+          onChange={(e) => setEmail(e.target.value)}
           error={emailError}
-          hint="Wrong email? Go back to sign in and change it there."
         />
-        <SubmitButton busy={busy}>Send reset link</SubmitButton>
+        <SubmitButton busy={busy} busyText="Sending…">Send reset link</SubmitButton>
       </form>
     </AuthLayout>
   );

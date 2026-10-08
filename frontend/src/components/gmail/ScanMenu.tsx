@@ -1,6 +1,7 @@
 import { ChevronDown, ScanSearch } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { SCAN_RANGE_LABELS, type ScanRange } from '../../lib/gmail';
+import { buttonClass } from '../Button';
 
 /** The "Scan" button: opens a small list of how far back to look. */
 export function ScanMenu({ disabled, onScan }: { disabled: boolean; onScan: (range: ScanRange) => void }) {
@@ -28,7 +29,7 @@ export function ScanMenu({ disabled, onScan }: { disabled: boolean; onScan: (ran
         aria-haspopup="true"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+        className={buttonClass({ variant: 'primary' })}
       >
         <ScanSearch className="size-4" aria-hidden />
         Scan

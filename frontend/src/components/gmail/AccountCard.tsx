@@ -1,5 +1,7 @@
 import { CircleAlert, LoaderCircle, Mail, Unplug } from 'lucide-react';
+import { useFeedback } from '../../lib/feedback-context';
 import { timeAgo, type GmailAccount, type ScanRange } from '../../lib/gmail';
+import { Button } from '../Button';
 import { ScanMenu } from './ScanMenu';
 
 /** One connected Gmail address: its scan status, Scan and Disconnect. */
@@ -10,6 +12,7 @@ export function AccountCard(props: {
   onDisconnect: () => void;
 }) {
   const { account } = props;
+  const { confirm } = useFeedback();
   const scanning = account.scanStatus === 'QUEUED' || account.scanStatus === 'SCANNING';
 
   return (
@@ -39,17 +42,22 @@ export function AccountCard(props: {
       </div>
       <div className="flex items-center gap-2">
         <ScanMenu disabled={scanning || props.busy} onScan={props.onScan} />
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          icon={Unplug}
           disabled={props.busy}
-          onClick={() => {
-            if (window.confirm(`Disconnect ${account.email}? Bills you imported stay in Documents.`)) props.onDisconnect();
+          onClick={async () => {
+            const ok = await confirm({
+              title: `Disconnect ${account.email}?`,
+              message: 'Bill Locker stops looking in this inbox. Bills you already imported stay in Documents.',
+              confirmLabel: 'Disconnect',
+              danger: true,
+            });
+            if (ok) props.onDisconnect();
           }}
-          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
         >
-          <Unplug className="size-4" aria-hidden />
           Disconnect
-        </button>
+        </Button>
       </div>
     </div>
   );

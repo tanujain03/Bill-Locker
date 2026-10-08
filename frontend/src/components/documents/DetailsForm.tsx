@@ -9,6 +9,7 @@ import {
   type ItemValues,
 } from '../../lib/document-form';
 import { DOCUMENT_TYPE_LABELS, FIELD_LABELS, ITEM_LABELS } from '../../lib/documents';
+import { useFeedback } from '../../lib/feedback-context';
 import { TextField } from '../FormParts';
 import { CopyButton } from './CopyButton';
 
@@ -21,6 +22,7 @@ type Props = {
 
 /** The details of a bill, grouped like the CSV, each field with its own copy button. */
 export function DetailsForm({ value, onChange, fieldErrors }: Props) {
+  const { confirm } = useFeedback();
   type Field = keyof typeof FIELD_LABELS;
   const set = (field: Field) => (text: string) => onChange({ ...value, [field]: text });
 
@@ -38,10 +40,18 @@ export function DetailsForm({ value, onChange, fieldErrors }: Props) {
   const setItem = (index: number, item: ItemValues) =>
     onChange({ ...value, items: value.items.map((old, i) => (i === index ? item : old)) });
 
-  function removeItem(index: number) {
+  async function removeItem(index: number) {
     // Only ask when there is something to lose.
     const filled = Object.values(value.items[index]).some((text) => text.trim());
-    if (filled && !confirm(`Remove product ${index + 1} and its details?`)) return;
+    const ok =
+      !filled ||
+      (await confirm({
+        title: `Remove product ${index + 1}?`,
+        message: 'Its details are taken off this bill when you save.',
+        confirmLabel: 'Remove product',
+        danger: true,
+      }));
+    if (!ok) return;
     onChange({ ...value, items: value.items.filter((_, i) => i !== index) });
   }
 
@@ -213,7 +223,7 @@ function Card({
         </span>
         <div>
           <h2 className="leading-tight font-semibold">{title}</h2>
-          {description && <p className="text-xs text-slate-500">{description}</p>}
+          {description && <p className="text-xs text-slate-600">{description}</p>}
         </div>
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">{children}</div>

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { usePageTitle } from '../lib/usePageTitle';
 import { useScreenScale } from '../lib/useScreenScale';
 import { Logo } from './Logo';
 import { PromoPanel } from './PromoPanel';
@@ -16,6 +17,7 @@ export function AuthLayout({ title, subtitle, children, footer }: {
   footer?: ReactNode;
 }) {
   useScreenScale();
+  usePageTitle(title);
 
   return (
     <div className="flex h-dvh overflow-hidden">
