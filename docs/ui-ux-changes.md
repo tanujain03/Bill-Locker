@@ -184,6 +184,19 @@ URLs below assume `http://localhost:5173`.
 - [ ] Browser tab titles everywhere: "Dashboard · Bill Locker", "Documents · …", "Sign in to your locker · …".
 - [ ] Small grey helper text is a shade darker (easier to read).
 
+## 17. Share a saved bill on WhatsApp
+
+**Where:** open a **saved** bill → the bar above the preview. **Files:** `lib/share.ts`,
+`components/documents/DocumentPreview.tsx`, `pages/DocumentPage.tsx`
+
+- [ ] A bill that isn't saved yet: no WhatsApp button. After *Save details*: a green **WhatsApp** button appears above the preview.
+- [ ] **Chrome/Edge on Windows, or a phone:** click it → the system share sheet opens → pick **WhatsApp** → choose a contact.
+      The PDF/photo is attached, with a message like "Bill from Croma · 12 Mar 2026 · Total ₹54,990.00", the products
+      with their warranty end dates, and "Shared from Bill Locker". (WhatsApp Desktop must be installed to appear in the Windows sheet.)
+- [ ] Close the share sheet without choosing: nothing happens (no error).
+- [ ] **Browsers without file sharing (e.g. Firefox):** WhatsApp opens in a new tab with the message filled in, the file
+      downloads, and a toast says to attach it with 📎.
+
 ---
 
 ## Not done (and why)

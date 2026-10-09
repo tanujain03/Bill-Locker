@@ -31,6 +31,7 @@ import {
   type DocumentDetail,
 } from '../lib/documents';
 import { useFeedback } from '../lib/feedback-context';
+import { billShareText } from '../lib/share';
 import { usePageTitle } from '../lib/usePageTitle';
 import { usePolling } from '../lib/usePolling';
 
@@ -307,7 +308,13 @@ export function DocumentPage() {
             <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
               {/* The file stays in view while you scroll the details, so you can compare. */}
               <div className="lg:sticky lg:top-4 lg:self-start">
-                <DocumentPreview id={id} contentType={document.contentType} fileName={document.fileName} />
+                {/* Sharing sends the saved details, so it appears once the bill is saved. */}
+                <DocumentPreview
+                  id={id}
+                  contentType={document.contentType}
+                  fileName={document.fileName}
+                  shareText={document.status === 'SAVED' ? billShareText(document) : undefined}
+                />
               </div>
 
               <form noValidate onSubmit={save} className="relative">
