@@ -1,5 +1,6 @@
 package project.bill_locker.document.ai;
 
+import java.util.List;
 import project.bill_locker.document.DocumentDetails;
 
 /**
@@ -15,4 +16,12 @@ public interface DetailExtractor {
 	 * @throws ExtractionException when the details can't be read
 	 */
 	DocumentDetails extract(byte[] file, String contentType);
+
+	/**
+	 * The same, with the links found in the bill's QR codes (QrCodeReader), so the AI can
+	 * tell which one registers the warranty. Readers that can't use them just ignore them.
+	 */
+	default DocumentDetails extract(byte[] file, String contentType, List<String> qrLinks) {
+		return extract(file, contentType);
+	}
 }

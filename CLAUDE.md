@@ -44,6 +44,14 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   library); every card/bar/row links to a filtered list; Documents filters live in the URL
   (`?q=&type=&status=&source=&month=`). Saving a bill now fills an empty warranty end date.
   Guide: `docs/task-4-dashboard.md`.
+- Task 5: warranty registration links per product (`document_items.brand`, `registration_url`,
+  `registration_source` = DOCUMENT / QR_CODE / WEB_SEARCH / SEARCH / USER). Reading: `QrCodeReader` (ZXing +
+  PDFBox) decodes QR links and passes them to Gemini, which also returns `brand` + `warrantyRegistrationUrl`.
+  The link shows as a clickable link (new tab), not an input. No link/QR: the page shows the detected brand and
+  asks to confirm; only then `POST /api/documents/{id}/registration-page {position, brand}` (`RegistrationFinder`:
+  Gemini + `google_search` tool, then `LinkChecker`: https + public addresses only, re-checked per redirect; else a
+  Google search link) and the tab (opened during the click) goes there. Tests use `FakeRegistrationFinder`. Only links to brand pages; never submit their
+  forms. Guide: `docs/task-5-warranty-registration.md`.
 - UI/UX pass: icon-rail sidebar (hover opens, pin button; navigation + Settings only), top bar with search
   (`Ctrl K` → `/documents?q=`), 🔔 (`useAttention`), one-click `UploadButton` + `DropAnywhere`, phone tab bar,
   `/settings` (`PUT /api/users/me`, `PUT /api/users/me/password`; wrong current password = 400 `WRONG_PASSWORD`,
@@ -59,7 +67,8 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   the signed-in user; `components/RouteGuards.tsx` (`RequireAuth`, `GuestOnly`).
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
   Packages: `security` (SecurityConfig, JWT), `user` (incl. Settings endpoints), `auth` (incl. password reset),
-  `common` (BaseEntity, ApiException, GlobalExceptionHandler), `document` (+ `document.ai`), `gmail`.
+  `common` (BaseEntity, ApiException, GlobalExceptionHandler), `document` (+ `document.ai`,
+  `document.registration`), `gmail`.
   Tables: `users`, `password_reset_tokens`, `documents`, `document_items`, `document_files`,
   `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`.
 - `docs/api-contract.md` — the full target REST API; its top lists what is built so far.

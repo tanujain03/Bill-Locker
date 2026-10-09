@@ -26,6 +26,7 @@ import {
   deleteDocument,
   downloadDocument,
   extractDocument,
+  findRegistrationPage,
   getDocument,
   saveDocument,
   type DocumentDetail,
@@ -61,6 +62,8 @@ export function DocumentPage() {
 
   /** Edits on screen that aren't saved yet. */
   const dirty = Boolean(document && form && JSON.stringify(form) !== JSON.stringify(toForm(document)));
+  /** Task 5: the product whose brand page is being searched for (null: none). */
+  const [finding, setFinding] = useState<number | null>(null);
 
   /** Show a document from the backend and reset the form to its values. */
   const show = useCallback((d: DocumentDetail) => {
@@ -140,7 +143,8 @@ export function DocumentPage() {
     setBusy('saving');
     setSaveError(null);
     try {
-      show(await saveDocument(id, fromForm(form)));
+      const saved = await saveDocument(id, fromForm(form));
+      show(saved);
       setJustSaved(true);
       setMessage(null); // "AI read it, please check" is done once it's saved
     } catch (error) {
@@ -150,6 +154,54 @@ export function DocumentPage() {
       requestAnimationFrame(() => window.document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
     } finally {
       setBusy(null);
+    }
+  }
+
+  /**
+   * The user confirmed the brand of a product whose bill has no registration link or QR
+   * code: find the brand's official page (backend web search, a few seconds) and open it
+   * in a new tab.
+   *
+   * The tab is opened right away, during the click: a tab opened later, when the answer
+   * arrives, would be blocked as a pop-up. It shows "Finding…" until we send it on.
+   */
+  async function openRegistrationPage(position: number, brand: string) {
+    const tab = window.open('', '_blank');
+    if (tab) {
+      tab.opener = null; // the brand's page can't reach back into Bill Locker
+      tab.document.title = 'Finding the registration page…';
+      tab.document.body.textContent = `Finding ${brand}'s warranty registration page…`;
+      tab.document.body.style.font = '16px system-ui, sans-serif';
+      tab.document.body.style.padding = '2rem';
+    }
+    setFinding(position);
+    try {
+      const page = await findRegistrationPage(id, position, brand);
+      if (tab) tab.location.href = page.url;
+      else toast('Your browser blocked the new tab. Click the link under Warranty registration.', 'info');
+      if (page.source === 'SEARCH') toast(`No official page found for ${brand}, so a Google search opened.`, 'info');
+      // Keep the link on the form too (the backend stored it on the saved product).
+      setForm((current) =>
+        current && {
+          ...current,
+          items: current.items.map((item, i) =>
+            i === position ? { ...item, registrationUrl: page.url, registrationSource: page.source } : item,
+          ),
+        },
+      );
+      setDocument((current) =>
+        current && {
+          ...current,
+          items: current.items.map((item, i) =>
+            i === position ? { ...item, registrationUrl: page.url, registrationSource: page.source } : item,
+          ),
+        },
+      );
+    } catch (error) {
+      tab?.close();
+      toast(errorMessage(error), 'error');
+    } finally {
+      setFinding(null);
     }
   }
 
@@ -329,7 +381,20 @@ export function DocumentPage() {
                     </p>
                   </div>
                 )}
-                {form && <DetailsForm value={form} onChange={editForm} fieldErrors={fieldErrors} />}
+                {form && (
+                  <DetailsForm
+                    value={form}
+                    onChange={editForm}
+                    fieldErrors={fieldErrors}
+                    registration={{
+                      finding: (index) => finding === index,
+                      // The backend looks the product up by its place on the bill, so it must exist there.
+                      canSearch: (index) =>
+                        document.status !== 'UPLOADED' && index < document.items.length && busy === null && finding === null,
+                      onConfirm: (index, brand) => openRegistrationPage(index, brand),
+                    }}
+                  />
+                )}
 
                 <SaveBar
                   state={

@@ -54,7 +54,8 @@ public class WarrantyService {
 				item.getWarrantyPeriodMonths());
 		return new WarrantyView(document.getId(), item.getProductName(), item.getModelNumber(), item.getSerialNumber(),
 				document.getSellerName(), item.getWarrantyProvider(), document.getPurchaseDate(),
-				item.getWarrantyStartDate(), end, WarrantyRules.daysLeft(end, today), WarrantyRules.status(end, today));
+				item.getWarrantyStartDate(), end, WarrantyRules.daysLeft(end, today), WarrantyRules.status(end, today),
+				item.getRegistrationUrl());
 	}
 
 	private static boolean matches(WarrantyView v, String search) {

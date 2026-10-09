@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.ResultActions;
 		"app.gmail.client-secret=test-secret", "app.gmail.token-key=" + ApiTest.TEST_TOKEN_KEY})
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, RecordingResetLinkSender.Config.class, FakeDetailExtractor.Config.class, FixedClockConfig.class,
-		FakeGoogleApi.Config.class})
+		FakeGoogleApi.Config.class, FakeRegistrationFinder.Config.class})
 public abstract class ApiTest {
 
 	protected static final String PASSWORD = "Str0ngPass";

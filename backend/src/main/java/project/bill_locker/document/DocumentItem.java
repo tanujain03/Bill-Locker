@@ -2,6 +2,8 @@ package project.bill_locker.document;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Index;
@@ -61,6 +63,18 @@ public class DocumentItem extends BaseEntity {
 	@Column(name = "warranty_provider", length = 500)
 	private String warrantyProvider;
 
+	/** The manufacturer's brand ("Noise" for "Noise Buds VS104"): used to find its registration page. */
+	@Column(name = "brand", length = 100)
+	private String brand;
+
+	/** The brand's warranty registration page (always http/https). */
+	@Column(name = "registration_url", length = 1000)
+	private String registrationUrl;
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "registration_source", length = 20)
+	private RegistrationSource registrationSource;
+
 	DocumentItem(Document document, int position, DocumentItemView values) {
 		this.document = document;
 		this.position = position;
@@ -72,5 +86,13 @@ public class DocumentItem extends BaseEntity {
 		this.warrantyStartDate = values.warrantyStartDate();
 		this.warrantyEndDate = values.warrantyEndDate();
 		this.warrantyProvider = values.warrantyProvider();
+		this.brand = values.brand();
+		this.registrationUrl = values.registrationUrl();
+		this.registrationSource = values.registrationUrl() == null ? null : values.registrationSource();
+	}
+
+	void setRegistration(String url, RegistrationSource source) {
+		this.registrationUrl = url;
+		this.registrationSource = source;
 	}
 }

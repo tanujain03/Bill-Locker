@@ -8,20 +8,32 @@ import {
   type FormValues,
   type ItemValues,
 } from '../../lib/document-form';
-import { DOCUMENT_TYPE_LABELS, FIELD_LABELS, ITEM_LABELS } from '../../lib/documents';
+import { DOCUMENT_TYPE_LABELS, FIELD_LABELS, ITEM_LABELS, type RegistrationSource } from '../../lib/documents';
 import { useFeedback } from '../../lib/feedback-context';
 import { TextField } from '../FormParts';
 import { CopyButton } from './CopyButton';
+import { RegistrationLink } from './RegistrationLink';
 
 type Props = {
   value: FormValues;
   onChange: (value: FormValues) => void;
   /** From the backend: "buyerEmail" or "items[0].warrantyEndDate" → message. */
   fieldErrors: Record<string, string>;
+  /** Task 5: finding a confirmed brand's registration page, run by the document page. */
+  registration: RegistrationSearch;
+};
+
+type RegistrationSearch = {
+  /** Is product `index`'s page being searched for right now? */
+  finding: (index: number) => boolean;
+  /** False for a product the backend doesn't know yet (added since the last save). */
+  canSearch: (index: number) => boolean;
+  /** The user confirmed the brand: find its page and open it in a new tab. */
+  onConfirm: (index: number, brand: string) => void;
 };
 
 /** The details of a bill, grouped like the CSV, each field with its own copy button. */
-export function DetailsForm({ value, onChange, fieldErrors }: Props) {
+export function DetailsForm({ value, onChange, fieldErrors, registration }: Props) {
   const { confirm } = useFeedback();
   type Field = keyof typeof FIELD_LABELS;
   const set = (field: Field) => (text: string) => onChange({ ...value, [field]: text });
@@ -119,6 +131,7 @@ export function DetailsForm({ value, onChange, fieldErrors }: Props) {
               onChange={(next) => setItem(index, next)}
               onRemove={() => removeItem(index)}
               fieldErrors={fieldErrors}
+              registration={registration}
             />
           ))}
           {/* At the end of the list: you add the next product where you finished the last one. */}
@@ -142,9 +155,10 @@ function ItemCard(props: {
   onChange: (item: ItemValues) => void;
   onRemove: () => void;
   fieldErrors: Record<string, string>;
+  registration: RegistrationSearch;
 }) {
   const { index, item } = props;
-  const field = (name: keyof ItemValues, type = 'text', hint?: string) => (
+  const field = (name: keyof typeof ITEM_LABELS, type = 'text', hint?: string) => (
     <Field
       label={ITEM_LABELS[name]}
       type={type}
@@ -183,6 +197,8 @@ function ItemCard(props: {
       </header>
       <div className="grid gap-4 p-5 sm:grid-cols-2">
         <Wide>{field('productName')}</Wide>
+        {/* data-brand: "No, change the brand" puts the cursor here. */}
+        <div data-brand={index}>{field('brand', 'text', 'The maker, detected from the product name')}</div>
         {field('modelNumber')}
         {field('serialNumber')}
         {field('unitPrice', 'number')}
@@ -198,6 +214,19 @@ function ItemCard(props: {
           {field('warrantyStartDate', 'date')}
           {field('warrantyEndDate', 'date', endHint)}
         </div>
+        <RegistrationLink
+          url={item.registrationUrl}
+          source={item.registrationSource as RegistrationSource | ''}
+          brand={item.brand}
+          finding={props.registration.finding(index)}
+          canSearch={props.registration.canSearch(index)}
+          onConfirm={() => props.registration.onConfirm(index, item.brand.trim())}
+          onChangeBrand={() => {
+            const input = window.document.querySelector<HTMLInputElement>(`[data-brand="${index}"] input`);
+            input?.focus();
+            input?.select();
+          }}
+        />
       </div>
     </article>
   );

@@ -1,4 +1,4 @@
-import { ArrowRight, Search, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ExternalLink, Search, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ErrorState } from '../components/ErrorState';
@@ -184,7 +184,7 @@ function WarrantyRows({ items }: { items: WarrantyView[] }) {
                 <WarrantyStatusPill status={w.status} daysLeft={w.daysLeft} />
               </td>
               <td className="px-4 py-3 text-right">
-                <BillLink id={w.documentId} />
+                <RowLinks warranty={w} />
               </td>
             </tr>
           ))}
@@ -205,7 +205,7 @@ function WarrantyRows({ items }: { items: WarrantyView[] }) {
             </div>
             <div className="mt-2 flex items-center justify-between gap-3">
               <ProductMeta warranty={w} />
-              <BillLink id={w.documentId} />
+              <RowLinks warranty={w} />
             </div>
           </li>
         ))}
@@ -221,14 +221,29 @@ function ProductMeta({ warranty: w }: { warranty: WarrantyView }) {
   return meta ? <p className="truncate text-xs text-slate-600">{meta}</p> : <span />;
 }
 
-function BillLink({ id }: { id: string }) {
+/** "Register ↗" (the brand's page, in a new tab) when we have it, and "Open bill". */
+function RowLinks({ warranty: w }: { warranty: WarrantyView }) {
   return (
-    <Link
-      to={`/documents/${id}`}
-      className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-brand-700 hover:text-brand-800"
-    >
-      Open bill
-      <ArrowRight className="size-4" aria-hidden />
-    </Link>
+    <span className="inline-flex shrink-0 items-center gap-3">
+      {w.registrationUrl && /^https?:\/\//i.test(w.registrationUrl) && (
+        <a
+          href={w.registrationUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Register this product's warranty on the brand's site"
+          className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800"
+        >
+          Register
+          <ExternalLink className="size-3.5" aria-hidden />
+        </a>
+      )}
+      <Link
+        to={`/documents/${w.documentId}`}
+        className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:text-brand-800"
+      >
+        Open bill
+        <ArrowRight className="size-4" aria-hidden />
+      </Link>
+    </span>
   );
 }

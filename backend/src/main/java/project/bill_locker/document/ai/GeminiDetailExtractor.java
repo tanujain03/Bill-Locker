@@ -28,7 +28,7 @@ public class GeminiDetailExtractor implements DetailExtractor {
 	private static final Logger log = LoggerFactory.getLogger(GeminiDetailExtractor.class);
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
-	static final String URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
+	public static final String URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
 
 	private static final String PROMPT = """
 			You read shopping documents: invoices, warranty cards and receipts.
@@ -41,6 +41,17 @@ public class GeminiDetailExtractor implements DetailExtractor {
 			- unitPrice is the price of one unit before tax; taxAmount is the total tax (GST/VAT); totalAmount is the final amount paid.
 			- warrantyPeriodMonths: the warranty length in months (1 year = 12). warrantyStartDate is usually the purchase date.
 			- serialNumber: the serial number or IMEI of that exact unit.
+			- brand: the manufacturer's brand of the product (e.g. Samsung, Noise, boAt), from the product name or the
+			  document. null for services such as rides, food, delivery or bills for utilities.
+			- warrantyRegistrationUrl: a web link printed on the document for registering this product's warranty
+			  (or the product), copied exactly. null when none is printed.
+			""";
+
+	/** Added to the prompt when QR codes were found: their links, decoded exactly. */
+	private static final String QR_HINT = """
+			The document's QR codes contain these links (decoded exactly): %s
+			If one of them is for warranty or product registration (look at the text printed next to the QR code),
+			use it as warrantyRegistrationUrl for the products it belongs to.
 			""";
 
 	private final RestClient restClient;
@@ -59,7 +70,13 @@ public class GeminiDetailExtractor implements DetailExtractor {
 
 	@Override
 	public DocumentDetails extract(byte[] file, String contentType) {
-		String body = JSON.writeValueAsString(requestBody(file, contentType));
+		return extract(file, contentType, List.of());
+	}
+
+	@Override
+	public DocumentDetails extract(byte[] file, String contentType, List<String> qrLinks) {
+		String prompt = qrLinks.isEmpty() ? PROMPT : PROMPT + QR_HINT.formatted(String.join(" , ", qrLinks));
+		String body = JSON.writeValueAsString(requestBody(file, contentType, prompt));
 		int lastStatus = 0;
 		for (String model : models) {
 			String reply;
@@ -122,13 +139,13 @@ public class GeminiDetailExtractor implements DetailExtractor {
 		throw new ExtractionException(ExtractionException.FAILED, "Gemini returned no answer for this document.");
 	}
 
-	private static Map<String, Object> requestBody(byte[] file, String contentType) {
+	private static Map<String, Object> requestBody(byte[] file, String contentType, String prompt) {
 		Map<String, Object> inlineData = Map.of(
 				"mime_type", contentType,
 				"data", Base64.getEncoder().encodeToString(file));
 		return Map.of(
 				"contents", List.of(Map.of("parts", List.of(
-						Map.of("text", PROMPT),
+						Map.of("text", prompt),
 						Map.of("inline_data", inlineData)))),
 				"generationConfig", Map.of(
 						"response_mime_type", "application/json",
@@ -160,7 +177,9 @@ public class GeminiDetailExtractor implements DetailExtractor {
 							"description", "Warranty length in months"),
 					"warrantyStartDate", text("Warranty start date, YYYY-MM-DD"),
 					"warrantyEndDate", text("Warranty end date, YYYY-MM-DD"),
-					"warrantyProvider", text("Who services the warranty, e.g. the manufacturer"))))));
+					"warrantyProvider", text("Who services the warranty, e.g. the manufacturer"),
+					"brand", text("Manufacturer's brand of the product; null for services"),
+					"warrantyRegistrationUrl", text("Link printed for registering the warranty"))))));
 
 	private static Map<String, Object> object(Map<String, Object> properties) {
 		return Map.of("type", "OBJECT", "properties", properties);

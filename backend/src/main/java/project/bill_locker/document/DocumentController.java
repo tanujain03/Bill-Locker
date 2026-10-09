@@ -80,6 +80,16 @@ public class DocumentController {
 		return documentService.save(CurrentUser.id(jwt), id, request);
 	}
 
+	/**
+	 * Task 5, when the bill has no registration link or QR code: after the user confirmed the
+	 * product's brand, find that brand's official warranty registration page.
+	 */
+	@PostMapping("/{id}/registration-page")
+	public RegistrationPage findRegistrationPage(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+			@Valid @RequestBody RegistrationPageRequest request) {
+		return documentService.findRegistrationPage(CurrentUser.id(jwt), id, request);
+	}
+
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {

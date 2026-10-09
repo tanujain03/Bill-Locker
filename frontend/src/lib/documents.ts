@@ -8,6 +8,9 @@ export type DocumentType = 'INVOICE' | 'WARRANTY_CARD' | 'RECEIPT' | 'OTHER';
 /** UPLOADED = not read yet, EXTRACTED = AI filled it (needs review), SAVED = the user saved it. */
 export type DocumentStatus = 'UPLOADED' | 'EXTRACTED' | 'SAVED';
 
+/** Where a product's warranty registration link came from (task 5). */
+export type RegistrationSource = 'DOCUMENT' | 'QR_CODE' | 'WEB_SEARCH' | 'SEARCH' | 'USER';
+
 export type DocumentItem = {
   productName: string | null;
   modelNumber: string | null;
@@ -17,6 +20,10 @@ export type DocumentItem = {
   warrantyStartDate: string | null;
   warrantyEndDate: string | null;
   warrantyProvider: string | null;
+  /** The manufacturer's brand, e.g. "Noise": used to find its registration page. */
+  brand: string | null;
+  registrationUrl: string | null;
+  registrationSource: RegistrationSource | null;
 };
 
 /** The details of a bill: what the AI reads and what the user saves. */
@@ -102,7 +109,19 @@ export const ITEM_LABELS = {
   warrantyStartDate: 'Warranty start',
   warrantyEndDate: 'Warranty end',
   warrantyProvider: 'Warranty provider',
-} as const satisfies Record<keyof DocumentItem, string>;
+  brand: 'Brand',
+  registrationUrl: 'Warranty registration link',
+} as const satisfies Record<Exclude<keyof DocumentItem, 'registrationSource'>, string>;
+
+/** The page to open: the brand's official one (WEB_SEARCH) or, if none was found, a Google search (SEARCH). */
+export type RegistrationPage = { url: string; source: RegistrationSource };
+
+/**
+ * When the bill has no registration link or QR code: after the user confirmed the brand,
+ * the backend finds that brand's official warranty registration page (and keeps it on the product).
+ */
+export const findRegistrationPage = (id: string, position: number, brand: string) =>
+  api<RegistrationPage>(`/documents/${id}/registration-page`, { body: { position, brand } });
 
 export const uploadDocument = (file: File) => {
   const form = new FormData();

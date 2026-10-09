@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
@@ -39,11 +40,23 @@ public record SaveDocumentRequest(
 			@Min(0) @Max(600) Integer warrantyPeriodMonths,
 			LocalDate warrantyStartDate,
 			LocalDate warrantyEndDate,
-			@Size(max = 500) String warrantyProvider) {
+			@Size(max = 500) String warrantyProvider,
+			@Size(max = 100) String brand,
+			// Only web links: the page turns this into a link, and "javascript:…" must never get there.
+			@Size(max = 1000) @Pattern(regexp = "^https?://\\S+$", message = "Enter a link starting with https://")
+			String registrationUrl,
+			RegistrationSource registrationSource) {
 
 		DocumentItemView toView() {
 			return new DocumentItemView(productName, modelNumber, serialNumber, unitPrice, warrantyPeriodMonths,
-					warrantyStartDate, warrantyEndDate, warrantyProvider);
+					warrantyStartDate, warrantyEndDate, warrantyProvider, blankToNull(brand), blankToNull(registrationUrl),
+					// A link without a source was typed in by the user.
+					registrationUrl == null || registrationUrl.isBlank() ? null
+							: registrationSource == null ? RegistrationSource.USER : registrationSource);
+		}
+
+		private static String blankToNull(String text) {
+			return text == null || text.isBlank() ? null : text.strip();
 		}
 	}
 

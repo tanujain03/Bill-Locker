@@ -99,4 +99,22 @@ class GeminiAnswerParserTests {
 				.isInstanceOf(ExtractionException.class)
 				.extracting("code").isEqualTo(ExtractionException.FAILED);
 	}
+
+	@Test
+	void keepsBrandAndOnlyRealRegistrationLinks() {
+		DocumentDetails d = GeminiAnswerParser.parse("""
+				{"items": [
+				  {"productName": "Noise Buds", "brand": "Noise", "warrantyRegistrationUrl": "https://www.gonoise.com/warranty"},
+				  {"productName": "TV", "brand": "LG", "warrantyRegistrationUrl": "www.lg.com/in/register"},
+				  {"productName": "Fan", "warrantyRegistrationUrl": "javascript:alert(1)"},
+				  {"productName": "Lamp", "warrantyRegistrationUrl": "see the box"}
+				]}
+				""");
+		assertThat(d.items().get(0).brand()).isEqualTo("Noise");
+		assertThat(d.items().get(0).registrationUrl()).isEqualTo("https://www.gonoise.com/warranty");
+		assertThat(d.items().get(1).registrationUrl()).isEqualTo("https://www.lg.com/in/register"); // scheme added
+		assertThat(d.items().get(2).registrationUrl()).isNull(); // never a clickable script
+		assertThat(d.items().get(3).registrationUrl()).isNull();
+		assertThat(d.items().get(0).registrationSource()).isNull(); // DocumentService decides printed vs QR
+	}
 }

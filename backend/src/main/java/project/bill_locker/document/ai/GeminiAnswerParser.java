@@ -47,9 +47,11 @@ final class GeminiAnswerParser {
 
 		List<DocumentItemView> items = new ArrayList<>();
 		for (JsonNode item : root.path("items")) { // a missing "items" loops zero times
+			// The link's source (printed or QR code) is decided by DocumentService, which knows the QR links.
 			items.add(new DocumentItemView(text(item, "productName"), text(item, "modelNumber"),
 					text(item, "serialNumber"), number(item, "unitPrice"), wholeNumber(item, "warrantyPeriodMonths"),
-					date(item, "warrantyStartDate"), date(item, "warrantyEndDate"), text(item, "warrantyProvider")));
+					date(item, "warrantyStartDate"), date(item, "warrantyEndDate"), text(item, "warrantyProvider"),
+					shortText(item, "brand", 100), webLink(item, "warrantyRegistrationUrl"), null));
 		}
 		return new DocumentDetails(documentType(root), text(root, "documentNumber"),
 				text(root, "sellerName"), text(root, "sellerAddress"), text(root, "sellerContact"),
@@ -73,6 +75,28 @@ final class GeminiAnswerParser {
 		}
 		// Columns hold 500 characters; a longer value is cut rather than failing the save.
 		return text.length() > MAX_TEXT ? text.substring(0, MAX_TEXT) : text;
+	}
+
+	/** Like text(), for a column of {@code max} characters: too long means misread → null. */
+	private static String shortText(JsonNode node, String field, int max) {
+		String text = text(node, field);
+		return text == null || text.length() > max ? null : text;
+	}
+
+	/**
+	 * Only a real web link (http/https, no spaces, fits the column). The page makes it
+	 * clickable, so anything else ("javascript:…", "see box") becomes null.
+	 */
+	static String webLink(JsonNode node, String field) {
+		JsonNode value = node.path(field);
+		if (!value.isString()) {
+			return null;
+		}
+		String link = value.asString().strip();
+		if (link.startsWith("www.")) {
+			link = "https://" + link; // printed without the scheme
+		}
+		return link.matches("(?i)^https?://\\S+$") && link.length() <= 1000 ? link : null;
 	}
 
 	/** Unknown or missing types become OTHER (or null when there's nothing at all). */
