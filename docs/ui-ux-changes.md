@@ -197,6 +197,33 @@ URLs below assume `http://localhost:5173`.
 - [ ] **Browsers without file sharing (e.g. Firefox):** WhatsApp opens in a new tab with the message filled in, the file
       downloads, and a toast says to attach it with 📎.
 
+## 18. Warranties only for products; a Bills & receipts page
+
+**Files:** backend `warranty/WarrantyRules.java` (`hasWarranty`), `WarrantyService.java`, Gemini prompt;
+frontend `pages/BillsPage.tsx`, `components/documents/DocumentList.tsx`, `components/AppLayout.tsx`, `App.tsx`.
+
+- [ ] `/warranties` (and the dashboard's Products / Warranty health numbers) only show products from an
+      **Invoice** or **Warranty card**, or products with warranty details (months, dates, provider). A ride or
+      food receipt without them is gone from there.
+- [ ] Sidebar: **Bills & receipts** (receipt icon) under Documents → `/bills`. Phones: **Bills** in the bottom bar.
+- [ ] `/bills` lists only documents of type **Bill / receipt** (the old "Receipt"), with Bills & receipts count,
+      Spent this month, Total, and a search (kept in the URL).
+- [ ] New bills: the AI files rides, food, fuel, utility and phone bills as **Bill / receipt**. An older bill:
+      open it, set **Document type → Bill / receipt**, save → it appears on `/bills` and leaves `/warranties`.
+
+## 19. Bills & receipts: read automatically, saved without review
+
+**Files:** backend `BillCategory.java`, `DocumentService.statusAfterRead`, `Document.category`, Gemini prompt;
+frontend `DetailsForm.tsx` (slim form), `DocumentPage.tsx` (message), `DocumentList.tsx`, `BillsPage.tsx` (chips).
+
+- [ ] Upload a ride / food / phone bill → after the AI read it says "Read and saved under Bills & receipts.
+      Nothing to do…" and the status is **Saved** (not "Needs review"). It doesn't appear in **Needs attention** or 🔔.
+- [ ] Its form shows only: Document type, **Category**, Shop or company, Date, Amount, Bill or receipt number.
+- [ ] Change the type to **Invoice** → the full form (seller, buyer, products, warranty) comes back with its values.
+- [ ] An invoice still waits for review ("Details read by AI. Please check them…").
+- [ ] `/bills`: rows say the category (Travel, Food…), chips **All · Travel · Food …** with counts filter the list
+      and the three totals; the chip is kept in the URL (`?category=`).
+
 ---
 
 ## Not done (and why)

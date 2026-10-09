@@ -14,6 +14,7 @@ each task implements a part of this contract.
 | `/api/integrations/gmail/...` (connect, callback, scan, emails, import / ignore / restore files, disconnect) | Complete, see section 13. Several Gmail addresses per user; needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_TOKEN_KEY`. Imported files are read by AI in the background |
 | `GET /api/warranties`, `GET /api/dashboard` | Complete, see sections 6 and 7. Computed from **saved** bills' product lines (no product/warranty tables yet) |
 | `PUT /api/users/me`, `PUT /api/users/me/password` | Complete (Settings page). Change your name; change your password with the current one (`400 WRONG_PASSWORD` + `fieldErrors.currentPassword` when it's wrong — never 401, which the browser treats as "session expired") |
+| Bills & receipts | A document read as `RECEIPT` is saved straight away (`status: SAVED`); documents and list rows carry `category` (`TRAVEL`, `FOOD`, `GROCERIES`, `FUEL`, `UTILITIES`, `PHONE_INTERNET`, `SHOPPING`, `HEALTH`, `OTHER`; only for `RECEIPT`, also accepted by `PUT /api/documents/{id}`) |
 | `POST /api/documents/{id}/registration-page` | Complete (task 5). Warranty registration links: from the bill (printed / QR code, during reading); without one, the user confirms the detected brand and this finds its official page (Gemini + Google Search); items carry `brand`, `registrationUrl`, `registrationSource`. See [`task-5-warranty-registration.md`](task-5-warranty-registration.md) |
 
 Everything else is not built yet. How tasks 1–4 work is explained in

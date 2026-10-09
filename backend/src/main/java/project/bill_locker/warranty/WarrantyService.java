@@ -13,7 +13,7 @@ import project.bill_locker.document.Document;
 import project.bill_locker.document.DocumentItem;
 import project.bill_locker.document.DocumentRepository;
 
-/** Every product on the user's saved bills, with how its warranty stands today. */
+/** Every product with a warranty on the user's saved bills, with how its warranty stands today. */
 @Service
 public class WarrantyService {
 
@@ -29,12 +29,18 @@ public class WarrantyService {
 		this.clock = clock;
 	}
 
-	/** All products of all saved bills, in the "All" tab's order. Also used by the dashboard. */
+	/**
+	 * The products with a warranty (see {@link WarrantyRules#hasWarranty}) on all saved bills,
+	 * in the "All" tab's order. Also used by the dashboard.
+	 */
 	@Transactional(readOnly = true)
 	public List<WarrantyView> views(UUID userId) {
 		LocalDate today = LocalDate.now(clock);
 		return documents.findSavedWithItems(userId).stream()
-				.flatMap(document -> document.getItems().stream().map(item -> view(document, item, today)))
+				.flatMap(document -> document.getItems().stream()
+						.filter(item -> WarrantyRules.hasWarranty(document.getDocumentType(), item.getWarrantyPeriodMonths(),
+								item.getWarrantyStartDate(), item.getWarrantyEndDate(), item.getWarrantyProvider()))
+						.map(item -> view(document, item, today)))
 				.sorted(ORDER)
 				.toList();
 	}

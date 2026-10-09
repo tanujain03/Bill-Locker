@@ -78,8 +78,9 @@ export function DocumentPage() {
     setMessage(null);
     setJustSaved(false);
     try {
-      show(await extractDocument(id));
-      setMessage({ tone: 'info', text: 'Details read by AI. Please check them, fix anything wrong, then save.' });
+      const d = await extractDocument(id);
+      show(d);
+      setMessage(afterRead(d));
     } catch (error) {
       // No key → just a hint; the user can type the details in.
       const tone = error instanceof ApiError && error.code === 'AI_NOT_CONFIGURED' ? 'info' : 'error';
@@ -114,9 +115,7 @@ export function DocumentPage() {
       .then((d) => {
         if (d.readQueued || dirty) return;
         show(d);
-        if (d.status === 'EXTRACTED') {
-          setMessage({ tone: 'info', text: 'Details read by AI. Please check them, fix anything wrong, then save.' });
-        }
+        if (d.status === 'EXTRACTED' || d.documentType === 'RECEIPT') setMessage(afterRead(d));
       })
       .catch(() => {}); // the next tick tries again
   });
@@ -422,6 +421,16 @@ export function DocumentPage() {
       </main>
     </div>
   );
+}
+
+/**
+ * What the page says after the AI read: an invoice waits for the user's check; a bill or
+ * receipt was saved straight away (the backend does that), so it only needs a look.
+ */
+function afterRead(d: DocumentDetail): Message {
+  return d.documentType === 'RECEIPT' && d.status === 'SAVED'
+    ? { tone: 'success', text: 'Read and saved under Bills & receipts. Nothing to do: if something is wrong, fix it and save again.' }
+    : { tone: 'info', text: 'Details read by AI. Please check them, fix anything wrong, then save.' };
 }
 
 type SaveState = 'saving' | 'error' | 'dirty' | 'saved' | 'clean' | 'review';

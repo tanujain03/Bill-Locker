@@ -5,6 +5,7 @@ import { GuestOnly, RequireAuth } from './components/RouteGuards';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { DocumentPage } from './pages/DocumentPage';
 import { DocumentsPage } from './pages/DocumentsPage';
+import { BillsPage } from './pages/BillsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -35,6 +36,7 @@ export function App() {
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/gmail" element={<GmailPage />} />
           <Route path="/warranties" element={<WarrantiesPage />} />
+          <Route path="/bills" element={<BillsPage />} />
           <Route path="/documents/:id" element={<DocumentPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

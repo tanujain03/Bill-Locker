@@ -35,7 +35,12 @@ public class GeminiDetailExtractor implements DetailExtractor {
 			Extract the details of the attached document into the JSON schema.
 			Rules:
 			- Copy values exactly as printed. Never guess or invent a value; use null when it is not printed.
-			- documentType: INVOICE, WARRANTY_CARD, RECEIPT or OTHER.
+			- documentType: INVOICE (a tax invoice for buying products, e.g. electronics or appliances),
+			  WARRANTY_CARD, RECEIPT (a bill or receipt for a service or everyday spending: rides, food, groceries,
+			  fuel, travel, electricity/water/gas, phone/internet bills, recharges, subscriptions) or OTHER.
+			- category: only for a RECEIPT, what it was for: TRAVEL (cabs, rides, trains, flights, hotels), FOOD
+			  (restaurants, food delivery), GROCERIES, FUEL, UTILITIES (electricity, water, gas), PHONE_INTERNET (mobile,
+			  broadband, recharges, DTH), SHOPPING, HEALTH (pharmacy, doctor, lab) or OTHER. null for other document types.
 			- Add one entry to "items" for every product line on the document (not for taxes, discounts or delivery).
 			- Dates as YYYY-MM-DD. Amounts as plain numbers without currency symbols or thousands separators.
 			- unitPrice is the price of one unit before tax; taxAmount is the total tax (GST/VAT); totalAmount is the final amount paid.
@@ -168,6 +173,9 @@ public class GeminiDetailExtractor implements DetailExtractor {
 			"purchaseDate", text("Date of purchase, YYYY-MM-DD"),
 			"taxAmount", number("Total tax (GST/VAT/sales tax)"),
 			"totalAmount", number("Final amount paid"),
+			"category", Map.of("type", "STRING", "nullable", true, "description", "Only for RECEIPT: what it was for",
+					"enum", List.of("TRAVEL", "FOOD", "GROCERIES", "FUEL", "UTILITIES", "PHONE_INTERNET", "SHOPPING",
+							"HEALTH", "OTHER")),
 			"items", Map.of("type", "ARRAY", "items", object(props(
 					"productName", text("Name of the product"),
 					"modelNumber", text("Manufacturer model number"),

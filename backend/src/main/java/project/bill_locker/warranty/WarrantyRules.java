@@ -1,6 +1,7 @@
 package project.bill_locker.warranty;
 
 import java.time.LocalDate;
+import project.bill_locker.document.DocumentType;
 import java.time.temporal.ChronoUnit;
 
 /**
@@ -44,5 +45,16 @@ public final class WarrantyRules {
 	/** Days until the end (negative once it has passed); null when the end is unknown. */
 	public static Long daysLeft(LocalDate effectiveEnd, LocalDate today) {
 		return effectiveEnd == null ? null : ChronoUnit.DAYS.between(today, effectiveEnd);
+	}
+
+	/**
+	 * Does this product belong on the Warranties page (and the dashboard's warranty numbers)?
+	 * Yes for products on an invoice or a warranty card, and for any product whose bill gives
+	 * warranty details. A ride, food or utility bill (or a document of unknown type) without
+	 * them is not a product with a warranty: it lives on the Bills & receipts page.
+	 */
+	public static boolean hasWarranty(DocumentType type, Integer months, LocalDate start, LocalDate end, String provider) {
+		return type == DocumentType.INVOICE || type == DocumentType.WARRANTY_CARD
+				|| months != null || start != null || end != null || (provider != null && !provider.isBlank());
 	}
 }

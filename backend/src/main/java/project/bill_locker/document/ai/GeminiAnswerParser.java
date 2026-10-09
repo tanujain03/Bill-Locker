@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import project.bill_locker.document.BillCategory;
 import project.bill_locker.document.DocumentDetails;
 import project.bill_locker.document.DocumentItemView;
 import project.bill_locker.document.DocumentType;
@@ -56,7 +57,9 @@ final class GeminiAnswerParser {
 		return new DocumentDetails(documentType(root), text(root, "documentNumber"),
 				text(root, "sellerName"), text(root, "sellerAddress"), text(root, "sellerContact"),
 				text(root, "buyerName"), text(root, "buyerAddress"), text(root, "buyerEmail"),
-				date(root, "purchaseDate"), number(root, "taxAmount"), number(root, "totalAmount"), items);
+				date(root, "purchaseDate"), number(root, "taxAmount"), number(root, "totalAmount"), items,
+				// Only bills and receipts are sorted into categories.
+				documentType(root) == DocumentType.RECEIPT ? BillCategory.parse(text(root, "category")) : null);
 	}
 
 	private static ExtractionException unreadable() {

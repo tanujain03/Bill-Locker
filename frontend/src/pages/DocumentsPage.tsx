@@ -1,15 +1,13 @@
 import { CalendarDays, FilterX, Search, Upload, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
-import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
-import { StatusBadge } from '../components/documents/StatusBadge';
+import { useSearchParams } from 'react-router';
+import { DocumentList } from '../components/documents/DocumentList';
 import { Button } from '../components/Button';
 import { UploadButton } from '../components/UploadButton';
 import { Alert } from '../components/FormParts';
 import { errorMessage } from '../lib/api';
 import {
   DOCUMENT_TYPE_LABELS,
-  formatAmount,
   listDocuments,
   monthLabel,
   type DocumentStatus,
@@ -197,47 +195,6 @@ function Select(props: { label: string; value: string; onChange: (value: string)
         ))}
       </select>
     </label>
-  );
-}
-
-function DocumentList({ documents, filtered }: { documents: DocumentSummary[]; filtered: boolean }) {
-  if (documents.length === 0) {
-    return (
-      <p className="mt-6 rounded-xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">
-        {filtered ? 'No documents match your search.' : 'No documents yet. Upload your first bill above.'}
-      </p>
-    );
-  }
-  return (
-    <ul className="mt-4 divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
-      {documents.map((d) => (
-        <li key={d.id}>
-          <Link to={`/documents/${d.id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50">
-            <FileTypeIcon contentType={d.contentType} />
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-center gap-2">
-                <p className="truncate font-medium">{d.sellerName ?? d.fileName}</p>
-                <SourceBadge sourceGmail={d.sourceGmail} />
-              </div>
-              <p className="mt-0.5 truncate text-sm text-slate-500">
-                {[
-                  d.documentType && DOCUMENT_TYPE_LABELS[d.documentType],
-                  d.firstProductName && (d.itemCount > 1 ? `${d.firstProductName} +${d.itemCount - 1} more` : d.firstProductName),
-                  d.purchaseDate,
-                  d.sellerName && d.fileName,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </p>
-            </div>
-            {d.totalAmount != null && (
-              <span className="shrink-0 text-sm font-medium tabular-nums">{formatAmount(d.totalAmount)}</span>
-            )}
-            <StatusBadge status={d.status} reading={d.readQueued} />
-          </Link>
-        </li>
-      ))}
-    </ul>
   );
 }
 

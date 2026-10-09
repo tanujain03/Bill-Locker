@@ -27,6 +27,7 @@ public record DocumentDetail(
 		BigDecimal taxAmount,
 		BigDecimal totalAmount,
 		List<DocumentItemView> items,
+		BillCategory category,
 		Instant createdAt,
 		Instant updatedAt,
 		boolean readQueued,
@@ -41,6 +42,7 @@ public record DocumentDetail(
 				d.getBuyerName(), d.getBuyerAddress(), d.getBuyerEmail(),
 				d.getPurchaseDate(), d.getTaxAmount(), d.getTotalAmount(),
 				d.getItems().stream().map(DocumentItemView::of).toList(),
+				BillCategory.parse(d.getCategory()),
 				d.getCreatedAt(), d.getUpdatedAt(),
 				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail());
 	}

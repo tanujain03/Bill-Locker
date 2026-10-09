@@ -15,7 +15,7 @@ class WarrantyApiTests extends DocumentApiTestBase {
 
 	/** One saved bill with four products: expiring in 10 days, active, expired 36 days ago, no dates. */
 	private static final String FOUR_ITEMS = """
-			{"sellerName": "Croma", "purchaseDate": "2025-10-10", "items": [
+			{"documentType": "INVOICE", "sellerName": "Croma", "purchaseDate": "2025-10-10", "items": [
 			  {"productName": "Air conditioner", "warrantyEndDate": "2026-10-17", "warrantyProvider": "LG"},
 			  {"productName": "Phone", "modelNumber": "SM-S931B", "warrantyEndDate": "2027-10-07", "warrantyProvider": "Samsung India"},
 			  {"productName": "Kettle", "warrantyEndDate": "2026-09-01"},
@@ -156,5 +156,36 @@ class WarrantyApiTests extends DocumentApiTestBase {
 				.andExpect(jsonPath("$.counts.all").value(0))
 				.andExpect(jsonPath("$.counts.noInfo").value(0))
 				.andExpect(jsonPath("$.items.length()").value(0));
+	}
+
+	@Test
+	void onlyInvoicesWarrantyCardsAndProductsWithWarrantyDetails() throws Exception {
+		String token = registerAndGetToken(uniqueEmail("w-types"));
+		// Shown: an invoice (even without warranty details) and a warranty card.
+		saveBill(token, """
+				{"documentType": "INVOICE", "items": [{"productName": "Mixer"}]}
+				""");
+		saveBill(token, """
+				{"documentType": "WARRANTY_CARD", "items": [{"productName": "LG Split AC"}]}
+				""");
+		// A receipt with warranty details still counts…
+		saveBill(token, """
+				{"documentType": "RECEIPT", "items": [{"productName": "Trimmer", "warrantyPeriodMonths": 6}]}
+				""");
+		// …but a ride receipt, an "other" document and an untyped one without them don't.
+		saveBill(token, """
+				{"documentType": "RECEIPT", "items": [{"productName": "Bike ride"}]}
+				""");
+		saveBill(token, """
+				{"documentType": "OTHER", "items": [{"productName": "Parking"}]}
+				""");
+		saveBill(token, """
+				{"items": [{"productName": "Groceries"}]}
+				""");
+
+		warranties(token, "?q=")
+				.andExpect(jsonPath("$.counts.all").value(3))
+				.andExpect(jsonPath("$.items[*].productName").value(org.hamcrest.Matchers.containsInAnyOrder(
+						"Mixer", "LG Split AC", "Trimmer")));
 	}
 }

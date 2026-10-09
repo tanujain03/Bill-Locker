@@ -8,7 +8,13 @@ import {
   type FormValues,
   type ItemValues,
 } from '../../lib/document-form';
-import { DOCUMENT_TYPE_LABELS, FIELD_LABELS, ITEM_LABELS, type RegistrationSource } from '../../lib/documents';
+import {
+  BILL_CATEGORY_LABELS,
+  DOCUMENT_TYPE_LABELS,
+  FIELD_LABELS,
+  ITEM_LABELS,
+  type RegistrationSource,
+} from '../../lib/documents';
 import { useFeedback } from '../../lib/feedback-context';
 import { TextField } from '../FormParts';
 import { CopyButton } from './CopyButton';
@@ -38,10 +44,10 @@ export function DetailsForm({ value, onChange, fieldErrors, registration }: Prop
   type Field = keyof typeof FIELD_LABELS;
   const set = (field: Field) => (text: string) => onChange({ ...value, [field]: text });
 
-  /** A text box for one bill-level field. */
-  const field = (name: Field, type = 'text') => (
+  /** A text box for one bill-level field (a bill or receipt uses plainer labels). */
+  const field = (name: Field, type = 'text', label: string = FIELD_LABELS[name]) => (
     <Field
-      label={FIELD_LABELS[name]}
+      label={label}
       type={type}
       value={value[name]}
       onChange={set(name)}
@@ -69,24 +75,46 @@ export function DetailsForm({ value, onChange, fieldErrors, registration }: Prop
 
   const addItem = () => onChange({ ...value, items: [...value.items, emptyItem()] });
 
+  const typePicker = (
+    <Select
+      label={FIELD_LABELS.documentType}
+      value={value.documentType}
+      onChange={set('documentType')}
+      options={Object.entries(DOCUMENT_TYPE_LABELS)}
+      empty="Not set"
+    />
+  );
+
+  // A bill or receipt (a ride, a meal, a phone bill) keeps just the essentials. The other
+  // fields aren't deleted, only hidden: changing the type back shows them again.
+  if (value.documentType === 'RECEIPT') {
+    return (
+      <div className="space-y-4">
+        <Card icon={ReceiptText} title="Bill / receipt" description="Just the essentials: no products or warranty.">
+          {typePicker}
+          <Select
+            label={FIELD_LABELS.category}
+            value={value.category}
+            onChange={set('category')}
+            options={Object.entries(BILL_CATEGORY_LABELS)}
+            empty="Not set"
+          />
+          <Wide>{field('sellerName', 'text', 'Shop or company')}</Wide>
+          {field('purchaseDate', 'date', 'Date')}
+          {field('totalAmount', 'number', 'Amount')}
+          <Wide>{field('documentNumber', 'text', 'Bill or receipt number')}</Wide>
+        </Card>
+        <p className="px-1 text-xs text-slate-600">
+          Bought a product with a warranty? Change the type to <strong>Invoice</strong> to see all fields.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <Card icon={FileText} title="Document">
-        <label className="block text-sm font-medium text-slate-700">
-          {FIELD_LABELS.documentType}
-          <select
-            value={value.documentType}
-            onChange={(e) => set('documentType')(e.target.value)}
-            className="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal shadow-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-          >
-            <option value="">Not set</option>
-            {Object.entries(DOCUMENT_TYPE_LABELS).map(([type, label]) => (
-              <option key={type} value={type}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {typePicker}
         {field('documentNumber')}
       </Card>
 
@@ -257,6 +285,33 @@ function Card({
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">{children}</div>
     </section>
+  );
+}
+
+/** A labelled drop-down (document type, category), styled like the text boxes. */
+function Select(props: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: [string, string][];
+  empty: string;
+}) {
+  return (
+    <label className="block text-sm font-medium text-slate-700">
+      {props.label}
+      <select
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+        className="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal shadow-xs outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+      >
+        <option value="">{props.empty}</option>
+        {props.options.map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

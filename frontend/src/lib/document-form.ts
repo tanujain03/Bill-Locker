@@ -9,8 +9,10 @@ import {
   ITEM_LABELS,
   type DocumentDetails,
   type DocumentItem,
+  type BillCategory,
   type DocumentType,
   type RegistrationSource,
+  BILL_CATEGORY_LABELS,
 } from './documents';
 
 export type ItemValues = Record<keyof DocumentItem, string>;
@@ -40,6 +42,8 @@ export function fromForm(values: FormValues): DocumentDetails {
   const number = (value: string) => (value.trim() === '' ? null : Number(value));
   return {
     documentType: (values.documentType || null) as DocumentType | null,
+    // Only a bill or receipt keeps its category (the backend drops it for other types too).
+    category: values.documentType === 'RECEIPT' ? ((values.category || null) as BillCategory | null) : null,
     documentNumber: text(values.documentNumber),
     sellerName: text(values.sellerName),
     sellerAddress: text(values.sellerAddress),
@@ -97,7 +101,11 @@ export function itemToText(item: ItemValues, index: number): string {
 export function detailsToText(values: FormValues): string {
   const lines = FIELDS.filter((field) => values[field].trim()).map((field) => {
     const value =
-      field === 'documentType' ? DOCUMENT_TYPE_LABELS[values.documentType as DocumentType] : values[field].trim();
+      field === 'documentType'
+        ? DOCUMENT_TYPE_LABELS[values.documentType as DocumentType]
+        : field === 'category'
+          ? BILL_CATEGORY_LABELS[values.category as BillCategory]
+          : values[field].trim();
     return `${FIELD_LABELS[field]}: ${value}`;
   });
   const items = values.items.map((item, i) => itemToText(item, i));

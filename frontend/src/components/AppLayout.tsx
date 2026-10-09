@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Mail,
   Menu,
+  Receipt,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
@@ -20,12 +21,21 @@ import { NotificationBell } from './NotificationBell';
 import { UploadButton } from './UploadButton';
 import { UserMenu } from './UserMenu';
 
-type NavItem = { to: string; label: string; Icon: LucideIcon; badge?: (a: Attention) => number };
+type NavItem = {
+  to: string;
+  label: string;
+  /** A shorter label for the phone tab bar, where space is tight. */
+  short?: string;
+  Icon: LucideIcon;
+  badge?: (a: Attention) => number;
+};
 
 const LINKS: NavItem[] = [
   { to: '/home', label: 'Dashboard', Icon: LayoutDashboard },
   // The badges say how much waits there, without opening the dashboard.
   { to: '/documents', label: 'Documents', Icon: FileText, badge: (a) => a.toReview + a.readFailed },
+  // Everyday spending (rides, food, utilities): documents of type "Bill / receipt".
+  { to: '/bills', label: 'Bills & receipts', short: 'Bills', Icon: Receipt },
   { to: '/warranties', label: 'Warranties', Icon: ShieldCheck, badge: (a) => a.expiring.length },
   { to: '/gmail', label: 'Gmail', Icon: Mail, badge: (a) => a.gmailFiles },
 ];
@@ -302,7 +312,7 @@ function Sidebar({ pinned, expanded, onTogglePinned, attention }: {
 
 /** Phones: the main places plus a big Upload in the middle, within thumb reach. */
 function PhoneTabBar({ attention }: { attention: Attention | null }) {
-  const tab = ({ to, label, Icon, badge }: NavItem) => {
+  const tab = ({ to, label, short, Icon, badge }: NavItem) => {
     const count = badge && attention ? badge(attention) : 0;
     return (
       <NavLink
@@ -313,12 +323,12 @@ function PhoneTabBar({ attention }: { attention: Attention | null }) {
         }
       >
         <Icon className="size-5" aria-hidden />
-        {label}
+        {short ?? label}
         {count > 0 && <Badge count={count} className="absolute top-1 left-1/2 ml-1.5 scale-90" />}
       </NavLink>
     );
   };
-  const [home, documents, warranties, gmail] = LINKS;
+  const [home, documents, bills, warranties, gmail] = LINKS;
 
   return (
     <nav
@@ -330,6 +340,7 @@ function PhoneTabBar({ attention }: { attention: Attention | null }) {
       <div className="flex flex-1 justify-center">
         <UploadButton iconOnlyOnPhones className="rounded-full shadow-lg shadow-brand-600/30" />
       </div>
+      {tab(bills)}
       {tab(warranties)}
       {tab(gmail)}
     </nav>

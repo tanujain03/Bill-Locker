@@ -30,7 +30,8 @@ public record SaveDocumentRequest(
 		LocalDate purchaseDate,
 		@PositiveOrZero @Digits(integer = 10, fraction = 2) BigDecimal taxAmount,
 		@PositiveOrZero @Digits(integer = 10, fraction = 2) BigDecimal totalAmount,
-		@Size(max = 50, message = "A document can have at most 50 products.") List<@Valid ItemRequest> items) {
+		@Size(max = 50, message = "A document can have at most 50 products.") List<@Valid ItemRequest> items,
+		BillCategory category) {
 
 	public record ItemRequest(
 			@Size(max = 500) String productName,
@@ -63,6 +64,7 @@ public record SaveDocumentRequest(
 	DocumentDetails toDetails() {
 		List<DocumentItemView> views = items == null ? List.of() : items.stream().map(ItemRequest::toView).toList();
 		return new DocumentDetails(documentType, documentNumber, sellerName, sellerAddress, sellerContact,
-				buyerName, buyerAddress, buyerEmail, purchaseDate, taxAmount, totalAmount, views);
+				buyerName, buyerAddress, buyerEmail, purchaseDate, taxAmount, totalAmount, views,
+				documentType == DocumentType.RECEIPT ? category : null); // only bills and receipts have one
 	}
 }

@@ -19,6 +19,7 @@ public record DocumentSummary(
 		BigDecimal totalAmount,
 		int itemCount,
 		String firstProductName,
+		BillCategory category,
 		Instant createdAt,
 		boolean readQueued,
 		String readError,
@@ -28,7 +29,8 @@ public record DocumentSummary(
 		var items = d.getItems();
 		return new DocumentSummary(d.getId(), d.getFileName(), d.getContentType(), d.getSizeBytes(), d.getStatus(),
 				d.getDocumentType(), d.getDocumentNumber(), d.getSellerName(), d.getPurchaseDate(), d.getTotalAmount(),
-				items.size(), items.isEmpty() ? null : items.getFirst().getProductName(), d.getCreatedAt(),
+				items.size(), items.isEmpty() ? null : items.getFirst().getProductName(), BillCategory.parse(d.getCategory()),
+				d.getCreatedAt(),
 				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail());
 	}
 }

@@ -8,6 +8,30 @@ export type DocumentType = 'INVOICE' | 'WARRANTY_CARD' | 'RECEIPT' | 'OTHER';
 /** UPLOADED = not read yet, EXTRACTED = AI filled it (needs review), SAVED = the user saved it. */
 export type DocumentStatus = 'UPLOADED' | 'EXTRACTED' | 'SAVED';
 
+/** What a bill or receipt was for (only documents of type RECEIPT have one). */
+export type BillCategory =
+  | 'TRAVEL'
+  | 'FOOD'
+  | 'GROCERIES'
+  | 'FUEL'
+  | 'UTILITIES'
+  | 'PHONE_INTERNET'
+  | 'SHOPPING'
+  | 'HEALTH'
+  | 'OTHER';
+
+export const BILL_CATEGORY_LABELS: Record<BillCategory, string> = {
+  TRAVEL: 'Travel',
+  FOOD: 'Food',
+  GROCERIES: 'Groceries',
+  FUEL: 'Fuel',
+  UTILITIES: 'Utilities',
+  PHONE_INTERNET: 'Phone & internet',
+  SHOPPING: 'Shopping',
+  HEALTH: 'Health',
+  OTHER: 'Other',
+};
+
 /** Where a product's warranty registration link came from (task 5). */
 export type RegistrationSource = 'DOCUMENT' | 'QR_CODE' | 'WEB_SEARCH' | 'SEARCH' | 'USER';
 
@@ -40,6 +64,8 @@ export type DocumentDetails = {
   taxAmount: number | null;
   totalAmount: number | null;
   items: DocumentItem[];
+  /** Bills and receipts only. */
+  category: BillCategory | null;
 };
 
 export type DocumentDetail = DocumentDetails & {
@@ -72,6 +98,7 @@ export type DocumentSummary = {
   totalAmount: number | null;
   itemCount: number;
   firstProductName: string | null;
+  category: BillCategory | null;
   readQueued: boolean;
   readError: string | null;
   sourceGmail: string | null;
@@ -81,13 +108,15 @@ export type DocumentSummary = {
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   INVOICE: 'Invoice',
   WARRANTY_CARD: 'Warranty card',
-  RECEIPT: 'Receipt',
+  // Rides, food, fuel, utility and phone bills: they get their own page (/bills).
+  RECEIPT: 'Bill / receipt',
   OTHER: 'Other',
 };
 
 /** Field → label, in the order of invoice_warranty_fields.csv. Used by the form and by "Copy". */
 export const FIELD_LABELS = {
   documentType: 'Document type',
+  category: 'Category',
   documentNumber: 'Document number',
   sellerName: 'Seller name',
   sellerAddress: 'Seller address',

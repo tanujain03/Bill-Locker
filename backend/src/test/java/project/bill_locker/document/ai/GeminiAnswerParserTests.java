@@ -117,4 +117,17 @@ class GeminiAnswerParserTests {
 		assertThat(d.items().get(3).registrationUrl()).isNull();
 		assertThat(d.items().get(0).registrationSource()).isNull(); // DocumentService decides printed vs QR
 	}
+
+	@Test
+	void categoryOnlyForReceipts() {
+		assertThat(GeminiAnswerParser.parse("""
+				{"documentType": "RECEIPT", "category": "PHONE_INTERNET"}
+				""").category()).isEqualTo(project.bill_locker.document.BillCategory.PHONE_INTERNET);
+		assertThat(GeminiAnswerParser.parse("""
+				{"documentType": "RECEIPT", "category": "something new"}
+				""").category()).isEqualTo(project.bill_locker.document.BillCategory.OTHER);
+		assertThat(GeminiAnswerParser.parse("""
+				{"documentType": "INVOICE", "category": "FOOD"}
+				""").category()).isNull();
+	}
 }

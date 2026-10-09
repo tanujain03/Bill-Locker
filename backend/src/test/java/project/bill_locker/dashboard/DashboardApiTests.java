@@ -192,7 +192,7 @@ class DashboardApiTests extends DocumentApiTestBase {
 	void productsAndWarranties() throws Exception {
 		String token = registerAndGetToken(uniqueEmail("d-warranty"));
 		saveBill(token, """
-				{"sellerName": "Croma", "items": [
+				{"documentType": "INVOICE", "sellerName": "Croma", "items": [
 				  {"productName": "Phone", "warrantyEndDate": "2028-01-01"},
 				  {"productName": "AC", "warrantyEndDate": "2026-10-17"},
 				  {"productName": "Cable"}

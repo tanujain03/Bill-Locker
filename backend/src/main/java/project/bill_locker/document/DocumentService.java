@@ -150,7 +150,7 @@ public class DocumentService {
 
 		return transaction.execute(status -> {
 			Document document = findOwned(userId, id); // it may have been deleted meanwhile → 404
-			document.replaceDetails(details, DocumentStatus.EXTRACTED);
+			document.replaceDetails(details, statusAfterRead(details));
 			return DocumentDetail.of(document);
 		});
 	}
@@ -224,9 +224,7 @@ public class DocumentService {
 			}
 			return registrationQr == null ? item : item.withRegistration(registrationQr, RegistrationSource.QR_CODE);
 		}).toList();
-		return new DocumentDetails(d.documentType(), d.documentNumber(), d.sellerName(), d.sellerAddress(),
-				d.sellerContact(), d.buyerName(), d.buyerAddress(), d.buyerEmail(), d.purchaseDate(), d.taxAmount(),
-				d.totalAmount(), items);
+		return d.withItems(items);
 	}
 
 	/**
@@ -282,7 +280,7 @@ public class DocumentService {
 				.filter(d -> queuedAt.equals(d.getReadQueuedAt()))
 				.ifPresent(d -> {
 					if (details != null) {
-						d.replaceDetails(details, DocumentStatus.EXTRACTED);
+						d.replaceDetails(details, statusAfterRead(details));
 					} else {
 						d.readFailed(error);
 					}
@@ -292,6 +290,15 @@ public class DocumentService {
 	/** Takes the document out of the queue with a reason (own transaction, so it can follow a failed one). */
 	private void markReadFailed(UUID id, Instant queuedAt, String message) {
 		storeRead(id, queuedAt, null, message);
+	}
+
+	/**
+	 * After the AI read: an invoice or warranty card waits for the user's review (EXTRACTED),
+	 * because warranties depend on its details. A bill or receipt (a ride, a meal) is saved
+	 * straight away: nobody should have to review a ₹47 receipt. It can still be edited.
+	 */
+	static DocumentStatus statusAfterRead(DocumentDetails details) {
+		return details.documentType() == DocumentType.RECEIPT ? DocumentStatus.SAVED : DocumentStatus.EXTRACTED;
 	}
 
 	/** The message the user sees when reading fails (a missing key gets a how-to-fix hint). */
@@ -341,9 +348,7 @@ public class DocumentService {
 			}
 			return item.withWarrantyEndDate(end);
 		}).toList();
-		return new DocumentDetails(d.documentType(), d.documentNumber(), d.sellerName(), d.sellerAddress(),
-				d.sellerContact(), d.buyerName(), d.buyerAddress(), d.buyerEmail(), d.purchaseDate(), d.taxAmount(),
-				d.totalAmount(), items);
+		return d.withItems(items);
 	}
 
 	static ApiException fileTooLarge() {

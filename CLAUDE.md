@@ -52,6 +52,16 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   Gemini + `google_search` tool, then `LinkChecker`: https + public addresses only, re-checked per redirect; else a
   Google search link) and the tab (opened during the click) goes there. Tests use `FakeRegistrationFinder`. Only links to brand pages; never submit their
   forms. Guide: `docs/task-5-warranty-registration.md`.
+- Warranties vs bills: the Warranties page and the dashboard's warranty numbers only count products on an
+  INVOICE or WARRANTY_CARD, or with warranty details (`WarrantyRules.hasWarranty`). `/bills` (`BillsPage`,
+  "Bills & receipts" in the nav, "Bills" on the phone bar) lists documents of type RECEIPT, labelled
+  "Bill / receipt" (rides, food, fuel, utility/phone bills; the Gemini prompt says so). No new BILL type: the
+  local DB has a CHECK constraint on `documents.document_type`. `components/documents/DocumentList.tsx` is shared.
+  Bills/receipts are light: after the AI read a RECEIPT goes straight to SAVED (`DocumentService.statusAfterRead`;
+  invoices stay EXTRACTED for review), with `documents.category` (`BillCategory`: TRAVEL, FOOD, GROCERIES, FUEL,
+  UTILITIES, PHONE_INTERNET, SHOPPING, HEALTH, OTHER; plain varchar, parsed in Java, so no DB enum constraint;
+  only kept for RECEIPT). The form shows only type, category, shop, date, amount, number for a RECEIPT; `/bills`
+  has category chips (`?category=`).
 - UI/UX pass: icon-rail sidebar (hover opens, pin button; navigation + Settings only), top bar with search
   (`Ctrl K` → `/documents?q=`), 🔔 (`useAttention`), one-click `UploadButton` + `DropAnywhere`, phone tab bar,
   `/settings` (`PUT /api/users/me`, `PUT /api/users/me/password`; wrong current password = 400 `WRONG_PASSWORD`,
