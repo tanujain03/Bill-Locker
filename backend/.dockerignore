@@ -1,0 +1,7 @@
+# Keep the build small and secrets out of the image.
+.env
+target
+.mvn
+mvnw
+mvnw.cmd
+HELP.md
