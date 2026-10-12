@@ -4,7 +4,7 @@ This is the full REST API Bill Locker is heading towards. The backend and the
 frontend are rebuilt from scratch on the `restart` branch, one task at a time;
 each task implements a part of this contract.
 
-### Implemented so far (restart branch, tasks 1–4)
+### Implemented so far (restart branch, tasks 1–6)
 
 | Endpoint | Notes |
 |---|---|
@@ -16,6 +16,7 @@ each task implements a part of this contract.
 | `PUT /api/users/me`, `PUT /api/users/me/password` | Complete (Settings page). Change your name; change your password with the current one (`400 WRONG_PASSWORD` + `fieldErrors.currentPassword` when it's wrong — never 401, which the browser treats as "session expired") |
 | Bills & receipts | A document read as `RECEIPT` is saved straight away (`status: SAVED`); documents and list rows carry `category` (`TRAVEL`, `FOOD`, `GROCERIES`, `FUEL`, `UTILITIES`, `PHONE_INTERNET`, `SHOPPING`, `HEALTH`, `OTHER`; only for `RECEIPT`, also accepted by `PUT /api/documents/{id}`) |
 | `POST /api/documents/{id}/registration-page` | Complete (task 5). Warranty registration links: from the bill (printed / QR code, during reading); without one, the user confirms the detected brand and this finds its official page (Gemini + Google Search); items carry `brand`, `registrationUrl`, `registrationSource`. See [`task-5-warranty-registration.md`](task-5-warranty-registration.md) |
+| `POST /api/assistant/chat` | Complete (task 6). Chat assistant: Gemini writes one SELECT on user-filtered `ai_*` views, run read-only as the `bill_locker_ai` role; answers from the rows. See section 11 and [`task-6-assistant.md`](task-6-assistant.md) |
 
 Everything else is not built yet. How tasks 1–4 work is explained in
 [`task-1-auth.md`](task-1-auth.md), [`task-2-documents.md`](task-2-documents.md),
@@ -340,7 +341,22 @@ Click targets used by the UI: `DOCUMENT_PROCESSED` → `/documents/{documentId}`
 
 ---
 
-## 11. AI assistant — `POST /api/ai/chat`
+## 11. AI assistant — `POST /api/assistant/chat` (built, task 6)
+
+What was built (simpler than the original target below; see [`task-6-assistant.md`](task-6-assistant.md)):
+
+Request `{ "messages": [ { "role": "user" | "assistant", "text": "…" } ] }`: the chat so far,
+newest last, 1–10 messages, `text` 1–2000 chars, the last one from `user`. Nothing is stored.
+
+Response `200 { "answer": "You spent ₹9,337.50 this month.", "sql": "SELECT …" | null }`.
+`answer` is plain text; a bill appears as `/documents/<id>` (the page turns it into a link).
+`sql` is the read-only query that was run (null when the assistant only replied).
+
+Errors: `400 VALIDATION_ERROR`; `503 AI_NOT_CONFIGURED` (no `GEMINI_API_KEY`);
+`503 ASSISTANT_FAILED` (Gemini busy / out of quota / unreachable). A query that fails twice is
+`200` with "I couldn't look that up…".
+
+Original target (not built):
 
 Request `{ "message": "Is my laptop still under warranty?", "sessionId": "…" | null }` (message 1–1000 chars)
 

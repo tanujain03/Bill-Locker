@@ -15,6 +15,7 @@ import {
 import { useEffect, useRef, useState, type FocusEvent, type FormEvent } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { useAttention, type Attention } from '../lib/useAttention';
+import { AssistantChat } from './assistant/AssistantChat';
 import { DropAnywhere } from './DropAnywhere';
 import { Logo } from './Logo';
 import { NotificationBell } from './NotificationBell';
@@ -175,6 +176,8 @@ export function AppLayout() {
 
       <PhoneTabBar attention={attention} />
       <DropAnywhere />
+      {/* Here, not in a page, so the chat stays open while you move between pages. */}
+      <AssistantChat />
     </div>
   );
 }

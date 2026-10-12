@@ -67,6 +67,14 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   `/settings` (`PUT /api/users/me`, `PUT /api/users/me/password`; wrong current password = 400 `WRONG_PASSWORD`,
   never 401, because any 401 for a sent token signs the browser out as "session expired"), ₹ amounts,
   `usePageTitle`. Checklist: `docs/ui-ux-changes.md`; reasons: `docs/ui-ux-review.md`.
+- Task 6: "Ask to your locker" chat assistant (`components/assistant/AssistantChat.tsx` in `AppLayout`, history only in
+  React state; `POST /api/assistant/chat`, package `assistant`). Gemini plans (QUERY with one SELECT, or REPLY: it
+  never changes data), `ReadOnlyQueryRunner` runs the SQL in a read-only transaction as role `bill_locker_ai`
+  (SELECT only on six `security_barrier` `ai_*` views filtered by `app.user_id` from the JWT; 3 s timeout, 50 rows,
+  values cut to 500 chars), one retry on a failed query, then Gemini answers from the rows. `AssistantDatabaseSetup`
+  creates the views + role at startup (Java strings, no migrations) and revokes `set_config` and session advisory
+  locks from PUBLIC; the runner refuses to run (503) if the role could still use them. Tests use
+  `FakeAssistantModel`. Guide: `docs/task-6-assistant.md`.
 
 ## Repository
 
@@ -78,7 +86,7 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
   Packages: `security` (SecurityConfig, JWT), `user` (incl. Settings endpoints), `auth` (incl. password reset),
   `common` (BaseEntity, ApiException, GlobalExceptionHandler), `document` (+ `document.ai`,
-  `document.registration`), `gmail`.
+  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`.
   Tables: `users`, `password_reset_tokens`, `documents`, `document_items`, `document_files`,
   `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`.
 - `docs/api-contract.md` — the full target REST API; its top lists what is built so far.
