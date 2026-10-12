@@ -9,6 +9,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Wallet,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -34,8 +35,10 @@ type NavItem = {
 
 const LINKS: NavItem[] = [
   { to: '/home', label: 'Dashboard', Icon: LayoutDashboard },
+  // Where the money went, month by month.
+  { to: '/expenses', label: 'Expenses', Icon: Wallet },
   // The badges say how much waits there, without opening the dashboard.
-  { to: '/documents', label: 'Documents', Icon: FileText, badge: (a) => a.toReview + a.readFailed },
+  { to: '/documents', label: 'Documents', short: 'Docs', Icon: FileText, badge: (a) => a.toReview + a.readFailed },
   // Everyday spending (rides, food, utilities): documents of type "Bill / receipt".
   { to: '/bills', label: 'Bills & receipts', short: 'Bills', Icon: Receipt },
   { to: '/warranties', label: 'Warranties', Icon: ShieldCheck, badge: (a) => a.expiring.length },
@@ -333,7 +336,8 @@ function PhoneTabBar({ attention }: { attention: Attention | null }) {
       </NavLink>
     );
   };
-  const [home, documents, bills, warranties, gmail] = LINKS;
+  // Gmail has no tab here (the dashboard has an "Import from Gmail" button); the 🔔 counts its files.
+  const [home, expenses, documents, bills, warranties] = LINKS;
 
   return (
     <nav
@@ -341,13 +345,13 @@ function PhoneTabBar({ attention }: { attention: Attention | null }) {
       className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center border-t border-slate-200 bg-white/95 px-1 backdrop-blur sm:hidden"
     >
       {tab(home)}
+      {tab(expenses)}
       {tab(documents)}
       <div className="flex flex-1 justify-center">
         <UploadButton iconOnlyOnPhones className="rounded-full shadow-lg shadow-brand-600/30" />
       </div>
       {tab(bills)}
       {tab(warranties)}
-      {tab(gmail)}
     </nav>
   );
 }

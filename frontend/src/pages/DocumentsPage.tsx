@@ -1,4 +1,4 @@
-import { CalendarDays, FilterX, Search, Upload, X } from 'lucide-react';
+import { CalendarDays, FilterX, Search, Tag, Upload, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { DocumentList } from '../components/documents/DocumentList';
@@ -7,12 +7,15 @@ import { UploadButton } from '../components/UploadButton';
 import { Alert } from '../components/FormParts';
 import { errorMessage } from '../lib/api';
 import {
+  BILL_CATEGORY_LABELS,
   DOCUMENT_TYPE_LABELS,
   listDocuments,
   monthLabel,
+  type BillCategory,
   type DocumentStatus,
   type DocumentSummary,
 } from '../lib/documents';
+import { rangeLabel } from '../lib/expenses';
 import { usePolling } from '../lib/usePolling';
 import { usePageTitle } from '../lib/usePageTitle';
 
@@ -20,7 +23,7 @@ import { usePageTitle } from '../lib/usePageTitle';
 export function DocumentsPage() {
   usePageTitle('Documents');
 
-  // The filters live in the URL (?q=&type=&status=&source=&month=), so a link from the
+  // The filters live in the URL (?q=&type=&status=&source=&month=&from=&to=&category=), so a link from the
   // dashboard opens the list already filtered, and Back/refresh keep the filters.
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
@@ -31,6 +34,13 @@ export function DocumentsPage() {
   /** 'YYYY-MM': bills bought in that month (filtered here, like source). */
   const monthParam = params.get('month') ?? '';
   const month = /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : ''; // ignore a malformed ?month=
+  /** 'YYYY-MM-DD', both included: bills bought in a period of the Expenses page (filtered here too). */
+  const fromParam = params.get('from') ?? '';
+  const toParam = params.get('to') ?? '';
+  const period = /^\d{4}-\d{2}-\d{2}$/.test(fromParam) && /^\d{4}-\d{2}-\d{2}$/.test(toParam) ? { from: fromParam, to: toParam } : null;
+  /** A spending category from the Expenses page; 'NONE' = bills without one (filtered here too). */
+  const categoryParam = params.get('category') ?? '';
+  const category = categoryParam === 'NONE' || categoryParam in BILL_CATEGORY_LABELS ? categoryParam : '';
   const setFilter = (name: string) => (value: string) =>
     setParams(
       (current) => {
@@ -73,7 +83,7 @@ export function DocumentsPage() {
       .catch(() => {}); // the next tick tries again
   });
 
-  const filtered = Boolean(q || type || status || source || month);
+  const filtered = Boolean(q || type || status || source || month || period || category);
   // First visit (no bills at all): a big "add your first bill" area. After that the list
   // is what people come for, so uploading shrinks to one slim line above it.
   const noBillsYet = documents?.length === 0 && !filtered;
@@ -139,6 +149,35 @@ export function DocumentsPage() {
             <X className="size-4" aria-label="Remove month filter" />
           </button>
         )}
+        {period && (
+          // Set by the Expenses page: the bills of its period.
+          <button
+            type="button"
+            onClick={() => setParams((current) => {
+              const next = new URLSearchParams(current);
+              next.delete('from');
+              next.delete('to');
+              return next;
+            }, { replace: true })}
+            className="mt-3 mr-2 inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100"
+          >
+            <CalendarDays className="size-4" aria-hidden />
+            Bought in {rangeLabel(period)}
+            <X className="size-4" aria-label="Remove period filter" />
+          </button>
+        )}
+        {category && (
+          // Set by a category on the Expenses page.
+          <button
+            type="button"
+            onClick={() => setFilter('category')('')}
+            className="mt-3 ml-2 inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100"
+          >
+            <Tag className="size-4" aria-hidden />
+            {category === 'NONE' ? 'No category yet' : BILL_CATEGORY_LABELS[category as BillCategory]}
+            <X className="size-4" aria-label="Remove category filter" />
+          </button>
+        )}
 
         {listError && (
           <div className="mt-4">
@@ -157,7 +196,10 @@ export function DocumentsPage() {
             documents={documents.filter(
               (d) =>
                 (!source || (source === 'GMAIL') === Boolean(d.sourceGmail)) &&
-                (!month || (d.purchaseDate ?? '').startsWith(month)),
+                (!month || (d.purchaseDate ?? '').startsWith(month)) &&
+                // ISO dates compare as text: "2026-05-01" <= "2026-05-17" <= "2026-10-07".
+                (!period || (d.purchaseDate !== null && d.purchaseDate >= period.from && d.purchaseDate <= period.to)) &&
+                (!category || (d.category ?? 'NONE') === category),
             )}
             filtered={filtered}
           />

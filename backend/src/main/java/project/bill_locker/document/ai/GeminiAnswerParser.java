@@ -58,8 +58,7 @@ final class GeminiAnswerParser {
 				text(root, "sellerName"), text(root, "sellerAddress"), text(root, "sellerContact"),
 				text(root, "buyerName"), text(root, "buyerAddress"), text(root, "buyerEmail"),
 				date(root, "purchaseDate"), number(root, "taxAmount"), number(root, "totalAmount"), items,
-				// Only bills and receipts are sorted into categories.
-				documentType(root) == DocumentType.RECEIPT ? BillCategory.parse(text(root, "category")) : null);
+				BillCategory.parse(text(root, "category")));
 	}
 
 	private static ExtractionException unreadable() {

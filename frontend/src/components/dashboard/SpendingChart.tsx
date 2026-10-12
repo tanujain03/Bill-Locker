@@ -14,7 +14,7 @@ export function SpendingChart({ months, withoutDate }: { months: MonthSpend[]; w
   const total = months.reduce((sum, m) => sum + m.amount, 0);
 
   return (
-    <Panel icon={ChartColumn} title="Spending" hint="last 12 months" id="spending">
+    <Panel icon={ChartColumn} title="Spending" hint="last 12 months" id="spending" viewAll="/expenses">
       {max === 0 ? (
         <PanelEmpty>No spending yet. Save a bill with a date and a total to see it here.</PanelEmpty>
       ) : (

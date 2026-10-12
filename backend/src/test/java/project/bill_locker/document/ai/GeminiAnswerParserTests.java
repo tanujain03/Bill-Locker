@@ -119,7 +119,7 @@ class GeminiAnswerParserTests {
 	}
 
 	@Test
-	void categoryOnlyForReceipts() {
+	void categoryForEveryDocumentType() {
 		assertThat(GeminiAnswerParser.parse("""
 				{"documentType": "RECEIPT", "category": "PHONE_INTERNET"}
 				""").category()).isEqualTo(project.bill_locker.document.BillCategory.PHONE_INTERNET);
@@ -127,7 +127,7 @@ class GeminiAnswerParserTests {
 				{"documentType": "RECEIPT", "category": "something new"}
 				""").category()).isEqualTo(project.bill_locker.document.BillCategory.OTHER);
 		assertThat(GeminiAnswerParser.parse("""
-				{"documentType": "INVOICE", "category": "FOOD"}
-				""").category()).isNull();
+				{"documentType": "INVOICE", "category": "ELECTRONICS"}
+				""").category()).isEqualTo(project.bill_locker.document.BillCategory.ELECTRONICS);
 	}
 }

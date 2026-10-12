@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
 import java.util.Locale;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -26,6 +27,10 @@ public class User extends BaseEntity {
 	@Column(name = "password_hash", nullable = false, length = 100)
 	private String passwordHash;
 
+	/** How much the user plans to spend per month (Expenses page); null = no budget set. */
+	@Column(name = "monthly_budget", precision = 12, scale = 2)
+	private BigDecimal monthlyBudget;
+
 	public User(String name, String email, String passwordHash) {
 		this.name = name;
 		this.email = normalizeEmail(email);
@@ -38,6 +43,10 @@ public class User extends BaseEntity {
 
 	public void changePasswordHash(String newPasswordHash) {
 		this.passwordHash = newPasswordHash;
+	}
+
+	public void setMonthlyBudget(BigDecimal amount) {
+		this.monthlyBudget = amount;
 	}
 
 	public static String normalizeEmail(String email) {

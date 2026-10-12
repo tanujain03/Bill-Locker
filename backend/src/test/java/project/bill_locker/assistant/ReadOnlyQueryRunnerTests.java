@@ -174,6 +174,15 @@ class ReadOnlyQueryRunnerTests extends DocumentApiTestBase {
 	}
 
 	@Test
+	void theMonthlyBudgetIsReadable() {
+		// "How much of my budget is left?" needs it (set on the Expenses page).
+		jdbc.update("UPDATE users SET monthly_budget = 25000 WHERE id = ?", userA);
+		assertThat(runner.run(userA, "SELECT monthly_budget FROM ai_me"))
+				.extracting(r -> new java.math.BigDecimal(String.valueOf(r.get("monthly_budget"))).intValue())
+				.containsExactly(25000);
+	}
+
+	@Test
 	void errorsNeverQuoteOtherUsersValues() {
 		// A plain view lets the planner test the AI's condition before the user filter, so the
 		// cast error would quote B's seller ("Reliance"). security_barrier views filter first.

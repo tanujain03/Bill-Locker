@@ -115,7 +115,15 @@ export function DetailsForm({ value, onChange, fieldErrors, registration }: Prop
     <div className="space-y-4">
       <Card icon={FileText} title="Document">
         {typePicker}
-        {field('documentNumber')}
+        {/* What it was spent on: the Expenses page adds money up per category. */}
+        <Select
+          label={FIELD_LABELS.category}
+          value={value.category}
+          onChange={set('category')}
+          options={Object.entries(BILL_CATEGORY_LABELS)}
+          empty="Not set"
+        />
+        <Wide>{field('documentNumber')}</Wide>
       </Card>
 
       <Card icon={Store} title="Seller" description="The shop or company that sold it">

@@ -42,8 +42,8 @@ export function fromForm(values: FormValues): DocumentDetails {
   const number = (value: string) => (value.trim() === '' ? null : Number(value));
   return {
     documentType: (values.documentType || null) as DocumentType | null,
-    // Only a bill or receipt keeps its category (the backend drops it for other types too).
-    category: values.documentType === 'RECEIPT' ? ((values.category || null) as BillCategory | null) : null,
+    // Every type keeps its category: the Expenses page adds money up per category.
+    category: (values.category || null) as BillCategory | null,
     documentNumber: text(values.documentNumber),
     sellerName: text(values.sellerName),
     sellerAddress: text(values.sellerAddress),
