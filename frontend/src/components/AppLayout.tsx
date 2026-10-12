@@ -21,6 +21,7 @@ import { Logo } from './Logo';
 import { NotificationBell } from './NotificationBell';
 import { UploadButton } from './UploadButton';
 import { UserMenu } from './UserMenu';
+import { WarrantyReminder } from './WarrantyReminder';
 
 type NavItem = {
   to: string;
@@ -176,6 +177,7 @@ export function AppLayout() {
 
       <PhoneTabBar attention={attention} />
       <DropAnywhere />
+      <WarrantyReminder expiring={attention?.expiring} />
       {/* Here, not in a page, so the chat stays open while you move between pages. */}
       <AssistantChat />
     </div>
