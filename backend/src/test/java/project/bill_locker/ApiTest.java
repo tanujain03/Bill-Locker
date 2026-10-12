@@ -19,7 +19,8 @@ import org.springframework.test.web.servlet.ResultActions;
  * data goes to a throwaway PostgreSQL started by {@link TestcontainersConfiguration}.
  */
 @SpringBootTest(properties = {"app.workers.enabled=false", "app.gmail.client-id=test-client",
-		"app.gmail.client-secret=test-secret", "app.gmail.token-key=" + ApiTest.TEST_TOKEN_KEY})
+		"app.gmail.client-secret=test-secret", "app.gmail.token-key=" + ApiTest.TEST_TOKEN_KEY,
+		"app.assistant.db-password=" + ApiTest.TEST_AI_PASSWORD})
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, RecordingResetLinkSender.Config.class, FakeDetailExtractor.Config.class, FixedClockConfig.class,
 		FakeGoogleApi.Config.class, FakeRegistrationFinder.Config.class, FakeAssistantModel.Config.class})
@@ -29,6 +30,9 @@ public abstract class ApiTest {
 
 	/** 32 bytes of 0x01 in base64: a valid Gmail token key for tests. */
 	protected static final String TEST_TOKEN_KEY = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
+
+	/** Password of the bill_locker_ai login in the test database. */
+	protected static final String TEST_AI_PASSWORD = "test-ai-password-7f3c9a1e5b";
 
 	@Autowired
 	protected MockMvc mvc;

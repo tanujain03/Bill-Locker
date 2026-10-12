@@ -69,12 +69,19 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   `usePageTitle`. Checklist: `docs/ui-ux-changes.md`; reasons: `docs/ui-ux-review.md`.
 - Task 6: "Ask to your locker" chat assistant (`components/assistant/AssistantChat.tsx` in `AppLayout`, history only in
   React state; `POST /api/assistant/chat`, package `assistant`). Gemini plans (QUERY with one SELECT, or REPLY: it
-  never changes data), `ReadOnlyQueryRunner` runs the SQL in a read-only transaction as role `bill_locker_ai`
-  (SELECT only on six `security_barrier` `ai_*` views filtered by `app.user_id` from the JWT; 3 s timeout, 50 rows,
-  values cut to 500 chars), one retry on a failed query, then Gemini answers from the rows. `AssistantDatabaseSetup`
-  creates the views + role at startup (Java strings, no migrations) and revokes `set_config` and session advisory
-  locks from PUBLIC; the runner refuses to run (503) if the role could still use them. Tests use
-  `FakeAssistantModel`. Guide: `docs/task-6-assistant.md`.
+  never changes data), `ReadOnlyQueryRunner` runs the SQL read-only on its **own connection logged in as `bill_locker_ai`**
+  (password `AI_DATABASE_PASSWORD`; SELECT only on six `security_barrier` `ai_*` views; member of no role; new connection per
+  question, closed after; one question at a time), the views filter on `app.user_id` + `app.user_sig` (sha256 of secret + id,
+  secret in table `ai_secret`); Java query timeout 3 s, 50 rows, values cut to 500 chars; one retry on a failed query, then Gemini
+  answers from the rows. `AssistantDatabaseSetup` creates the login, secret and views at startup (Java strings, no migrations).
+  No superuser needed (task 8, so it works on Neon). Tests use `FakeAssistantModel`. Guide: `docs/task-6-assistant.md`.
+- Task 7: live. Frontend on Vercel (`frontend/vercel.json`: `/api/*` rewritten to `https://bill-locker-backend.onrender.com`,
+  everything else → `index.html`; deploys from `main`), backend on Render (Docker, `backend/Dockerfile`, root `backend`,
+  region Ohio; env vars in Render, never in git; free plan sleeps after 15 min), database on Neon (project Bill-Locker,
+  branch `production`, us-east-2, direct host without `-pooler`). Local dev keeps the local DB via `backend/.env`.
+  `server.port=${PORT:8080}`, `server.forward-headers-strategy=framework`. Guide: `docs/task-7-deploy.md`.
+- Task 8: chat assistant without superuser rights (Neon): see Task 6 above. Plan and reasons:
+  `docs/task-8-assistant-on-neon-plan.md`.
 
 ## Repository
 
@@ -110,7 +117,8 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   Reads `backend/.env` (git-ignored; keys in `backend/.env.example`: `DATABASE_URL`,
   `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `JWT_SECRET`, `FRONTEND_URL`, `MAIL_HOST`, `MAIL_PORT`,
   `MAIL_USERNAME`, `MAIL_PASSWORD`, `GEMINI_API_KEY`, optional `GEMINI_MODEL`, `GOOGLE_CLIENT_ID`,
-  `GOOGLE_CLIENT_SECRET`, `GMAIL_TOKEN_KEY`, optional `GMAIL_REDIRECT_URI`; Gmail import is off without the first three). Never put real
+  `GOOGLE_CLIENT_SECRET`, `GMAIL_TOKEN_KEY`, optional `GMAIL_REDIRECT_URI`; Gmail import is off without the first three;
+  `AI_DATABASE_PASSWORD`, chat assistant off without it). Never put real
   values in `application.properties` or commit them.
 - `.\mvnw.cmd test` — MockMvc API tests against Testcontainers (`pgvector/pgvector:pg17`,
   needs Docker); never touches the local database. Keep all tests green. Tests swap
