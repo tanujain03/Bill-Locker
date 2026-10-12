@@ -1,23 +1,27 @@
 # Bill Locker — REST API contract
 
-This is the contract the frontend (`frontend/`) is built against. The in-browser
-mock API (`frontend/src/mocks/handlers.ts`) implements it end to end, so the UI
-can be demoed before the backend exists. **The Spring Boot backend must implement
-the same paths, payloads and error codes** — then set `VITE_API_MOCKING=false`
-and the UI works unchanged.
+This is the full REST API Bill Locker is heading towards. The backend and the
+frontend are rebuilt from scratch on the `restart` branch, one task at a time;
+each task implements a part of this contract.
 
-TypeScript definitions of every payload live in `frontend/src/types/`.
-
-### Implemented by the Spring Boot backend so far (step 3)
+### Implemented so far (restart branch, tasks 1–6)
 
 | Endpoint | Notes |
 |---|---|
-| `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `PUT /api/users/me` | Complete, except that login rate limiting is not implemented yet |
-| `POST /api/documents/upload`, `GET /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/download`, `DELETE /api/documents/{id}` | Files are stored in PostgreSQL. No OCR yet, so documents stay `UPLOADED` and `extraction`/`extractedText` are `null`. The `productId` part and filter are ignored (no products yet) |
+| `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` | Complete, except login rate limiting |
+| `POST /api/auth/forgot-password`, `POST /api/auth/reset-password` | Complete. The reset link is emailed over SMTP (`MAIL_*` settings); without them it is written to the backend log |
+| `/api/documents/...` (upload, extract, list + search, get, save, download, delete) | Complete, see section 8. Reading uses Google Gemini (`GEMINI_API_KEY`) |
+| `/api/integrations/gmail/...` (connect, callback, scan, emails, import / ignore / restore files, disconnect) | Complete, see section 13. Several Gmail addresses per user; needs `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GMAIL_TOKEN_KEY`. Imported files are read by AI in the background |
+| `GET /api/warranties`, `GET /api/dashboard` | Complete, see sections 6 and 7. Computed from **saved** bills' product lines (no product/warranty tables yet) |
+| `PUT /api/users/me`, `PUT /api/users/me/password` | Complete (Settings page). Change your name; change your password with the current one (`400 WRONG_PASSWORD` + `fieldErrors.currentPassword` when it's wrong — never 401, which the browser treats as "session expired") |
+| Bills & receipts | A document read as `RECEIPT` is saved straight away (`status: SAVED`); documents and list rows carry `category` (`TRAVEL`, `FOOD`, `GROCERIES`, `FUEL`, `UTILITIES`, `PHONE_INTERNET`, `SHOPPING`, `HEALTH`, `OTHER`; only for `RECEIPT`, also accepted by `PUT /api/documents/{id}`) |
+| `POST /api/documents/{id}/registration-page` | Complete (task 5). Warranty registration links: from the bill (printed / QR code, during reading); without one, the user confirms the detected brand and this finds its official page (Gemini + Google Search); items carry `brand`, `registrationUrl`, `registrationSource`. See [`task-5-warranty-registration.md`](task-5-warranty-registration.md) |
+| `POST /api/assistant/chat` | Complete (task 6). Chat assistant: Gemini writes one SELECT on user-filtered `ai_*` views, run read-only as the `bill_locker_ai` role; answers from the rows. See section 11 and [`task-6-assistant.md`](task-6-assistant.md) |
 
-Everything else is still mock-only. Against the real backend the frontend hides
-those features (`frontend/src/lib/features.ts`, `BACKEND_FEATURES`). How it works
-is explained in [`step-3-backend-basics.md`](step-3-backend-basics.md).
+Everything else is not built yet. How tasks 1–4 work is explained in
+[`task-1-auth.md`](task-1-auth.md), [`task-2-documents.md`](task-2-documents.md),
+[`task-3-gmail.md`](task-3-gmail.md) and [`task-4-dashboard.md`](task-4-dashboard.md).
+A query parameter of the wrong kind (e.g. `?status=BAD`) answers `400 VALIDATION_ERROR`.
 
 ---
 
@@ -27,7 +31,7 @@ is explained in [`step-3-backend-basics.md`](step-3-backend-basics.md).
 |---|---|
 | Base path | `/api` (the frontend calls `/api/...`; Vite dev proxy / nginx forward it to the backend) |
 | Format | JSON (`application/json`), except file upload (multipart) and download (binary) |
-| Auth | `Authorization: Bearer <JWT>` on every endpoint except `POST /api/auth/register`, `POST /api/auth/login` |
+| Auth | `Authorization: Bearer <JWT>` on every endpoint except `POST /api/auth/register`, `/login`, `/forgot-password` and `/reset-password` |
 | User scoping | The current user comes **only** from the JWT. Never accept a `userId` from the client. Every query filters by it (`WHERE user_id = :currentUser`), including vector search. |
 | Ownership | Accessing another user's product/document/record returns **404** (not 403) so existence isn't leaked |
 | IDs | Opaque strings (UUIDs recommended) |
@@ -53,14 +57,15 @@ to users (no stack traces, SQL or internal details).
 
 | Status | Typical `code` |
 |---|---|
-| 400 | `VALIDATION_ERROR`, `FILE_REQUIRED`, `INVALID_UPLOAD` |
+| 400 | `VALIDATION_ERROR`, `INVALID_RESET_TOKEN`, `FILE_REQUIRED`, `INVALID_UPLOAD` |
 | 401 | `UNAUTHORIZED` (missing/expired token), `INVALID_CREDENTIALS` (login) |
-| 404 | `PRODUCT_NOT_FOUND`, `DOCUMENT_NOT_FOUND`, `SERVICE_RECORD_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `GMAIL_MESSAGE_NOT_FOUND` |
-| 409 | `EMAIL_ALREADY_REGISTERED`, `DOCUMENT_NOT_READY`, `DOCUMENT_ALREADY_CONFIRMED`, `GMAIL_NOT_CONNECTED` |
+| 404 | `PRODUCT_NOT_FOUND`, `DOCUMENT_NOT_FOUND`, `SERVICE_RECORD_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `GMAIL_ACCOUNT_NOT_FOUND`, `GMAIL_FILE_NOT_FOUND` |
+| 409 | `EMAIL_ALREADY_REGISTERED`, `DOCUMENT_NOT_READY`, `DOCUMENT_ALREADY_CONFIRMED`, `GMAIL_SCAN_RUNNING` |
 | 413 | `FILE_TOO_LARGE` |
 | 415 | `UNSUPPORTED_FILE_TYPE` |
 | 429 | `RATE_LIMITED` |
 | 500 | `SERVER_ERROR` |
+| 503 | `AI_NOT_CONFIGURED`, `GMAIL_NOT_CONFIGURED` |
 
 The frontend treats any `401` on an authenticated call as "session expired":
 it clears the token and sends the user to `/login`.
@@ -72,14 +77,15 @@ it clears the token and sends the user to `/login`.
 | Enum | Values |
 |---|---|
 | `WarrantyStatus` | `ACTIVE`, `EXPIRING_SOON`, `EXPIRED`, `UNKNOWN` |
-| `DocumentType` | `INVOICE`, `WARRANTY_CARD`, `SERVICE_RECEIPT`, `REPAIR_RECEIPT`, `OTHER` |
-| `ProcessingStatus` | `UPLOADED`, `PROCESSING`, `PROCESSED`, `REVIEW_REQUIRED`, `CONFIRMED`, `FAILED` |
+| `DocumentType` | `INVOICE`, `WARRANTY_CARD`, `RECEIPT`, `OTHER` (built in task 2) |
+| `DocumentStatus` | `UPLOADED`, `EXTRACTED`, `SAVED` (built in task 2) |
 | `ProcessingStage` | `OCR`, `EXTRACTION`, `INDEXING` (optional detail while `PROCESSING`) |
 | `DocumentSource` | `UPLOAD`, `GMAIL` |
 | `ServiceType` | `ROUTINE_MAINTENANCE`, `REPAIR`, `INSTALLATION`, `INSPECTION`, `OTHER` |
 | `NotificationType` | `WARRANTY_EXPIRING`, `WARRANTY_EXPIRED`, `SERVICE_DUE`, `DOCUMENT_PROCESSED`, `GMAIL_BILLS_FOUND` |
-| `GmailSyncStatus` | `IDLE`, `SYNCING`, `ERROR` |
-| `GmailMessageStatus` | `NEW`, `IMPORTED`, `IGNORED` |
+| `GmailScanStatus` | `IDLE`, `QUEUED`, `SCANNING`, `ERROR` (built in task 3) |
+| `GmailFileStatus` | `NEW`, `IGNORED`, `IMPORTING`, `IMPORTED`, `FAILED` (built in task 3) |
+| `EmailKind` | `INVOICE`, `WARRANTY`, `SERVICE`, `RECEIPT`, `ORDER`, `UNSURE` (built in task 3) |
 
 ---
 
@@ -107,6 +113,23 @@ The JWT should carry `sub` (user id) and `exp`; the frontend reads `exp` to drop
 
 ### `GET /api/auth/me` → `User`
 ### `PUT /api/users/me` `{ "name": "New Name" }` → `User`
+Same name rules as register (`fieldErrors.name`).
+
+### `PUT /api/users/me/password` `{ "currentPassword": "...", "newPassword": "..." }` → `200 { "message": "Your password has been changed." }`
+- Wrong current password → `400 WRONG_PASSWORD` with `fieldErrors.currentPassword` (not 401: the frontend signs out on any 401).
+- `newPassword`: same rules as register (`fieldErrors.newPassword`). Tokens already issued keep working until they expire.
+
+### `POST /api/auth/forgot-password`
+Request `{ "email": "asha@example.com" }` → always `200 { "message": "If an account exists for this email, we've sent a link to reset the password." }`,
+whether or not the email has an account (no account enumeration). If it has one, any earlier
+link stops working and a new one-time link `<FRONTEND_URL>/reset-password?token=<token>` is sent
+(by email; written to the backend log when no mail account is set up). The link expires after 30 minutes. Only a SHA-256 hash
+of the token is stored (`password_reset_tokens`).
+
+### `POST /api/auth/reset-password`
+Request `{ "token": "<from the link>", "password": "N3wPassword" }` → `200 { "message": "Your password has been changed. You can sign in now." }`.
+- password: same rules as register (`fieldErrors.password` if broken).
+- Unknown, used or expired token → `400 INVALID_RESET_TOKEN`. A token works once.
 
 ---
 
@@ -170,132 +193,112 @@ date of the product's most recent service record.
 
 ## 6. Warranties
 
-Warranty maths is deterministic Java code — never the LLM:
+Built on `restart` (task 4) from the product lines of **saved** bills. Warranty maths is
+plain Java (`WarrantyRules`), never the AI:
 
-- `expiryDate = startDate.plusMonths(warrantyMonths).minusDays(1)` (e.g. 2026-09-15 + 24 months → **2028-09-14**)
-- `daysRemaining = expiryDate − today` (whole days, negative once expired)
-- `status`: `UNKNOWN` if months or start date is missing (or months = 0); `EXPIRED` if `daysRemaining < 0`;
-  `EXPIRING_SOON` if `0 ≤ daysRemaining ≤ 30`; otherwise `ACTIVE`.
+- end date = the printed `warrantyEndDate`, or else `start.plusMonths(months).minusDays(1)`
+  when both are set and months > 0 (2026-01-10 + 12 months → **2027-01-09**), or else unknown
+- `daysLeft = endDate − today` (whole days, negative once expired, `null` when unknown)
+- `status`: `NO_INFO` when unknown; `EXPIRED` if `daysLeft < 0`; `EXPIRING_SOON` if
+  `0 ≤ daysLeft ≤ 30`; otherwise `ACTIVE`.
 
-### `GET /api/warranties?status=` → `Warranty[]` (soonest expiry first, unknown last)
-`Warranty` = the product's warranty summary plus `productId`, `productName`,
-`productBrand`, `categoryName`, `categorySlug`, `sourceDocumentId`.
+### `GET /api/warranties?status=&q=`
+```json
+{
+  "counts": { "all": 7, "active": 3, "expiringSoon": 2, "expired": 1, "noInfo": 1 },
+  "items": [{
+    "documentId": "…", "productName": "LG Air Conditioner", "modelNumber": null, "serialNumber": null,
+    "sellerName": "Reliance Digital", "warrantyProvider": "LG", "purchaseDate": "2026-03-21",
+    "startDate": null, "endDate": "2026-10-19", "daysLeft": 12, "status": "EXPIRING_SOON"
+  }]
+}
+```
+`status` (optional) filters the items only; `q` (optional, case-insensitive: product,
+model, serial, seller, warranty provider) filters items **and** counts. Order: expiring
+soon and active by end date ascending, expired most recent first, no info by purchase date
+descending. Bad `status` → 400.
 
 ---
 
 ## 7. Dashboard
 
-### `GET /api/dashboard/summary`
+### `GET /api/dashboard`
 ```json
 {
-  "totalProducts": 9,
-  "totalDocuments": 13,
-  "documentsToReview": 1,
-  "totalSpending": 395348,
-  "currency": "INR",
-  "warranties": { "total": 9, "active": 4, "expiringSoon": 2, "expired": 2, "unknown": 1 },
-  "spendingByCategory": [{ "categoryName": "Home Appliances", "categorySlug": "home-appliances", "amount": 163470 }],
-  "upcomingExpirations": [ /* Warranty[], 0–90 days left, soonest first */ ],
-  "upcomingServices": [ /* ServiceRecord[], next service within 60 days or overdue, one per product */ ],
-  "recentDocuments": [ /* DocumentSummary[], 5 newest */ ]
+  "savedBills": 24, "savedBillsThisMonth": 4,
+  "products": 31, "productsWithWarranty": 27,
+  "totalSpent": 412350.00, "spentThisMonth": 38200.00,
+  "attention": { "toReview": 2, "readFailed": 1, "reading": 0 },
+  "warranties": { "active": 18, "expiringSoon": 3, "expired": 6, "noInfo": 4 },
+  "expiringSoon": [ /* Warranty items as in section 6, the 5 nearest EXPIRING_SOON */ ],
+  "spendingByMonth": [ { "month": "2025-11", "amount": 0.00, "bills": 0 } /* … 12 entries, current month last */ ],
+  "billsWithoutDateOrTotal": 2,
+  "topShops": [ { "name": "Croma", "amount": 120000.00, "bills": 5 } ],
+  "recentBills": [ /* DocumentSummary[], the 5 newest, any status */ ]
 }
 ```
+- Money, products and warranties: **saved** bills only. `this month` = purchase date in the
+  current month. `attention` counts all the user's documents: `toReview` = EXTRACTED,
+  `readFailed` = UPLOADED with a background-read error, `reading` = queued for the AI.
+- `spendingByMonth`: by purchase date; bills outside the 12 months or without a date or total
+  are left out (`billsWithoutDateOrTotal` counts the latter).
+- `topShops`: up to 5, grouped by seller name ignoring case and outer spaces, shown with the
+  spelling of the most recent bill.
+- An empty account answers zeros and empty lists.
 
 ---
 
 ## 8. Documents
 
-### Upload — `POST /api/documents/upload` (multipart/form-data)
-| Part | Required | Notes |
-|---|---|---|
-| `file` | yes | PDF, JPEG, PNG or WEBP; ≤ 10 MB |
-| `documentType` | no | `DocumentType` hint chosen by the user (AI respects it) |
-| `productId` | no | attach to an existing (owned) product |
+Built in task 2 (details in [`task-2-documents.md`](task-2-documents.md)). The
+fields follow `invoice_warranty_fields.csv`: bill-level fields on the document,
+product + warranty fields per item.
 
-Server-side validation: MIME type **and** extension allow-list, magic-byte check,
-size limit, sanitised file name (no paths), stored under a random key in object
-storage — never executed. Errors: `400 FILE_REQUIRED`, `413 FILE_TOO_LARGE`,
-`415 UNSUPPORTED_FILE_TYPE`, `404 PRODUCT_NOT_FOUND`.
-
-Response `201 DocumentSummary` with `processingStatus: "UPLOADED"`; processing
-continues asynchronously.
-
-### Processing lifecycle
-```
-UPLOADED → PROCESSING (stage OCR → EXTRACTION → INDEXING) → REVIEW_REQUIRED → CONFIRMED
-                                   ↘ FAILED (errorMessage) ──(reprocess)──↗
-```
-- The UI polls `GET /api/documents/{id}` every 1.5 s while `UPLOADED`/`PROCESSING`,
-  and shows: Uploading → Reading (OCR) → Analyzing with AI → Ready for review.
-  `processingStage` is optional but makes the progress accurate.
-- When extraction finishes: set `REVIEW_REQUIRED` (or `PROCESSED`; both mean "needs
-  review") and create a `DOCUMENT_PROCESSED` notification.
-- On failure: `FAILED` + a user-readable `errorMessage`.
-
-### `DocumentSummary`
-```json
-{
-  "id": "…", "productId": null, "productName": null,
-  "documentType": "INVOICE", "fileName": "Philips_Air_Fryer_Invoice.pdf",
-  "mimeType": "application/pdf", "fileSize": 73402,
-  "processingStatus": "REVIEW_REQUIRED", "processingStage": null,
-  "source": "UPLOAD", "errorMessage": null,
-  "createdAt": "…", "updatedAt": "…"
-}
-```
-
-### `DocumentDetail` = `DocumentSummary` + `extraction` + `extractedText`
-`extraction`/`extractedText` are `null` until processing finishes.
-
-```json
-// ExtractionResult — missing values are null, never guessed
-{
-  "documentType": "INVOICE",
-  "productName": "Philips Air Fryer HD9252/90",
-  "brand": "Philips",
-  "model": "HD9252/90",
-  "serialNumber": null,
-  "purchaseDate": "2026-09-27",
-  "purchasePrice": 8999,
-  "currency": "INR",
-  "seller": "Metro Electronics, Bengaluru",
-  "invoiceNumber": "ME/2026-27/006745",
-  "warrantyMonths": 24,
-  "suggestedCategorySlug": "kitchen",
-  "confidence": { "productName": 0.96, "model": 0.8, "serialNumber": 0, "warrantyMonths": 0.74 }
-}
-```
-The UI shows ≥ 0.85 as "High confidence", 0.60–0.85 as "Please verify", < 0.60 as
-"Low confidence" and `null` values as "Not found". Omit a field's confidence if
-the provider gives none.
+`DocumentStatus`: `UPLOADED` (stored, not read) → `EXTRACTED` (AI filled it, needs
+review) → `SAVED` (user saved it). `DocumentType` (task 2): `INVOICE`,
+`WARRANTY_CARD`, `RECEIPT`, `OTHER`.
 
 | Method & path | Result |
 |---|---|
-| `GET /api/documents?productId=&status=&documentType=` | `DocumentSummary[]`, newest first |
+| `POST /api/documents/upload` (multipart part `file`) | `201 DocumentDetail`. PDF/JPEG/PNG/WebP by magic bytes, ≤ 10 MB, file name stripped of paths. `400 FILE_EMPTY`, `400 FILE_TOO_LARGE`, `400 INVALID_FILE_TYPE` |
+| `POST /api/documents/{id}/extract` | Reads the file with AI (synchronous), replaces details + items, status `EXTRACTED` → `DocumentDetail`. `503 AI_NOT_CONFIGURED`, `502 EXTRACTION_FAILED` (document unchanged) |
+| `GET /api/documents?q=&type=&status=` | `DocumentSummary[]`, newest first. `q`: file name, document number, seller, product name (case-insensitive) |
 | `GET /api/documents/{id}` | `DocumentDetail` |
-| `GET /api/documents/{id}/download` | the file bytes, `Content-Type` = stored MIME type, `Content-Disposition: inline; filename="…"` (fetched with the Bearer header and previewed via an object URL) |
-| `POST /api/documents/{id}/confirm` | see below |
-| `POST /api/documents/{id}/reprocess` | `DocumentSummary` (back to `UPLOADED`) |
-| `DELETE /api/documents/{id}` | `204` (removes the file from storage and its RAG chunks; products stay) |
-
-### Confirm — `POST /api/documents/{id}/confirm`
-Nothing extracted by the AI becomes application data until the user confirms.
+| `PUT /api/documents/{id}` | Saves reviewed details; `items` replaces the list; status `SAVED` → `DocumentDetail`. `400 VALIDATION_ERROR` + `fieldErrors` (e.g. `items[0].warrantyEndDate`) |
+| `GET /api/documents/{id}/download` | the file bytes, `Content-Type` = stored type, `Content-Disposition: inline; filename="…"` (fetched with the Bearer header, previewed via an object URL) |
+| `DELETE /api/documents/{id}` | `204` (file and items too) |
 
 ```json
+// DocumentDetail
 {
-  "documentType": "INVOICE",
-  "productId": null,
-  "product": { /* ProductInput — the values the user reviewed/edited */ }
+  "id": "…", "fileName": "croma.pdf", "contentType": "application/pdf", "sizeBytes": 73402,
+  "status": "EXTRACTED", "documentUrl": "/api/documents/…/download",
+  "documentType": "INVOICE", "documentNumber": "INV-1029",
+  "sellerName": "Croma", "sellerAddress": "…", "sellerContact": "…",
+  "buyerName": "…", "buyerAddress": "…", "buyerEmail": "…",
+  "purchaseDate": "2026-01-10", "taxAmount": 228.66, "totalAmount": 1499.00,
+  "items": [{
+    "productName": "Phone", "modelNumber": "M-1", "serialNumber": "SN-1", "unitPrice": 1199,
+    "warrantyPeriodMonths": 12, "warrantyStartDate": "2026-01-10", "warrantyEndDate": "2027-01-09",
+    "warrantyProvider": "Samsung"
+  }],
+  "createdAt": "…", "updatedAt": "…"
 }
 ```
-- `productId: null` → create a product (+ warranty with `sourceDocumentId`).
-- `productId: "<owned id>"` → update that product with `product` (full replace —
-  the UI pre-fills it with the saved values and only fills empty ones from the document).
-- Link the document to the product and set it to `CONFIRMED`.
-- Allowed from `REVIEW_REQUIRED`, `PROCESSED` and `FAILED` (manual entry).
-  `409 DOCUMENT_NOT_READY` while processing, `409 DOCUMENT_ALREADY_CONFIRMED` if done.
+`DocumentSummary`: `id, fileName, contentType, sizeBytes, status, documentType,
+documentNumber, sellerName, purchaseDate, totalAmount, itemCount, firstProductName, createdAt,
+readQueued, readError, sourceGmail`.
+`PUT` body = the details part of `DocumentDetail` (`documentType` … `items`), all optional.
 
-Response `{ "document": DocumentSummary, "product": Product }`.
+Added in task 3 (on both `DocumentDetail` and `DocumentSummary`):
+
+| Field | Meaning |
+|---|---|
+| `readQueued` | `true` while the document waits for the background AI read (set for Gmail imports). The UI shows "Reading…" and asks again every 3 s. A manual `extract` or `PUT` sets it back to `false` |
+| `readError` | Why the last background read failed (e.g. no `GEMINI_API_KEY`); the status stays `UPLOADED` and the user can press Read with AI. `null` otherwise |
+| `sourceGmail` | The Gmail address the file was imported from, `null` for uploads |
+
+Later tasks: linking documents to products/warranties, AI search over documents.
 
 ---
 
@@ -338,7 +341,22 @@ Click targets used by the UI: `DOCUMENT_PROCESSED` → `/documents/{documentId}`
 
 ---
 
-## 11. AI assistant — `POST /api/ai/chat`
+## 11. AI assistant — `POST /api/assistant/chat` (built, task 6)
+
+What was built (simpler than the original target below; see [`task-6-assistant.md`](task-6-assistant.md)):
+
+Request `{ "messages": [ { "role": "user" | "assistant", "text": "…" } ] }`: the chat so far,
+newest last, 1–10 messages, `text` 1–2000 chars, the last one from `user`. Nothing is stored.
+
+Response `200 { "answer": "You spent ₹9,337.50 this month.", "sql": "SELECT …" | null }`.
+`answer` is plain text; a bill appears as `/documents/<id>` (the page turns it into a link).
+`sql` is the read-only query that was run (null when the assistant only replied).
+
+Errors: `400 VALIDATION_ERROR`; `503 AI_NOT_CONFIGURED` (no `GEMINI_API_KEY`);
+`503 ASSISTANT_FAILED` (Gemini busy / out of quota / unreachable). A query that fails twice is
+`200` with "I couldn't look that up…".
+
+Original target (not built):
 
 Request `{ "message": "Is my laptop still under warranty?", "sessionId": "…" | null }` (message 1–1000 chars)
 
@@ -390,57 +408,107 @@ question was understood.
 
 ## 13. Gmail import
 
-Lets users import bills from their inbox instead of uploading files. Google tokens
-never reach the browser.
+Built in task 3 (details in [`task-3-gmail.md`](task-3-gmail.md)). Lets users import
+bills from one or more Gmail inboxes instead of uploading files. Scope
+`gmail.readonly` only. Google tokens never reach the browser. Scanning, importing and
+reading the imported documents run in background workers; the endpoints only change
+rows and answer at once.
+
+Enums: `GmailScanStatus` (`IDLE`, `QUEUED`, `SCANNING`, `ERROR`), `GmailFileStatus`
+(`NEW`, `IGNORED`, `IMPORTING`, `IMPORTED`, `FAILED`), `EmailKind` (`INVOICE`,
+`WARRANTY`, `SERVICE`, `RECEIPT`, `ORDER`, `UNSURE`), `ScanRange` (`SIX_MONTHS`,
+`ONE_YEAR`, `TWO_YEARS`, `FIVE_YEARS`), `EmailView` (`TO_REVIEW`, `IGNORED`,
+`IMPORTED`).
 
 ### OAuth flow
 ```
-UI  ── POST /api/integrations/gmail/connect ──▶ backend: create OAuth `state` bound to the user
-UI  ◀─ { authorizationUrl } ─────────────────── (Google consent URL, scope gmail.readonly,
-                                                 access_type=offline, prompt=consent)
+UI  ── POST /api/integrations/gmail/connect ──▶ backend: one-time `state` (hash stored) + PKCE
+                                                 verifier + browser nonce (hash stored)
+UI  ◀─ { authorizationUrl } + Set-Cookie: gmail_connect=<nonce>; HttpOnly; SameSite=Lax;
+        Path=/api/integrations/gmail; Max-Age=600
 UI  ── window.location = authorizationUrl ────▶ Google consent screen
-Google ── GET /api/integrations/gmail/callback?code&state ──▶ backend: verify state, exchange
-                                                 code, store refresh token encrypted, start a scan
-backend ── 302 ──▶ {FRONTEND_URL}/gmail?status=connected   (or ?status=error&reason=…)
+Google ── GET /api/integrations/gmail/callback?code&state ──▶ backend: state used once, cookie
+                                                 must match, exchange code, store refresh token
+                                                 encrypted, queue a scan
+backend ── 302 ──▶ {FRONTEND_URL}/gmail?connected=<address>   (or ?error=denied|expired|failed)
 ```
-The callback is a browser redirect without a JWT — the user is resolved from the
-server-side `state`. The frontend only follows `authorizationUrl` if it is on
-`accounts.google.com` or the app's own origin.
+- The callback is a browser redirect without a JWT; the user comes from the
+  server-side `state` (valid 10 minutes, deleted atomically when used).
+- It also needs the `gmail_connect` cookie of the browser that clicked Connect, so
+  someone else's Connect link can't attach your mailbox to their account. Missing or
+  different cookie, unknown, used or expired state → `?error=expired`. The cookie is
+  always cleared.
+- It **always** answers `302` to the Gmail page, never an error page: `?error=denied`
+  (you refused or Google sent an error), `?error=expired` (above), `?error=failed`
+  (anything else).
+- A user may connect several addresses; the same address again replaces its token.
+- The frontend only follows `authorizationUrl` if it is on `accounts.google.com`.
 
 ### Scan
-Search recent mail (e.g. `newer_than:1y (invoice OR receipt OR bill OR "order confirmation" OR warranty)`),
-let the AI classify each candidate (`detectedType`, `confidence`), and store the
-shortlist. Nothing is imported automatically.
+`after:<date> has:attachment (invoice OR receipt OR bill OR warranty OR guarantee OR service OR "order confirmation" OR "tax invoice")`,
+newest 200 emails per scan, emails already stored are skipped. A file is offered when it
+is a PDF/JPEG/PNG/WebP (by type, or extension for `application/octet-stream`), not
+inline, has a file name, is ≤ 10 MB, and an image is ≥ 20 KB. Emails are classified by
+keyword rules into `EmailKind`; junk without an "invoice" file is dropped. Only sender,
+subject, Gmail's preview, date and file names are stored, never the body. Nothing is
+imported automatically. The first scan after connecting covers `ONE_YEAR`.
+
+Google errors: 401, `invalid_grant` and 403 (other than the rate-limit / API-disabled
+reasons) mean access was removed (`lastError`: "Gmail access was removed. Connect this
+account again."); other 403s, 429, 5xx and network errors are temporary ("Gmail could
+not be reached. Try Scan again later.").
 
 ### Endpoints
+All need the Bearer token except the callback. Another user's account or file → `404`.
+Connect, scan, import, ignore, restore and disconnect answer `503 GMAIL_NOT_CONFIGURED` when the server has no Google
+settings (`GET /api/integrations/gmail` still answers, with `configured: false`, and `GET .../emails` lists what exists).
+
 | Method & path | Result |
 |---|---|
-| `GET /api/integrations/gmail` | `GmailConnection` — `{ connected, email, connectedAt, lastSyncedAt, autoSync, syncStatus, lastError }` (polled every 1.5 s while `SYNCING`) |
-| `POST /api/integrations/gmail/connect` | `{ "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?..." }` |
-| `GET /api/integrations/gmail/callback` | OAuth redirect target (backend only) → 302 to the frontend |
-| `POST /api/integrations/gmail/sync` | `GmailConnection` with `syncStatus: "SYNCING"`; `409 GMAIL_NOT_CONNECTED` |
-| `PUT /api/integrations/gmail/settings` | `{ "autoSync": true }` → `GmailConnection` (daily background scan) |
-| `GET /api/integrations/gmail/messages` | `GmailMessage[]` |
-| `POST /api/integrations/gmail/import` | `{ "messageIds": ["…"] }` → `{ "documents": DocumentSummary[] }` — each attachment (or the email body rendered to PDF when there's no attachment) enters the normal document pipeline with `source: "GMAIL"` |
-| `POST /api/integrations/gmail/messages/{id}/ignore` | `GmailMessage` with `status: "IGNORED"` |
-| `DELETE /api/integrations/gmail` | `204` — revoke the Google token, delete stored tokens and the shortlist (imported documents stay) |
+| `GET /api/integrations/gmail` | `GmailOverview` (polled every 3 s while an account is `QUEUED` / `SCANNING`) |
+| `POST /api/integrations/gmail/connect` | `{ "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth?..." }` + the `gmail_connect` cookie. `503 GMAIL_NOT_CONFIGURED` |
+| `GET /api/integrations/gmail/callback` | OAuth redirect target (backend only, public) → `302` as above |
+| `POST /api/integrations/gmail/accounts/{id}/scan` `{ "range": "ONE_YEAR" }` | `GmailAccountView` with `scanStatus: "QUEUED"`. `404 GMAIL_ACCOUNT_NOT_FOUND`, `409 GMAIL_SCAN_RUNNING` (already `QUEUED` / `SCANNING`), `400 VALIDATION_ERROR` (bad range), `503` |
+| `GET /api/integrations/gmail/emails?view=TO_REVIEW` | `GmailEmailView[]`, newest first. Each email lists only its files in that view. `TO_REVIEW` = files `NEW` + `IMPORTING` + `FAILED`, `IGNORED` = `IGNORED`, `IMPORTED` = `IMPORTED`. `400 INVALID_VIEW` |
+| `POST /api/integrations/gmail/files/import` `{ "fileIds": ["…"] }` | `GmailFileView[]` (same order). `NEW`, `IGNORED`, `FAILED` and `IMPORTED`-with-a-deleted-document files become `IMPORTING`; other files are returned unchanged. A background worker downloads each and creates a document (status `UPLOADED`, `readQueued: true`, `sourceGmail`) that is then read by AI. `400 VALIDATION_ERROR`, `404 GMAIL_FILE_NOT_FOUND`, `503` |
+| `POST /api/integrations/gmail/files/ignore` `{ "fileIds": [...] }` | `GmailFileView[]`: `NEW` / `FAILED` → `IGNORED` |
+| `POST /api/integrations/gmail/files/restore` `{ "fileIds": [...] }` | `GmailFileView[]`: `IGNORED` → `NEW` |
+| `DELETE /api/integrations/gmail/accounts/{id}` | `204` — revoke the Google token (best effort), delete the account, its emails and files (imported documents stay). `404 GMAIL_ACCOUNT_NOT_FOUND` |
+
+`fileIds` holds 1–100 ids (`400 VALIDATION_ERROR` otherwise). All ids are checked first:
+if any is not the caller's, the answer is `404 GMAIL_FILE_NOT_FOUND` and nothing changes.
 
 ```json
-// GmailMessage
+// GmailOverview
 {
-  "id": "…",
+  "configured": true,
+  "accounts": [{
+    "id": "…", "email": "asha@gmail.com", "scanStatus": "IDLE",
+    "lastScannedAt": "2026-10-07T09:12:00Z", "lastError": null, "connectedAt": "2026-10-07T09:10:00Z"
+  }],
+  "counts": { "toReview": 4, "ignored": 1, "imported": 7 }
+}
+
+// GmailEmailView
+{
+  "id": "…", "accountEmail": "asha@gmail.com",
   "fromName": "Amazon.in", "fromEmail": "auto-confirm@amazon.in",
   "subject": "Your Amazon.in order of Sony WH-1000XM5 Wireless Headphones",
   "snippet": "The tax invoice for order #408-… is attached.",
-  "receivedAt": "…",
-  "attachments": [{ "fileName": "Invoice_408-5561234-9912.pdf", "mimeType": "application/pdf", "size": 84213 }],
-  "detectedType": "INVOICE",
-  "confidence": 0.97,
-  "status": "NEW",
-  "documentIds": []
+  "receivedAt": "2026-10-05T08:00:00Z",
+  "kind": "INVOICE",
+  "files": [{
+    "id": "…", "fileName": "Invoice_408-5561234-9912.pdf", "contentType": "application/pdf",
+    "sizeBytes": 84213, "status": "IMPORTED", "error": null,
+    "document": { "id": "…", "status": "UPLOADED", "readQueued": true }
+  }]
 }
 ```
-The UI offers "Import all" only for emails with `confidence ≥ 0.6`.
+`GmailFileView` is the `files[]` item. `document` is `null` until the file is imported
+(and again after that document is deleted); `error` is set when `status` is `FAILED`
+("This file is no longer in Gmail.", "This file isn't a PDF or image Bill Locker can read.", …).
+`GmailAccountView` is the `accounts[]` item. A `scanStatus` of `ERROR` comes with a
+`lastError` the user can act on.
 
 ---
 

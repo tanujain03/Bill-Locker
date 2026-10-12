@@ -19,8 +19,8 @@ import org.hibernate.annotations.OnDeleteAction;
 /**
  * The bytes of an uploaded file, stored in PostgreSQL (column type {@code bytea}).
  *
- * <p>It has its own table so that listing documents never loads whole files: the
- * bytes are read only when someone previews or downloads that one document.
+ * <p>It has its own table so that listing or opening documents never loads whole
+ * files: the bytes are read only for a download/preview or for the AI.
  */
 @Entity
 @Table(name = "document_files")

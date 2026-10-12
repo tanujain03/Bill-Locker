@@ -1,31 +1,36 @@
 package project.bill_locker.document;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
-/**
- * A document as the API returns it in lists (docs/api-contract.md §8,
- * "DocumentSummary"). Products, processing stages and Gmail import come in later
- * steps, so for now those fields are always null, or "UPLOAD" for the source.
- */
+/** One row in the documents list: just enough to recognise a bill. */
 public record DocumentSummary(
 		UUID id,
-		UUID productId,
-		String productName,
-		DocumentType documentType,
 		String fileName,
-		String mimeType,
-		long fileSize,
-		ProcessingStatus processingStatus,
-		String processingStage,
-		String source,
-		String errorMessage,
+		String contentType,
+		long sizeBytes,
+		DocumentStatus status,
+		DocumentType documentType,
+		String documentNumber,
+		String sellerName,
+		LocalDate purchaseDate,
+		BigDecimal totalAmount,
+		int itemCount,
+		String firstProductName,
+		BillCategory category,
 		Instant createdAt,
-		Instant updatedAt) {
+		boolean readQueued,
+		String readError,
+		String sourceGmail) {
 
-	static DocumentSummary from(Document document) {
-		return new DocumentSummary(document.getId(), null, null, document.getDocumentType(), document.getFileName(),
-				document.getMimeType(), document.getFileSize(), document.getProcessingStatus(), null, "UPLOAD", null,
-				document.getCreatedAt(), document.getUpdatedAt());
+	public static DocumentSummary of(Document d) {
+		var items = d.getItems();
+		return new DocumentSummary(d.getId(), d.getFileName(), d.getContentType(), d.getSizeBytes(), d.getStatus(),
+				d.getDocumentType(), d.getDocumentNumber(), d.getSellerName(), d.getPurchaseDate(), d.getTotalAmount(),
+				items.size(), items.isEmpty() ? null : items.getFirst().getProductName(), BillCategory.parse(d.getCategory()),
+				d.getCreatedAt(),
+				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail());
 	}
 }

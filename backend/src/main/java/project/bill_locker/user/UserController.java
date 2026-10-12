@@ -7,11 +7,12 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import project.bill_locker.auth.MessageResponse;
 import project.bill_locker.security.CurrentUser;
 
-/** Profile endpoint used by the Settings page. */
+/** The Settings page: your own account. "me" is always the user in the token. */
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/api/users/me")
 public class UserController {
 
 	private final UserService userService;
@@ -20,9 +21,14 @@ public class UserController {
 		this.userService = userService;
 	}
 
-	/** {@code PUT /api/users/me} — change the signed-in user's name. */
-	@PutMapping("/me")
-	public UserResponse updateMe(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateProfileRequest request) {
-		return userService.rename(CurrentUser.id(jwt), request.name());
+	@PutMapping
+	public UserResponse updateProfile(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateProfileRequest request) {
+		return userService.updateProfile(CurrentUser.id(jwt), request);
+	}
+
+	@PutMapping("/password")
+	public MessageResponse changePassword(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ChangePasswordRequest request) {
+		userService.changePassword(CurrentUser.id(jwt), request);
+		return new MessageResponse("Your password has been changed.");
 	}
 }

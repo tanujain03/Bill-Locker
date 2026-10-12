@@ -11,27 +11,36 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * Base class for API tests. {@link MockMvc} sends requests through the real
  * security filters and controllers (without opening a network port), and the
  * data goes to a throwaway PostgreSQL started by {@link TestcontainersConfiguration}.
  */
-@SpringBootTest
+@SpringBootTest(properties = {"app.workers.enabled=false", "app.gmail.client-id=test-client",
+		"app.gmail.client-secret=test-secret", "app.gmail.token-key=" + ApiTest.TEST_TOKEN_KEY})
 @AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, RecordingResetLinkSender.Config.class, FakeDetailExtractor.Config.class, FixedClockConfig.class,
+		FakeGoogleApi.Config.class, FakeRegistrationFinder.Config.class, FakeAssistantModel.Config.class})
 public abstract class ApiTest {
 
 	protected static final String PASSWORD = "Str0ngPass";
 
+	/** 32 bytes of 0x01 in base64: a valid Gmail token key for tests. */
+	protected static final String TEST_TOKEN_KEY = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
+
 	@Autowired
 	protected MockMvc mvc;
 
+	/** POSTs a JSON body to an open (no token) endpoint. */
+	protected ResultActions postJson(String url, String json) throws Exception {
+		return mvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(json));
+	}
+
 	/** Registers a new account and returns its login token. */
 	protected String registerAndGetToken(String email) throws Exception {
-		String response = mvc.perform(post("/api/auth/register")
-						.contentType(MediaType.APPLICATION_JSON)
-						.content(registerJson("Test User", email, PASSWORD)))
+		String response = postJson("/api/auth/register", registerJson("Test User", email, PASSWORD))
 				.andExpect(status().isCreated())
 				.andReturn().getResponse().getContentAsString();
 		return JsonPath.read(response, "$.token");

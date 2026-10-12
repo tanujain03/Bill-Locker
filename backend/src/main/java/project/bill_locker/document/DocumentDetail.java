@@ -1,15 +1,49 @@
 package project.bill_locker.document;
 
-import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 
-/**
- * One document with what was read from it (docs/api-contract.md §8,
- * "DocumentDetail"). {@code @JsonUnwrapped} puts the summary's fields at the top
- * level of the JSON. extraction and extractedText stay null until OCR is added.
- */
-public record DocumentDetail(@JsonUnwrapped DocumentSummary summary, Object extraction, String extractedText) {
+/** Everything about one document, sent to the document page. */
+public record DocumentDetail(
+		UUID id,
+		String fileName,
+		String contentType,
+		long sizeBytes,
+		DocumentStatus status,
+		/** The CSV's document_url: where the file can be downloaded (needs the login token). */
+		String documentUrl,
+		DocumentType documentType,
+		String documentNumber,
+		String sellerName,
+		String sellerAddress,
+		String sellerContact,
+		String buyerName,
+		String buyerAddress,
+		String buyerEmail,
+		LocalDate purchaseDate,
+		BigDecimal taxAmount,
+		BigDecimal totalAmount,
+		List<DocumentItemView> items,
+		BillCategory category,
+		Instant createdAt,
+		Instant updatedAt,
+		boolean readQueued,
+		String readError,
+		String sourceGmail) {
 
-	static DocumentDetail from(Document document) {
-		return new DocumentDetail(DocumentSummary.from(document), null, null);
+	static DocumentDetail of(Document d) {
+		return new DocumentDetail(d.getId(), d.getFileName(), d.getContentType(), d.getSizeBytes(), d.getStatus(),
+				"/api/documents/" + d.getId() + "/download",
+				d.getDocumentType(), d.getDocumentNumber(),
+				d.getSellerName(), d.getSellerAddress(), d.getSellerContact(),
+				d.getBuyerName(), d.getBuyerAddress(), d.getBuyerEmail(),
+				d.getPurchaseDate(), d.getTaxAmount(), d.getTotalAmount(),
+				d.getItems().stream().map(DocumentItemView::of).toList(),
+				BillCategory.parse(d.getCategory()),
+				d.getCreatedAt(), d.getUpdatedAt(),
+				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail());
 	}
 }

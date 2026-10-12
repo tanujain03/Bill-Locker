@@ -1,5 +1,6 @@
 package project.bill_locker.document;
 
+import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
@@ -14,18 +15,16 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import project.bill_locker.security.CurrentUser;
 
-/**
- * Document endpoints (docs/api-contract.md §8). Every method needs a valid token;
- * {@code @AuthenticationPrincipal Jwt} is that verified token.
- */
+/** HTTP ↔ Java for documents. Every endpoint needs a login token. */
 @RestController
 @RequestMapping("/api/documents")
 public class DocumentController {
@@ -36,41 +35,61 @@ public class DocumentController {
 		this.documentService = documentService;
 	}
 
-	/** {@code POST /api/documents/upload} — multipart form with a "file" and an optional "documentType". */
-	@PostMapping(path = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	/** The browser sends the file as multipart/form-data, in a part called "file". */
+	@PostMapping("/upload")
 	@ResponseStatus(HttpStatus.CREATED)
-	public DocumentSummary upload(@AuthenticationPrincipal Jwt jwt, @RequestPart("file") MultipartFile file,
-			@RequestParam(required = false) DocumentType documentType) {
-		return documentService.upload(CurrentUser.id(jwt), file, documentType);
+	public DocumentDetail upload(@AuthenticationPrincipal Jwt jwt, @RequestParam("file") MultipartFile file) {
+		return documentService.upload(CurrentUser.id(jwt), file);
 	}
 
-	/** {@code GET /api/documents?status=&documentType=} — the user's documents, newest first. */
+	/** The documents list. All three filters are optional. */
 	@GetMapping
 	public List<DocumentSummary> list(@AuthenticationPrincipal Jwt jwt,
-			@RequestParam(required = false) UUID productId,
-			@RequestParam(required = false) ProcessingStatus status,
-			@RequestParam(required = false) DocumentType documentType) {
-		return documentService.list(CurrentUser.id(jwt), productId, status, documentType);
+			@RequestParam(required = false) String q,
+			@RequestParam(required = false) DocumentType type,
+			@RequestParam(required = false) DocumentStatus status) {
+		return documentService.list(CurrentUser.id(jwt), q, type, status);
 	}
 
-	/** {@code GET /api/documents/{id}} */
 	@GetMapping("/{id}")
 	public DocumentDetail get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
 		return documentService.get(CurrentUser.id(jwt), id);
 	}
 
-	/** {@code GET /api/documents/{id}/download} — the file itself; "inline" lets the browser show it. */
+	/** The file itself. "inline" lets the browser show it (preview) instead of saving it. */
 	@GetMapping("/{id}/download")
 	public ResponseEntity<byte[]> download(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
 		DownloadedFile file = documentService.download(CurrentUser.id(jwt), id);
-		ContentDisposition disposition = ContentDisposition.inline().filename(file.fileName(), StandardCharsets.UTF_8).build();
 		return ResponseEntity.ok()
-				.contentType(MediaType.parseMediaType(file.mimeType()))
-				.header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+				.contentType(MediaType.parseMediaType(file.contentType()))
+				.header(HttpHeaders.CONTENT_DISPOSITION,
+						ContentDisposition.inline().filename(file.fileName(), StandardCharsets.UTF_8).build().toString())
 				.body(file.data());
 	}
 
-	/** {@code DELETE /api/documents/{id}} — removes the document and its file. */
+	/** Read the details with AI. Can be repeated ("Read again"). */
+	@PostMapping("/{id}/extract")
+	public DocumentDetail extract(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+		return documentService.extract(CurrentUser.id(jwt), id);
+	}
+
+	/** Save the reviewed details (first time and every later edit). */
+	@PutMapping("/{id}")
+	public DocumentDetail save(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+			@Valid @RequestBody SaveDocumentRequest request) {
+		return documentService.save(CurrentUser.id(jwt), id, request);
+	}
+
+	/**
+	 * Task 5, when the bill has no registration link or QR code: after the user confirmed the
+	 * product's brand, find that brand's official warranty registration page.
+	 */
+	@PostMapping("/{id}/registration-page")
+	public RegistrationPage findRegistrationPage(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+			@Valid @RequestBody RegistrationPageRequest request) {
+		return documentService.findRegistrationPage(CurrentUser.id(jwt), id, request);
+	}
+
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {

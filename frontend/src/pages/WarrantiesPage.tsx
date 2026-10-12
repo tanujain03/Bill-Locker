@@ -1,128 +1,249 @@
-import { ShieldAlert, ShieldCheck, ShieldX, Shield, Upload } from 'lucide-react';
-import { useMemo } from 'react';
+import { ArrowRight, ExternalLink, Search, ShieldCheck } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { useUpload } from '@/components/documents/upload-context';
-import { ProductIcon } from '@/components/products/ProductIcon';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { EmptyState, ErrorState, Skeleton } from '@/components/ui/feedback';
-import { FilterTabs } from '@/components/ui/misc';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { StatCard } from '@/components/ui/StatCard';
-import { WarrantyMeter, WarrantyStatusBadge } from '@/components/warranties/WarrantyStatus';
-import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { useWarranties } from '@/hooks/useWarranties';
-import { WARRANTY_STATUSES, type Warranty, type WarrantyStatus } from '@/types';
-import { formatDate } from '@/utils/format';
-import { WARRANTY_STATUS_LABELS } from '@/utils/warranty';
+import { ErrorState } from '../components/ErrorState';
+import { Tab, TabList } from '../components/Tabs';
+import { WarrantyStatusPill } from '../components/warranties/WarrantyStatusPill';
+import { errorMessage } from '../lib/api';
+import { usePageTitle } from '../lib/usePageTitle';
+import { formatDate } from '../lib/document-form';
+import {
+  listWarranties,
+  WARRANTY_STATUS_LABELS,
+  WARRANTY_STATUSES,
+  type WarrantyCounts,
+  type WarrantyList,
+  type WarrantyStatus,
+  type WarrantyView,
+} from '../lib/warranties';
 
-type Tab = 'ALL' | WarrantyStatus;
+const COUNT_KEY: Record<WarrantyStatus, keyof WarrantyCounts> = {
+  ACTIVE: 'active',
+  EXPIRING_SOON: 'expiringSoon',
+  EXPIRED: 'expired',
+  NO_INFO: 'noInfo',
+};
 
-function isTab(value: string | null): value is Tab {
-  return value === 'ALL' || (WARRANTY_STATUSES as string[]).includes(value ?? '');
-}
-
-/** Soonest expiry first; unknown warranties last. */
-function byExpiry(a: Warranty, b: Warranty): number {
-  return (a.expiryDate ?? '9999-12-31').localeCompare(b.expiryDate ?? '9999-12-31');
-}
-
+/** /warranties: every product on your saved bills and how long its warranty lasts. */
 export function WarrantiesPage() {
-  useDocumentTitle('Warranties');
+  usePageTitle('Warranties');
+  // The tab and the search live in the URL, so the dashboard can link straight to a tab.
   const [params, setParams] = useSearchParams();
-  const statusParam = params.get('status');
-  const tab: Tab = isTab(statusParam) ? statusParam : 'ALL';
-  const warranties = useWarranties();
-  const { openUpload } = useUpload();
+  const status = (WARRANTY_STATUSES as string[]).includes(params.get('status') ?? '')
+    ? (params.get('status') as WarrantyStatus)
+    : undefined;
+  const urlQuery = params.get('q') ?? '';
+  const [search, setSearch] = useState(urlQuery);
 
-  const counts = useMemo(() => {
-    const list = warranties.data ?? [];
-    const count = (status: WarrantyStatus) => list.filter((warranty) => warranty.status === status).length;
-    return { ALL: list.length, ACTIVE: count('ACTIVE'), EXPIRING_SOON: count('EXPIRING_SOON'), EXPIRED: count('EXPIRED'), UNKNOWN: count('UNKNOWN') };
-  }, [warranties.data]);
+  const [list, setList] = useState<WarrantyList | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const latest = useRef(0); // only the newest answer may update the page
 
-  const setTab = (next: Tab) => setParams(next === 'ALL' ? {} : { status: next }, { replace: true });
-  const visible = (warranties.data ?? []).filter((warranty) => tab === 'ALL' || warranty.status === tab).sort(byExpiry);
+  const load = useCallback(() => {
+    const mine = ++latest.current;
+    setError(null);
+    listWarranties({ status, q: urlQuery })
+      .then((answer) => mine === latest.current && setList(answer))
+      .catch((e) => mine === latest.current && setError(errorMessage(e)));
+  }, [status, urlQuery]);
+
+  useEffect(load, [load]);
+
+  // When the URL changes from outside (a header or dashboard link), the box follows it.
+  useEffect(() => setSearch(urlQuery), [urlQuery]);
+
+  // Typing updates the URL 300 ms after the last key, which then reloads the list.
+  useEffect(() => {
+    if (search === urlQuery) return;
+    const timer = setTimeout(() => setParam('q', search), 300);
+    return () => clearTimeout(timer);
+  }, [search, urlQuery]);
+
+  function setParam(name: string, value: string | undefined) {
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value) next.set(name, value);
+        else next.delete(name);
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
+  const counts = list?.counts;
+  const noSavedBills = counts?.all === 0 && !urlQuery;
 
   return (
+    <div className="min-h-dvh">
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        <h1 className="text-2xl font-semibold tracking-tight">Warranties</h1>
+        <p className="mt-1 text-slate-600">Every product on your saved bills and how long its warranty lasts.</p>
+
+        <div className="mt-6 flex flex-col-reverse gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <TabList label="Warranty status">
+            <Tab label="All" count={counts?.all} active={!status} onClick={() => setParam('status', undefined)} />
+            {WARRANTY_STATUSES.map((s) => (
+              <Tab
+                key={s}
+                label={WARRANTY_STATUS_LABELS[s]}
+                count={counts?.[COUNT_KEY[s]]}
+                active={status === s}
+                onClick={() => setParam('status', s)}
+              />
+            ))}
+          </TabList>
+          <label className="relative lg:w-80">
+            <span className="sr-only">Search warranties</span>
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" aria-hidden />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search product, model, serial or shop"
+              className="block w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-9 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            />
+          </label>
+        </div>
+
+        <div className="mt-4">
+          {error ? (
+            <ErrorState title="Could not load your warranties" message={error} onRetry={load} />
+          ) : !list ? (
+            <div className="animate-pulse space-y-2" aria-label="Loading warranties">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="h-16 rounded-xl bg-slate-200" />
+              ))}
+            </div>
+          ) : noSavedBills ? (
+            <Empty>
+              No saved bills yet. Save a bill with its warranty details to see it here.{' '}
+              <Link to="/documents" className="font-medium text-brand-700 hover:underline">
+                Go to documents
+              </Link>
+            </Empty>
+          ) : list.items.length === 0 ? (
+            <Empty>{urlQuery ? `No products match “${urlQuery}”.` : EMPTY_TAB[status ?? 'ALL']}</Empty>
+          ) : (
+            <WarrantyRows items={list.items} />
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/** What an empty tab says: specific, and good news where it is. */
+const EMPTY_TAB: Record<WarrantyStatus | 'ALL', string> = {
+  ALL: 'No products on your saved bills yet.',
+  EXPIRING_SOON: 'Nothing ends in the next 30 days.',
+  ACTIVE: 'No warranties are active right now.',
+  EXPIRED: 'No warranties have ended.',
+  NO_INFO: 'Every product has a warranty date.',
+};
+
+function Empty({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+      <span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
+        <ShieldCheck className="size-5" aria-hidden />
+      </span>
+      <p className="mt-3 max-w-md text-sm text-slate-600">{children}</p>
+    </div>
+  );
+}
+
+/** A table on wider screens, cards on phones — same data, same links. */
+function WarrantyRows({ items }: { items: WarrantyView[] }) {
+  return (
     <>
-      <PageHeader title="Warranties" description="Every warranty in one place — sorted by what expires first." />
+      <table className="hidden w-full overflow-hidden rounded-xl bg-white text-left text-sm ring-1 ring-slate-200 md:table">
+        <thead className="bg-slate-50 text-xs font-medium tracking-wide text-slate-500 uppercase">
+          <tr>
+            <th className="px-4 py-3">Product</th>
+            <th className="px-4 py-3">Shop</th>
+            <th className="px-4 py-3">Ends</th>
+            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">
+              <span className="sr-only">Bill</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {items.map((w, i) => (
+            <tr key={`${w.documentId}-${i}`} className="hover:bg-slate-50">
+              <td className="max-w-xs px-4 py-3">
+                <p className="truncate font-medium">{w.productName ?? 'Unnamed product'}</p>
+                <ProductMeta warranty={w} />
+              </td>
+              <td className="max-w-[12rem] truncate px-4 py-3 text-slate-600">{w.sellerName ?? '—'}</td>
+              <td className="px-4 py-3 whitespace-nowrap text-slate-600 tabular-nums">
+                {w.endDate ? formatDate(w.endDate) : '—'}
+              </td>
+              <td className="px-4 py-3">
+                <WarrantyStatusPill status={w.status} daysLeft={w.daysLeft} />
+              </td>
+              <td className="px-4 py-3 text-right">
+                <RowLinks warranty={w} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-      <section aria-label="Warranty summary" className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard label="Total warranties" value={counts.ALL} icon={<Shield aria-hidden />} tone="brand" loading={warranties.isPending} />
-        <StatCard label="Active" value={counts.ACTIVE} icon={<ShieldCheck aria-hidden />} tone="success" loading={warranties.isPending} />
-        <StatCard
-          label="Expiring soon"
-          value={counts.EXPIRING_SOON}
-          icon={<ShieldAlert aria-hidden />}
-          tone="warning"
-          hint="Within 30 days"
-          loading={warranties.isPending}
-        />
-        <StatCard label="Expired" value={counts.EXPIRED} icon={<ShieldX aria-hidden />} tone="danger" loading={warranties.isPending} />
-      </section>
-
-      <FilterTabs
-        label="Filter warranties by status"
-        value={tab}
-        onChange={setTab}
-        className="mb-4"
-        options={[
-          { value: 'ALL', label: 'All', count: counts.ALL },
-          ...WARRANTY_STATUSES.map((status) => ({ value: status, label: WARRANTY_STATUS_LABELS[status], count: counts[status] })),
-        ]}
-      />
-
-      <Card>
-        {warranties.isPending ? (
-          <div className="space-y-4 p-5 sm:p-6" aria-busy="true" aria-label="Loading warranties">
-            {Array.from({ length: 4 }, (_, index) => (
-              <Skeleton key={index} className="h-16 w-full" />
-            ))}
-          </div>
-        ) : warranties.isError ? (
-          <ErrorState title="Could not load warranties" error={warranties.error} onRetry={() => void warranties.refetch()} />
-        ) : warranties.data.length === 0 ? (
-          <EmptyState
-            icon={<ShieldCheck aria-hidden />}
-            title="No warranties tracked yet"
-            description="Upload a bill and Bill Locker calculates the warranty expiry for you."
-            action={
-              <Button onClick={() => openUpload()} leftIcon={<Upload className="size-4" aria-hidden />}>
-                Upload bill
-              </Button>
-            }
-          />
-        ) : visible.length === 0 ? (
-          <EmptyState compact icon={<ShieldCheck aria-hidden />} title={`No ${WARRANTY_STATUS_LABELS[tab as WarrantyStatus]?.toLowerCase() ?? ''} warranties`} description="Nothing in this category right now." />
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {visible.map((warranty) => (
-              <li key={warranty.id}>
-                <Link
-                  to={`/products/${warranty.productId}`}
-                  className="grid gap-3 px-5 py-4 transition-colors hover:bg-slate-50 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto] sm:items-center sm:gap-6 sm:px-6"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <ProductIcon name={warranty.productName} categorySlug={warranty.categorySlug} />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">{warranty.productName}</p>
-                      <p className="truncate text-xs text-slate-500">
-                        {[warranty.productBrand, warranty.categoryName].filter(Boolean).join(' · ') || '—'}
-                        {warranty.startDate && ` · bought ${formatDate(warranty.startDate)}`}
-                      </p>
-                    </div>
-                  </div>
-                  <WarrantyMeter warranty={warranty} />
-                  <div className="sm:justify-self-end">
-                    <WarrantyStatusBadge status={warranty.status} />
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      <ul className="space-y-2 md:hidden">
+        {items.map((w, i) => (
+          <li key={`${w.documentId}-${i}`} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{w.productName ?? 'Unnamed product'}</p>
+                <p className="truncate text-sm text-slate-500">
+                  {[w.sellerName, w.endDate && `Ends ${formatDate(w.endDate)}`].filter(Boolean).join(' · ')}
+                </p>
+              </div>
+              <WarrantyStatusPill status={w.status} daysLeft={w.daysLeft} />
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <ProductMeta warranty={w} />
+              <RowLinks warranty={w} />
+            </div>
+          </li>
+        ))}
+      </ul>
     </>
+  );
+}
+
+function ProductMeta({ warranty: w }: { warranty: WarrantyView }) {
+  const meta = [w.modelNumber && `Model ${w.modelNumber}`, w.serialNumber && `S/N ${w.serialNumber}`, w.warrantyProvider]
+    .filter(Boolean)
+    .join(' · ');
+  return meta ? <p className="truncate text-xs text-slate-600">{meta}</p> : <span />;
+}
+
+/** "Register ↗" (the brand's page, in a new tab) when we have it, and "Open bill". */
+function RowLinks({ warranty: w }: { warranty: WarrantyView }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-3">
+      {w.registrationUrl && /^https?:\/\//i.test(w.registrationUrl) && (
+        <a
+          href={w.registrationUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Register this product's warranty on the brand's site"
+          className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800"
+        >
+          Register
+          <ExternalLink className="size-3.5" aria-hidden />
+        </a>
+      )}
+      <Link
+        to={`/documents/${w.documentId}`}
+        className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:text-brand-800"
+      >
+        Open bill
+        <ArrowRight className="size-4" aria-hidden />
+      </Link>
+    </span>
   );
 }

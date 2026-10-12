@@ -1,152 +1,200 @@
-import { FileText, Mail, SearchX, Upload } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { DocumentList } from '@/components/documents/DocumentList';
-import { UploadDropzone } from '@/components/documents/UploadDropzone';
-import { useUpload } from '@/components/documents/upload-context';
-import { Button, ButtonLink } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Select } from '@/components/ui/Field';
-import { EmptyState, ErrorState, Skeleton } from '@/components/ui/feedback';
-import { FilterTabs } from '@/components/ui/misc';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { useDocuments } from '@/hooks/useDocuments';
-import { useDocumentTitle } from '@/hooks/useDocumentTitle';
-import { isFeatureEnabled } from '@/lib/features';
-import { DOCUMENT_TYPES, type DocumentSummary, type DocumentType } from '@/types';
-import { DOCUMENT_TYPE_LABELS, isProcessing, needsReview } from '@/utils/labels';
+import { CalendarDays, FilterX, Search, Upload, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
+import { DocumentList } from '../components/documents/DocumentList';
+import { Button } from '../components/Button';
+import { UploadButton } from '../components/UploadButton';
+import { Alert } from '../components/FormParts';
+import { errorMessage } from '../lib/api';
+import {
+  DOCUMENT_TYPE_LABELS,
+  listDocuments,
+  monthLabel,
+  type DocumentStatus,
+  type DocumentSummary,
+} from '../lib/documents';
+import { usePolling } from '../lib/usePolling';
+import { usePageTitle } from '../lib/usePageTitle';
 
-type StatusTab = 'all' | 'review' | 'processing' | 'saved' | 'failed';
-
-const TAB_FILTERS: Record<StatusTab, (document: DocumentSummary) => boolean> = {
-  all: () => true,
-  review: (document) => needsReview(document.processingStatus),
-  processing: (document) => isProcessing(document.processingStatus),
-  saved: (document) => document.processingStatus === 'CONFIRMED',
-  failed: (document) => document.processingStatus === 'FAILED',
-};
-
+/** /documents: upload a bill, and the list of your bills with search and filters. */
 export function DocumentsPage() {
-  useDocumentTitle('Documents');
-  const { openUpload } = useUpload();
-  const documents = useDocuments();
-  const [tab, setTab] = useState<StatusTab>('all');
-  const [type, setType] = useState<DocumentType | ''>('');
-  const gmailEnabled = isFeatureEnabled('gmail');
+  usePageTitle('Documents');
 
-  const counts = useMemo(() => {
-    const list = documents.data ?? [];
-    return Object.fromEntries(
-      (Object.keys(TAB_FILTERS) as StatusTab[]).map((key) => [key, list.filter(TAB_FILTERS[key]).length]),
-    ) as Record<StatusTab, number>;
-  }, [documents.data]);
+  // The filters live in the URL (?q=&type=&status=&source=&month=), so a link from the
+  // dashboard opens the list already filtered, and Back/refresh keep the filters.
+  const [params, setParams] = useSearchParams();
+  const q = params.get('q') ?? '';
+  const type = params.get('type') ?? '';
+  const status = params.get('status') ?? '';
+  /** '' (all), 'UPLOAD' or 'GMAIL'. Filtered here: the list is already loaded. */
+  const source = params.get('source') ?? '';
+  /** 'YYYY-MM': bills bought in that month (filtered here, like source). */
+  const monthParam = params.get('month') ?? '';
+  const month = /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : ''; // ignore a malformed ?month=
+  const setFilter = (name: string) => (value: string) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value) next.set(name, value);
+        else next.delete(name);
+        return next;
+      },
+      { replace: true }, // typing in the search box shouldn't fill the Back history
+    );
+  const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
 
-  const visible = (documents.data ?? []).filter(
-    (document) => TAB_FILTERS[tab](document) && (!type || document.documentType === type),
-  );
+  // Reload the list when a filter changes. The search waits 300 ms after the last
+  // key press, so we don't call the backend for every letter.
+  useEffect(() => {
+    let current = true; // ignore answers that arrive after a newer request started
+    const timer = setTimeout(() => {
+      listDocuments({ q, type, status })
+        .then((list) => {
+          if (!current) return;
+          setDocuments(list);
+          setListError(null);
+        })
+        .catch((error) => {
+          if (current) setListError(errorMessage(error));
+        });
+    }, 300);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [q, type, status]);
+
+  // While a document waits for the background AI read, ask again every 3 s with the same
+  // filters, so "Reading…" turns into "Needs review" without a reload.
+  usePolling(documents?.some((d) => d.readQueued) ?? false, () => {
+    listDocuments({ q, type, status })
+      .then(setDocuments)
+      .catch(() => {}); // the next tick tries again
+  });
+
+  const filtered = Boolean(q || type || status || source || month);
+  // First visit (no bills at all): a big "add your first bill" area. After that the list
+  // is what people come for, so uploading shrinks to one slim line above it.
+  const noBillsYet = documents?.length === 0 && !filtered;
 
   return (
-    <>
-      <PageHeader
-        title="Documents"
-        description="Every bill, invoice, warranty card and receipt — safely stored and searchable."
-        actions={
-          <>
-            {gmailEnabled && (
-              <ButtonLink to="/gmail" variant="secondary" leftIcon={<Mail className="size-4" aria-hidden />}>
-                Import from Gmail
-              </ButtonLink>
-            )}
-            <Button onClick={() => openUpload()} leftIcon={<Upload className="size-4" aria-hidden />}>
-              Upload
-            </Button>
-          </>
-        }
-      />
+    <div className="min-h-dvh">
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
+        <p className="mt-1 text-slate-600">Upload invoices, warranty cards and receipts. We read the details for you.</p>
 
-      <div className="mb-6">
-        <UploadDropzone compact onFiles={(files) => openUpload({ files })} />
-      </div>
-
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        {/* Status tabs only mean something once documents are read (OCR/AI). */}
-        {isFeatureEnabled('documentProcessing') && (
-          <FilterTabs
-            label="Filter documents by status"
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: 'all', label: 'All', count: counts.all },
-              { value: 'review', label: 'Needs review', count: counts.review },
-              { value: 'processing', label: 'Processing', count: counts.processing },
-              { value: 'saved', label: 'Saved', count: counts.saved },
-              { value: 'failed', label: 'Failed', count: counts.failed },
-            ]}
-          />
+        {noBillsYet ? (
+          <div className="mt-6 flex flex-col items-center rounded-2xl border-2 border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+            <span className="grid size-12 place-items-center rounded-xl bg-brand-50 text-brand-600">
+              <Upload className="size-6" aria-hidden />
+            </span>
+            <p className="mt-3 font-medium">Add your first bill</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Drop a file anywhere on this page, or choose one. PDF, JPG, PNG or WebP, up to 10 MB.
+            </p>
+            <UploadButton className="mt-4">Choose file</UploadButton>
+          </div>
+        ) : (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3">
+            <p className="flex items-center gap-2 text-sm text-slate-600">
+              <Upload className="size-4 shrink-0 text-brand-600" aria-hidden />
+              Drop a bill anywhere on the page to upload it (PDF, JPG, PNG or WebP, up to 10 MB).
+            </p>
+            <UploadButton variant="secondary" />
+          </div>
         )}
-        <div className="md:ml-auto md:w-52">
-          <Select aria-label="Filter by document type" value={type} onChange={(event) => setType(event.target.value as DocumentType | '')}>
-            <option value="">All types</option>
-            {DOCUMENT_TYPES.map((value) => (
-              <option key={value} value={value}>
-                {DOCUMENT_TYPE_LABELS[value]}
-              </option>
-            ))}
-          </Select>
-        </div>
-      </div>
 
-      <Card>
-        {documents.isPending ? (
-          <div className="space-y-4 p-5 sm:p-6" aria-busy="true" aria-label="Loading documents">
-            {Array.from({ length: 5 }, (_, index) => (
-              <Skeleton key={index} className="h-12 w-full" />
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <label className="relative flex-1">
+            <span className="sr-only">Search documents</span>
+            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" aria-hidden />
+            <input
+              type="search"
+              value={q}
+              onChange={(e) => setFilter('q')(e.target.value)}
+              placeholder="Search seller, product, number or file name"
+              className="block w-full rounded-lg border border-slate-300 bg-white py-2 pr-3 pl-9 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+            />
+          </label>
+          <Select label="Type" value={type} onChange={setFilter('type')} options={Object.entries(DOCUMENT_TYPE_LABELS)} />
+          <Select label="Status" value={status} onChange={setFilter('status')} options={STATUS_OPTIONS} />
+          <Select label="From" value={source} onChange={setFilter('source')} options={SOURCE_OPTIONS} />
+        </div>
+
+        {filtered && (
+          <Button variant="ghost" size="sm" icon={FilterX} onClick={() => setParams({}, { replace: true })} className="mt-3 mr-2">
+            Clear filters
+          </Button>
+        )}
+        {month && (
+          // Set by a bar of the dashboard's spending chart; one click removes it.
+          <button
+            type="button"
+            onClick={() => setFilter('month')('')}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100"
+          >
+            <CalendarDays className="size-4" aria-hidden />
+            Bought in {monthLabel(month)}
+            <X className="size-4" aria-label="Remove month filter" />
+          </button>
+        )}
+
+        {listError && (
+          <div className="mt-4">
+            <Alert tone="error">{listError}</Alert>
+          </div>
+        )}
+        {!documents && !listError && (
+          <div className="mt-4 animate-pulse space-y-px overflow-hidden rounded-xl" aria-label="Loading documents">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <div key={n} className="h-16 bg-slate-200" />
             ))}
           </div>
-        ) : documents.isError ? (
-          <ErrorState title="Could not load your documents" error={documents.error} onRetry={() => void documents.refetch()} />
-        ) : documents.data.length === 0 ? (
-          <EmptyState
-            icon={<FileText aria-hidden />}
-            title="No documents yet"
-            description={
-              gmailEnabled
-                ? 'Upload your first bill to get started, or import invoices from Gmail.'
-                : 'Upload your first bill to get started.'
-            }
-            action={
-              <>
-                <Button onClick={() => openUpload()} leftIcon={<Upload className="size-4" aria-hidden />}>
-                  Upload bill
-                </Button>
-                {gmailEnabled && (
-                  <ButtonLink to="/gmail" variant="secondary">
-                    Connect Gmail
-                  </ButtonLink>
-                )}
-              </>
-            }
-          />
-        ) : visible.length === 0 ? (
-          <EmptyState
-            icon={<SearchX aria-hidden />}
-            title="Nothing here"
-            description="No documents match these filters."
-            action={
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setTab('all');
-                  setType('');
-                }}
-              >
-                Show all documents
-              </Button>
-            }
-          />
-        ) : (
-          <DocumentList documents={visible} />
         )}
-      </Card>
-    </>
+        {documents && !noBillsYet && (
+          <DocumentList
+            documents={documents.filter(
+              (d) =>
+                (!source || (source === 'GMAIL') === Boolean(d.sourceGmail)) &&
+                (!month || (d.purchaseDate ?? '').startsWith(month)),
+            )}
+            filtered={filtered}
+          />
+        )}
+      </main>
+    </div>
   );
 }
+
+const SOURCE_OPTIONS: [string, string][] = [
+  ['UPLOAD', 'Uploaded'],
+  ['GMAIL', 'Gmail'],
+];
+
+const STATUS_OPTIONS: [DocumentStatus, string][] = [
+  ['UPLOADED', 'Not read yet'],
+  ['EXTRACTED', 'Needs review'],
+  ['SAVED', 'Saved'],
+];
+
+function Select(props: { label: string; value: string; onChange: (value: string) => void; options: [string, string][] }) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-slate-700">
+      {props.label}
+      <select
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+        className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+      >
+        <option value="">All</option>
+        {props.options.map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+

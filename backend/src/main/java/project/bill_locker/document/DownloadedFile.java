@@ -1,5 +1,5 @@
 package project.bill_locker.document;
 
-/** A stored file, ready to send back to the browser. */
-public record DownloadedFile(String fileName, String mimeType, byte[] data) {
+/** A stored file on its way back to the browser. */
+record DownloadedFile(String fileName, String contentType, byte[] data) {
 }
