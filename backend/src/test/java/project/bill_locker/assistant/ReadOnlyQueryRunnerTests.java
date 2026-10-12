@@ -12,6 +12,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import project.bill_locker.document.DocumentApiTestBase;
 
 /**
@@ -26,6 +28,14 @@ class ReadOnlyQueryRunnerTests extends DocumentApiTestBase {
 	@Autowired
 	JdbcTemplate jdbc;
 
+	@Autowired
+	PlatformTransactionManager transactionManager;
+
+	TransactionTemplate transaction;
+
+	/** set_config written so the text check doesn't see the word (as an attacker would). */
+	static final String SET_CONFIG = "U&\"\\0073et_config\"";
+
 	String emailA;
 	UUID userA;
 	UUID userB;
@@ -38,6 +48,7 @@ class ReadOnlyQueryRunnerTests extends DocumentApiTestBase {
 		saveBill(registerAndGetToken(emailB), bill("Reliance", "999"));
 		userA = userId(emailA);
 		userB = userId(emailB);
+		transaction = new TransactionTemplate(transactionManager);
 	}
 
 	@Test
@@ -87,11 +98,48 @@ class ReadOnlyQueryRunnerTests extends DocumentApiTestBase {
 	}
 
 	@Test
-	void setConfigIsRevokedForRole() {
-		// Checks the database itself, past the text check: the AI role can't call set_config at all.
-		assertThat(jdbc.queryForObject(
-				"SELECT has_function_privilege('bill_locker_ai', 'pg_catalog.set_config(text,text,boolean)', 'EXECUTE')",
-				Boolean.class)).isFalse();
+	void forgedUserIdShowsNothing() {
+		// Escaped spelling: passes the text check, so this tests the database itself. The AI login
+		// may call set_config, but can't sign B's id, so the views show no rows at all.
+		String forge = SET_CONFIG + "('app.user_id', '" + userB + "', true)";
+		assertThat(runner.run(userA, "SELECT (SELECT " + forge + ") AS f, (SELECT string_agg(seller_name, ',') FROM ai_documents) AS s"))
+				.extracting(r -> r.get("s")).doesNotContain("Reliance");
+		assertThat(runner.run(userA, "SELECT d.seller_name FROM (SELECT " + forge + ") x, ai_documents d"))
+				.extracting(r -> r.get("seller_name")).doesNotContain("Reliance");
+	}
+
+	@Test
+	void idWithoutSignatureShowsNothing() {
+		List<Map<String, Object>> rows = transaction.execute(status -> {
+			status.setRollbackOnly();
+			jdbc.queryForObject("SELECT set_config('app.user_id', ?, true)", String.class, userA.toString());
+			return jdbc.queryForList("SELECT * FROM ai_documents");
+		});
+		assertThat(rows).isEmpty();
+	}
+
+	@Test
+	void switchingToTheAppLoginIsRefused() {
+		// On a non-superuser database (Neon) this was the escape: the AI's session switched to
+		// the role it was logged in as. Now it is logged in as bill_locker_ai, a member of nothing.
+		String appLogin = jdbc.queryForObject("SELECT current_user", String.class);
+		assertThatThrownBy(() -> runner.run(userA, "SELECT " + SET_CONFIG + "('role', '" + appLogin + "', true) AS r"))
+				.isInstanceOf(QueryRejectedException.class)
+				.hasMessageContaining("permission denied");
+	}
+
+	@Test
+	void theSecretIsOffLimits() {
+		assertThatThrownBy(() -> runner.run(userA, "SELECT secret FROM ai_secret")).isInstanceOf(QueryRejectedException.class);
+	}
+
+	@Test
+	void timeLimitCantBeSwitchedOff() {
+		long start = System.nanoTime();
+		assertThatThrownBy(() -> runner.run(userA,
+				"SELECT " + SET_CONFIG + "('statement_timeout', '0', true) AS t, pg_sleep(10) AS s"))
+				.isInstanceOf(QueryRejectedException.class);
+		assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(6));
 	}
 
 	@Test
@@ -156,10 +204,15 @@ class ReadOnlyQueryRunnerTests extends DocumentApiTestBase {
 	}
 
 	@Test
-	void advisoryLocksAreOffLimits() {
-		// Session locks outlive the rollback: millions of them would fill Postgres's lock table.
-		assertThatThrownBy(() -> runner.run(userA, "SELECT pg_advisory_lock(1)")).isInstanceOf(QueryRejectedException.class);
-		assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory'", Long.class)).isZero();
+	void sessionLocksDieWithTheConnection() throws InterruptedException {
+		// Session locks outlive a rollback, but not the connection, which is closed after each question.
+		runner.run(userA, "SELECT pg_advisory_lock(1) AS l");
+		long locks = 1;
+		for (int i = 0; i < 50 && locks > 0; i++) { // Postgres ends the closed session a moment later
+			Thread.sleep(100);
+			locks = jdbc.queryForObject("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory'", Long.class);
+		}
+		assertThat(locks).isZero();
 	}
 
 	@Test
@@ -169,13 +222,13 @@ class ReadOnlyQueryRunnerTests extends DocumentApiTestBase {
 	}
 
 	@Test
-	void failsClosedWhenTheRoleCanChangeSettings() {
-		// e.g. the app's DB user isn't a superuser, so the REVOKE at startup only warned.
-		jdbc.execute("GRANT EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) TO bill_locker_ai");
+	void failsClosedWhenTheLoginBelongsToARole() {
+		// A role to switch to (or inherit from) would open the way out again.
+		jdbc.execute("GRANT pg_read_all_data TO bill_locker_ai");
 		try {
 			assertThatThrownBy(() -> runner.run(userA, "SELECT 1 AS one")).isInstanceOf(AssistantException.class);
 		} finally {
-			jdbc.execute("REVOKE EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) FROM bill_locker_ai");
+			jdbc.execute("REVOKE pg_read_all_data FROM bill_locker_ai");
 		}
 	}
 

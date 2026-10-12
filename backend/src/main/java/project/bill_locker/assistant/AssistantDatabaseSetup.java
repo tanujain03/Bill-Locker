@@ -3,6 +3,7 @@ package project.bill_locker.assistant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataAccessException;
@@ -11,20 +12,21 @@ import org.springframework.stereotype.Component;
 
 /**
  * Prepares what the assistant's SQL may read, every time the app starts (safe to repeat).
+ * Needs no superuser, so it works the same on your PC and on Neon (see docs/task-8).
  *
  * <ul>
- * <li>Six {@code ai_*} views: the user's own data, filtered by the {@code app.user_id}
- * setting that {@link ReadOnlyQueryRunner} sets from the login token. No setting → no rows.
- * Secrets (password hash, reset tokens, Gmail tokens) and file bytes are left out.
- * They are {@code security_barrier} views: Postgres applies the user filter first. A plain
- * view lets the planner test the AI's own conditions on every row, so an error like
- * "invalid input syntax: 'someone@else.com'" or a 1/0 could reveal other users' values.</li>
- * <li>A role {@code bill_locker_ai} that may only SELECT from those views. Views read the
- * tables with their owner's rights, so the role never needs rights on a table.</li>
- * <li>{@code set_config} is taken away from everyone but our own DB user: otherwise the AI's
- * SQL could change {@code app.user_id} and read another user's rows.</li>
- * <li>Session advisory locks are taken away too: they outlive the rollback, and millions of
- * them would fill Postgres's lock table for every database on the server.</li>
+ * <li>A login {@code bill_locker_ai} (password: AI_DATABASE_PASSWORD) that may only SELECT
+ * from the views below and belongs to no other role. {@link ReadOnlyQueryRunner} runs the AI's
+ * SQL logged in as it, so {@code set_config('role', …)} has no role to switch to.</li>
+ * <li>Six {@code ai_*} views: the user's own data. Secrets (password hash, reset tokens, Gmail
+ * tokens) and file bytes are left out. Views read the tables with their owner's rights, so the
+ * login never needs rights on a table. They are {@code security_barrier} views: Postgres
+ * applies the user filter first. A plain view lets the planner test the AI's own conditions
+ * on every row, so an error like "invalid input syntax: 'someone@else.com'" or a 1/0 could
+ * reveal other users' values.</li>
+ * <li>The user filter needs {@code app.user_id} <b>and</b> {@code app.user_sig}, a signature
+ * of that id made with the secret in {@code ai_secret}. The AI's SQL can change the id (it can
+ * call set_config), but can't read the secret, so it can't sign another user's id.</li>
  * </ul>
  *
  * Runs after Hibernate has created the tables. No migration files: plain SQL from Java.
@@ -34,11 +36,17 @@ class AssistantDatabaseSetup {
 
 	private static final Logger log = LoggerFactory.getLogger(AssistantDatabaseSetup.class);
 
+	/** The database login the AI's SQL runs as. */
+	static final String AI_ROLE = "bill_locker_ai";
+
 	/**
-	 * The signed-in user's id, as {@link ReadOnlyQueryRunner} sets it for one transaction.
-	 * Outside that it is missing, or '' on a connection that used it before: both mean no user.
+	 * The signed-in user's id, but only when app.user_sig = sha256(secret + id), as
+	 * {@link ReadOnlyQueryRunner} sets them for one transaction. Missing or wrong → null → no rows.
 	 */
-	private static final String ME = "nullif(current_setting('app.user_id', true), '')::uuid";
+	private static final String ME = """
+			(SELECT nullif(current_setting('app.user_id', true), '')::uuid FROM ai_secret s
+			  WHERE encode(sha256(convert_to(s.secret || current_setting('app.user_id', true), 'UTF8')), 'hex')
+			        = current_setting('app.user_sig', true))""";
 
 	/** View name → its SELECT. Dropped and created again on start, so column changes never fail. */
 	private static final List<String[]> VIEWS = List.of(
@@ -66,13 +74,6 @@ class AssistantDatabaseSetup {
 					FROM gmail_files f JOIN gmail_emails e ON e.id = f.email_id
 					WHERE e.user_id = """ + ME});
 
-	/** Advisory locks that last for the whole session (the transaction-level ones end with the rollback). */
-	static final List<String> SESSION_LOCKS = List.of(
-			"pg_advisory_lock(bigint)", "pg_advisory_lock(integer, integer)",
-			"pg_advisory_lock_shared(bigint)", "pg_advisory_lock_shared(integer, integer)",
-			"pg_try_advisory_lock(bigint)", "pg_try_advisory_lock(integer, integer)",
-			"pg_try_advisory_lock_shared(bigint)", "pg_try_advisory_lock_shared(integer, integer)");
-
 	/** What Gemini is told about the views. Keep in step with {@link #VIEWS}. */
 	public static final String VIEWS_DESCRIPTION = """
 			ai_me(name, email, created_at): the signed-in user.
@@ -98,13 +99,19 @@ class AssistantDatabaseSetup {
 			""";
 
 	private final JdbcTemplate jdbc;
+	private final String aiPassword;
 
-	AssistantDatabaseSetup(JdbcTemplate jdbc) {
+	AssistantDatabaseSetup(JdbcTemplate jdbc, @Value("${app.assistant.db-password:}") String aiPassword) {
 		this.jdbc = jdbc;
+		this.aiPassword = aiPassword;
 	}
 
 	@EventListener(ApplicationReadyEvent.class)
 	void setUp() {
+		if (aiPassword.isBlank()) {
+			log.warn("AI_DATABASE_PASSWORD is not set: the assistant stays off");
+			return;
+		}
 		try {
 			jdbc.execute("""
 					DO $$ BEGIN
@@ -112,22 +119,29 @@ class AssistantDatabaseSetup {
 					    CREATE ROLE bill_locker_ai NOLOGIN;
 					  END IF;
 					END $$""");
-			// Our own DB user must be allowed to "SET ROLE bill_locker_ai".
-			jdbc.execute("GRANT bill_locker_ai TO CURRENT_USER");
-			// Only our own DB user may change settings; the AI role may not (see the class comment).
-			jdbc.execute("REVOKE EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) FROM PUBLIC");
-			jdbc.execute("GRANT EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) TO CURRENT_USER");
-			jdbc.execute("REVOKE UPDATE ON pg_catalog.pg_settings FROM PUBLIC");
-			for (String lock : SESSION_LOCKS) {
-				jdbc.execute("REVOKE EXECUTE ON FUNCTION pg_catalog." + lock + " FROM PUBLIC");
-				jdbc.execute("GRANT EXECUTE ON FUNCTION pg_catalog." + lock + " TO CURRENT_USER");
+			// A role can't take a password as a "?" parameter, so it goes in as a quoted literal.
+			jdbc.execute("ALTER ROLE bill_locker_ai LOGIN PASSWORD '" + aiPassword.replace("'", "''") + "'");
+			// The runner sets app.user_id/app.user_sig with set_config. Older versions of this class
+			// took set_config away from PUBLIC on your local database; give it back to the AI login.
+			// (Elsewhere, e.g. Neon, it never lost it, so nothing to do.)
+			if (!Boolean.TRUE.equals(jdbc.queryForObject(
+					"SELECT has_function_privilege('bill_locker_ai', 'pg_catalog.set_config(text, text, boolean)', 'EXECUTE')",
+					Boolean.class))) {
+				jdbc.execute("GRANT EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) TO bill_locker_ai");
 			}
+			// The secret behind app.user_sig: only our own DB user (and the views) can read it.
+			jdbc.execute("CREATE TABLE IF NOT EXISTS ai_secret (secret text NOT NULL)");
+			jdbc.execute("REVOKE ALL ON ai_secret FROM PUBLIC");
+			jdbc.execute("""
+					INSERT INTO ai_secret (secret)
+					SELECT gen_random_uuid()::text || gen_random_uuid()::text
+					WHERE NOT EXISTS (SELECT 1 FROM ai_secret)""");
 			for (String[] view : VIEWS) {
 				jdbc.execute("DROP VIEW IF EXISTS " + view[0]);
 				jdbc.execute("CREATE VIEW " + view[0] + " WITH (security_barrier = true) AS " + view[1]);
 				jdbc.execute("GRANT SELECT ON " + view[0] + " TO bill_locker_ai");
 			}
-			log.info("Assistant views and the bill_locker_ai role are ready");
+			log.info("Assistant views and the bill_locker_ai login are ready");
 		} catch (DataAccessException e) {
 			// The rest of the app works without the assistant, so don't stop the start-up.
 			log.warn("Assistant database setup failed, the assistant won't work: {}", e.getMostSpecificCause().getMessage());

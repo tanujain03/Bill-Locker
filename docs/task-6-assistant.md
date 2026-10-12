@@ -47,31 +47,36 @@ is never trusted:
 |---|---|---|---|
 | 1 | **Text check**: starts with `SELECT`/`WITH`, no `;`, no `set_config`/`pg_settings` | `ReadOnlyQueryRunner.checked` | obvious nonsense, two statements |
 | 2 | **`SET TRANSACTION READ ONLY`** | `ReadOnlyQueryRunner.run` | every write: `DELETE`, `UPDATE`, `DROP`, even hidden in a `WITH` |
-| 3 | **`SET LOCAL ROLE bill_locker_ai`**: a role that may only read the `ai_*` views | `AssistantDatabaseSetup` | reading `users.password_hash`, reset tokens, Gmail tokens, file bytes |
-| 4 | **Views filter on `app.user_id`**, set from the JWT for this one transaction; `security_barrier` views | `AssistantDatabaseSetup` | other users' rows (`SELECT * FROM ai_documents` = only yours) |
-| 5 | **`statement_timeout = 3s`, max 50 rows, each value cut to 500 characters by Postgres** | `ReadOnlyQueryRunner` | slow or huge queries (`repeat('x', 300000000)` never reaches Java) |
+| 3 | **Its own login `bill_locker_ai`**: a new connection per question, logged in as a role that may only read the `ai_*` views and belongs to no other role | `AssistantDatabaseSetup`, `ReadOnlyQueryRunner` | reading `users.password_hash`, reset tokens, Gmail tokens, file bytes; switching to a stronger role |
+| 4 | **Views filter on `app.user_id` + `app.user_sig`** (a signature of the id with a secret the AI can't read), set from the JWT for this one transaction; `security_barrier` views | `AssistantDatabaseSetup` | other users' rows (`SELECT * FROM ai_documents` = only yours) |
+| 5 | **3 s limit enforced by Java** (`setQueryTimeout`, plus `statement_timeout`), max 50 rows, each value cut to 500 characters by Postgres | `ReadOnlyQueryRunner` | slow or huge queries (`repeat('x', 300000000)` never reaches Java) |
+
+> Changed in task 8 so it also works on Neon, where the app's database user isn't a superuser.
+> Why and how: `docs/task-8-assistant-on-neon-plan.md`.
 
 **Why `security_barrier`.** With a plain view, Postgres may test the AI's own condition on
 *every* row before the user filter. Then `WHERE email::int = 0` fails with an error quoting
 someone else's email, and a `CASE … 1/(…)` turns other users' rows into yes/no answers. A
 security-barrier view always filters to your rows first.
 
-**Fail closed.** Before every query the runner checks that the role really can't call
-`set_config`, update `pg_settings` or take advisory locks. If it can (say the app's DB user
-isn't a superuser, so the REVOKEs at startup only warned), the assistant answers
-`503 ASSISTANT_FAILED` and runs nothing.
+**The `set_config` trick.** Any SQL can call `set_config` inside a SELECT. Guard 1 rejects the
+word, but it can be spelled without it (`U&"3et_config"`), so the database must hold:
+- `set_config('app.user_id', '<someone else>', true)`: the views also need the signature
+  `app.user_sig = sha256(secret + id)`. The secret is in table `ai_secret`, which only the app's
+  own login (and the views, which run with their owner's rights) can read. Wrong signature → no rows.
+- `set_config('role', '<the app login>', true)`: Postgres lets a session switch to any role its
+  *login* belongs to. The AI logs in as `bill_locker_ai`, which belongs to none → *permission denied*.
+- `set_config('statement_timeout', '0', true)`: Java cancels the query after 3 s anyway.
 
-**Advisory locks.** `pg_advisory_lock` is revoked from PUBLIC too: session locks outlive the
-rollback, and millions of them would fill the lock table for every database on the server.
+**Fail closed.** Before every question the runner checks, on the chat connection, that it is
+`bill_locker_ai`, not a superuser and a member of no role; and `AI_DATABASE_PASSWORD` must be set.
+Otherwise the assistant answers `503 ASSISTANT_FAILED` and runs nothing.
 
-**The `set_config` trick.** Guard 4 trusts the `app.user_id` setting. Any SQL can normally
-call `set_config('app.user_id', '<someone else>', true)` to change it, so
-`WITH x AS (SELECT set_config(…)) SELECT * FROM x, ai_documents` would show another user's
-bills. So at startup `set_config` is taken away from everyone except our own DB user
-(`REVOKE EXECUTE … FROM PUBLIC`), and guard 1 also rejects the word.
-
-Everything is `SET LOCAL` inside one transaction that is always rolled back, so the role and
-the user id are gone before the connection goes back to the pool.
+**Nothing survives a question.** The connection is closed afterwards: settings and session
+advisory locks (which would outlive a rollback) die with it. Questions run **one at a time**
+(others wait up to 10 s), so no other user's chat session is open for the AI's SQL to look at in
+`pg_stat_activity` (a login sees its own other sessions there); the id and signature are sent as
+`?` parameters, so they never appear in statement text.
 
 ---
 
@@ -79,8 +84,8 @@ the user id are gone before the connection goes back to the pool.
 
 | File | What it does |
 |---|---|
-| `assistant/AssistantDatabaseSetup.java` | On every start (after Hibernate made the tables): creates role `bill_locker_ai` if missing, revokes `set_config`, drops + creates the six views, grants SELECT on them. Holds `VIEWS_DESCRIPTION`, what Gemini is told about the views. If it fails, it logs a warning and the rest of the app still starts. |
-| `assistant/ReadOnlyQueryRunner.java` | Guards 1, 2, 3 and 5, plus the fail-closed check. The AI's query is wrapped so Postgres returns each row as JSON with every value cut; rows come back as column → value (dates and ids as text). A database error becomes `QueryRejectedException` with Postgres's message ("column x does not exist"), so Gemini can fix its query. |
+| `assistant/AssistantDatabaseSetup.java` | On every start (after Hibernate made the tables), when `AI_DATABASE_PASSWORD` is set: creates/updates the login `bill_locker_ai` with that password, makes table `ai_secret` (one random value), drops + creates the six signed views, grants SELECT on them. Holds `VIEWS_DESCRIPTION`, what Gemini is told about the views. If it fails, it logs a warning and the rest of the app still starts. |
+| `assistant/ReadOnlyQueryRunner.java` | Guards 1, 2, 3 and 5, plus the fail-closed check: opens a connection as `bill_locker_ai` (same `DATABASE_URL`), sets the id + signature, runs the query, closes the connection. The AI's query is wrapped so Postgres returns each row as JSON with every value cut; rows come back as column → value (dates and ids as text). A database error becomes `QueryRejectedException` with Postgres's message ("column x does not exist"), so Gemini can fix its query. |
 | `assistant/GeminiAssistantModel.java` | The two Gemini calls. Instructions (prompt, today's date, views, or the rows) go in `system_instruction`; the chat goes in `contents` (our earlier answers as role `model`). The plan answers in a fixed JSON shape `{action, sql, reply}`. Busy (503) or out of quota (429) → next model in `GEMINI_MODEL`. |
 | `assistant/AssistantModelConfig.java` | No `GEMINI_API_KEY` → a model that answers `503 AI_NOT_CONFIGURED`. |
 | `assistant/AssistantService.java` | Plan → query (one retry) → answer. No `@Transactional`: only the query needs one, and Gemini calls are slow. |
@@ -119,7 +124,7 @@ On phones the panel fills the screen, and the button sits above the tab bar.
 
 | Test | Proves |
 |---|---|
-| `ReadOnlyQueryRunnerTests` (19) | only own rows; no setting = no rows; `DELETE` and `WITH … DELETE` change nothing; `users` and `documents` tables refused; `;` tricks refused; `set_config` trick refused, and the role really lacks `set_config`; 3 s timeout; 50 rows max; huge values cut; pooled connections are clean afterwards; every view works and is a security barrier; errors and yes/no tricks never reveal other users' values; advisory locks refused; fails closed when the role could change settings |
+| `ReadOnlyQueryRunnerTests` (23) | only own rows; no setting = no rows; an id without signature = no rows; a forged id (escaped `set_config`) = no rows; switching to the app's login refused; `ai_secret`, `users`, `documents` refused; `DELETE` and `WITH … DELETE` change nothing; `;` tricks refused; 3 s timeout, even after `set_config('statement_timeout', '0')`; 50 rows max; huge values cut; session locks gone after the question; every view works and is a security barrier; errors and yes/no tricks never reveal other users' values; fails closed when the login belongs to a role |
 | `GeminiAssistantModelTests` (7) | request shape (views and today in the prompt, earlier answers as `model`), retry carries the error, rows reach the answer prompt, backup model on 503, friendly 429/401 messages |
 | `AssistantApiTests` (13) | the whole endpoint with a fake AI: query, reply, one retry, friendly answer after two failures, a `DELETE` from the "AI" changes nothing, 503 errors, validation, 401 without a token |
 
@@ -129,11 +134,11 @@ Run: `.\mvnw.cmd test` (Docker must be running).
 
 ## 6. Try it
 
-1. `GEMINI_API_KEY` set in `backend/.env`; start the backend. The log shows
-   `Assistant views and the bill_locker_ai role are ready`.
+1. `GEMINI_API_KEY` and `AI_DATABASE_PASSWORD` set in `backend/.env`; start the backend. The log shows
+   `Assistant views and the bill_locker_ai login are ready`.
 2. Sign in, click the chat button, pick an example question.
 3. Try *"delete my last bill"*. To see the SQL that ran, look at the `sql` field of the
    `/api/assistant/chat` response in the browser's Network tab.
 
-Inspect it in psql: `\dv ai_*` lists the views; `SET ROLE bill_locker_ai; SELECT * FROM users;`
-→ *permission denied*.
+Inspect it in psql: `\dv ai_*` lists the views; log in as the AI
+(`psql -U bill_locker_ai -d BillLocker`) and `SELECT * FROM users;` → *permission denied*.
