@@ -7,6 +7,7 @@ import { DocumentPage } from './pages/DocumentPage';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { BillsPage } from './pages/BillsPage';
 import { ClaimKitPage } from './pages/ClaimKitPage';
+import { ProductPage } from './pages/ProductPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ExpensesPage } from './pages/ExpensesPage';
 import { LoginPage } from './pages/LoginPage';
@@ -40,6 +41,7 @@ export function App() {
           <Route path="/gmail" element={<GmailPage />} />
           <Route path="/warranties" element={<WarrantiesPage />} />
           <Route path="/warranties/claim/:documentId/:position" element={<ClaimKitPage />} />
+          <Route path="/products/:documentId/:position" element={<ProductPage />} />
           <Route path="/bills" element={<BillsPage />} />
           <Route path="/documents/:id" element={<DocumentPage />} />
           <Route path="/settings" element={<SettingsPage />} />

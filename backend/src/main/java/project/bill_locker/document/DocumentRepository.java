@@ -70,6 +70,22 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
 	List<Document> findTop5ByUserIdOrderByCreatedAtDesc(UUID userId);
 
+	// ---- Product pages ----
+
+	/**
+	 * The user's other documents with a product of this serial or model number (lower case;
+	 * "" = don't match on it). E.g. a warranty card or a service bill uploaded on its own.
+	 */
+	@Query("""
+			select distinct d from Document d join d.items i
+			where d.user.id = :userId and d.id <> :excludeId
+			  and ((:serial <> '' and lower(trim(i.serialNumber)) = :serial)
+			       or (:model <> '' and lower(trim(i.modelNumber)) = :model))
+			order by d.createdAt desc
+			""")
+	List<Document> findMentioning(@Param("userId") UUID userId, @Param("excludeId") UUID excludeId,
+			@Param("serial") String serial, @Param("model") String model);
+
 	// ---- Sample data ----
 
 	long countByUserIdAndSampleTrue(UUID userId);

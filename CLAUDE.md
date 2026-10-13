@@ -110,6 +110,11 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   and no different shop, or same shop + same total) → `DocumentDetail.possibleDuplicates`, `DocumentSummary.possibleDuplicate`
   ("Possible copy" badge, `DuplicateWarning.tsx`); "Keep both" = `POST /api/documents/{id}/not-duplicate`
   (`documents.not_duplicate`). Test `pdfBytes()` is unique per call. Guide: `docs/task-12-duplicate-bills.md`.
+- Task 13: product pages (`/products/:documentId/:position`, `ProductPage`; linked from Warranties names, dashboard
+  "Expiring soon", "Product page" on saved bill products (`DetailsForm.savedLinks`), the claim kit title). Package `product`:
+  `GET /api/documents/{id}/items/{position}/product` (`ProductService`: `WarrantyRules`, owned days, cost per month = price ÷
+  whole months owned (min 1), related documents via `DocumentRepository.findMentioning` by serial, else model number, missing
+  facts). Guide: `docs/task-13-product-pages.md`.
 
 ## Repository
 
@@ -121,7 +126,7 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
   Packages: `security` (SecurityConfig, JWT), `user` (incl. Settings endpoints), `auth` (incl. password reset),
   `common` (BaseEntity, ApiException, GlobalExceptionHandler), `document` (+ `document.ai`,
-  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`, `expense`, `sample`.
+  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`, `expense`, `sample`, `product`.
   Tables: `users`, `password_reset_tokens`, `documents`, `document_items`, `document_files`,
   `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`, `category_budgets`.
 - `docs/api-contract.md` — the full target REST API; its top lists what is built so far.

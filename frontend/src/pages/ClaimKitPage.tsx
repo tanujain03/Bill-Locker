@@ -23,6 +23,7 @@ import { WarrantyStatusPill } from '../components/warranties/WarrantyStatusPill'
 import { errorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { claimEmail, COMMON_PROBLEMS, getClaimKit, mailtoLink, type ClaimKit } from '../lib/claims';
+import { productLink } from '../lib/products';
 import { formatDate } from '../lib/document-form';
 import { downloadDocument, formatAmount } from '../lib/documents';
 import { today } from '../lib/expenses';
@@ -101,7 +102,11 @@ function Kit({ kit }: { kit: ClaimKit }) {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-brand-700">Warranty claim kit</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{product}</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+            <Link to={productLink(kit.documentId, kit.position)} className="hover:text-brand-700 hover:underline print:no-underline">
+              {product}
+            </Link>
+          </h1>
           <p className="mt-1 text-slate-600">
             {[kit.brand, kit.modelNumber && `Model ${kit.modelNumber}`, kit.sellerName && `bought at ${kit.sellerName}`]
               .filter(Boolean)
