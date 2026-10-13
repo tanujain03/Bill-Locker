@@ -26,7 +26,7 @@ export function DocumentList({ documents, filtered, emptyText }: {
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
                 <p className="truncate font-medium">{d.sellerName ?? d.fileName}</p>
-                <SourceBadge sourceGmail={d.sourceGmail} />
+                <SourceBadge sourceGmail={d.sourceGmail} sample={d.sample} />
               </div>
               <p className="mt-0.5 truncate text-sm text-slate-500">
                 {[

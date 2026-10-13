@@ -91,6 +91,8 @@ export type DocumentDetail = DocumentDetails & {
   readError: string | null;
   /** The Gmail address an imported document came from; null for uploads. */
   sourceGmail: string | null;
+  /** A demo bill from "Try with sample data". */
+  sample: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -112,6 +114,8 @@ export type DocumentSummary = {
   readQueued: boolean;
   readError: string | null;
   sourceGmail: string | null;
+  /** A demo bill from "Try with sample data". */
+  sample: boolean;
   createdAt: string;
 };
 

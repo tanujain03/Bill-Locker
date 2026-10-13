@@ -318,7 +318,7 @@ export function DocumentPage() {
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                     <StatusBadge status={document.status} reading={document.readQueued} />
                     {/* Where it came from, with the Gmail address in full here. */}
-                    <SourceBadge sourceGmail={document.sourceGmail} showAccount />
+                    <SourceBadge sourceGmail={document.sourceGmail} sample={document.sample} showAccount />
                     {document.sellerName && <span className="truncate">{document.fileName}</span>}
                   </div>
                 </div>

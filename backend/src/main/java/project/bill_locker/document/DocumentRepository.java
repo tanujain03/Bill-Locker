@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -57,4 +58,13 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 	long countByUserIdAndStatusAndReadErrorIsNotNullAndReadQueuedAtIsNull(UUID userId, DocumentStatus status);
 
 	List<Document> findTop5ByUserIdOrderByCreatedAtDesc(UUID userId);
+
+	// ---- Sample data ----
+
+	long countByUserIdAndSampleTrue(UUID userId);
+
+	/** Removes the user's sample bills; the database removes their files and items too (ON DELETE CASCADE). */
+	@Modifying
+	@Query("delete from Document d where d.user.id = :userId and d.sample = true")
+	int deleteSamples(@Param("userId") UUID userId);
 }

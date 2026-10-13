@@ -99,6 +99,11 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   `WarrantyRules`): facts, status, brand support + Google Maps service-centre search links, missing facts. The claim email
   is written in the browser (`lib/claims.ts` `claimEmail`) and opened with `mailto:` — the app never sends anything.
   `WarrantyView.position`. Print sheet: `print:hidden` on the app chrome. Guide: `docs/task-10-claim-kit.md`.
+- Task 11: sample data ("Try with sample data" on the empty dashboard, Settings → Sample data, violet dashboard banner).
+  Package `sample`: `SampleBills` (~30 bills dated from today: every warranty state + 3 months of receipts, monthly ones
+  recurring), `SamplePdf` (PDFBox one-pager "SAMPLE BILL"), `SampleDataService` (one transaction; again → 409
+  `SAMPLE_DATA_EXISTS`). `documents.sample` (nullable Boolean) + `sample` on DocumentSummary/Detail → "Sample" badge;
+  `DELETE /api/sample-data` removes only flagged bills. Frontend `lib/useSampleData.ts`. Guide: `docs/task-11-sample-data.md`.
 
 ## Repository
 
@@ -110,9 +115,9 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
   Packages: `security` (SecurityConfig, JWT), `user` (incl. Settings endpoints), `auth` (incl. password reset),
   `common` (BaseEntity, ApiException, GlobalExceptionHandler), `document` (+ `document.ai`,
-  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`.
+  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`, `expense`, `sample`.
   Tables: `users`, `password_reset_tokens`, `documents`, `document_items`, `document_files`,
-  `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`.
+  `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`, `category_budgets`.
 - `docs/api-contract.md` — the full target REST API; its top lists what is built so far.
   `docs/database-design.md` — the target design (13 tables); entity classes at tag
   `step-2-database`. Hibernate `ddl-auto=update` creates tables. No migration scripts or

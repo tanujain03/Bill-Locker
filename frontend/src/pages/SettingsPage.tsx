@@ -1,4 +1,4 @@
-import { KeyRound, LogOut, Mail, UserRound, type LucideIcon } from 'lucide-react';
+import { FlaskConical, KeyRound, LogOut, Mail, Trash2, UserRound, type LucideIcon } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { Button, buttonClass } from '../components/Button';
@@ -10,8 +10,9 @@ import { useAuth } from '../lib/auth-context';
 import { useFeedback } from '../lib/feedback-context';
 import { getGmail, timeAgo, type GmailOverview } from '../lib/gmail';
 import { usePageTitle } from '../lib/usePageTitle';
+import { useSampleData } from '../lib/useSampleData';
 
-/** /settings: your profile, your password, connected Gmail addresses, sign out. */
+/** /settings: your profile, your password, connected Gmail addresses, sample data, sign out. */
 export function SettingsPage() {
   usePageTitle('Settings');
   const { user, logout } = useAuth();
@@ -26,6 +27,7 @@ export function SettingsPage() {
         <ProfileSection />
         <PasswordSection />
         <GmailSection />
+        <SampleDataSection />
         <Section icon={LogOut} title="Sign out" description="Signs you out in this browser.">
           <Button icon={LogOut} variant="dangerGhost" onClick={logout} className="-ml-3">
             Sign out
@@ -167,6 +169,41 @@ function GmailSection() {
             {gmail.accounts.length === 0 ? 'Connect Gmail' : 'Manage on the Gmail page'}
           </Link>
         </>
+      )}
+    </Section>
+  );
+}
+
+/** Add the demo bills, or remove them again; the user's own bills are never touched. */
+function SampleDataSection() {
+  const { count, busy, add, remove } = useSampleData();
+  return (
+    <Section
+      icon={FlaskConical}
+      title="Sample data"
+      description="Realistic demo bills that fill every page, to explore or present Bill Locker."
+    >
+      {count === null ? (
+        <div className="h-10 animate-pulse rounded-lg bg-slate-100" aria-label="Loading" />
+      ) : count > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-700">
+            <span className="font-semibold">{count} sample bills</span> are in your account, marked “Sample”.
+          </p>
+          <Button variant="dangerGhost" icon={Trash2} busy={busy === 'removing'} onClick={remove}>
+            Remove sample data
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-600">
+            About 30 bills: products with warranties in every state, and three months of everyday bills. Your own bills
+            stay untouched.
+          </p>
+          <Button icon={FlaskConical} busy={busy === 'adding'} onClick={add}>
+            {busy === 'adding' ? 'Adding…' : 'Add sample data'}
+          </Button>
+        </div>
       )}
     </Section>
   );

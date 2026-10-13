@@ -23,7 +23,9 @@ public record DocumentSummary(
 		Instant createdAt,
 		boolean readQueued,
 		String readError,
-		String sourceGmail) {
+		String sourceGmail,
+		/** A demo bill from "Try with sample data". */
+		boolean sample) {
 
 	public static DocumentSummary of(Document d) {
 		var items = d.getItems();
@@ -31,6 +33,6 @@ public record DocumentSummary(
 				d.getDocumentType(), d.getDocumentNumber(), d.getSellerName(), d.getPurchaseDate(), d.getTotalAmount(),
 				items.size(), items.isEmpty() ? null : items.getFirst().getProductName(), BillCategory.parse(d.getCategory()),
 				d.getCreatedAt(),
-				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail());
+				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail(), d.isSample());
 	}
 }

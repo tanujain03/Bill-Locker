@@ -99,6 +99,28 @@ public class DocumentService {
 		return document;
 	}
 
+	/**
+	 * Stores one demo bill of "Try with sample data": already saved (no AI read), marked as
+	 * sample, warranty end dates filled in like a normal save.
+	 */
+	@Transactional
+	public void createSample(UUID userId, String fileName, byte[] pdf, DocumentDetails details) {
+		Document document = create(userId, fileName, pdf, null);
+		document.replaceDetails(withWarrantyEndDates(details), DocumentStatus.SAVED);
+		document.markSample();
+	}
+
+	@Transactional(readOnly = true)
+	public long countSamples(UUID userId) {
+		return documents.countByUserIdAndSampleTrue(userId);
+	}
+
+	/** Removes only the sample bills; the user's own bills stay. Returns how many were removed. */
+	@Transactional
+	public int deleteSamples(UUID userId) {
+		return documents.deleteSamples(userId);
+	}
+
 	@Transactional(readOnly = true)
 	public List<DocumentSummary> list(UUID userId, String q, DocumentType type, DocumentStatus status) {
 		// LIKE treats % and _ as wildcards; escaping them isn't worth it for a search box.

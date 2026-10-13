@@ -113,6 +113,14 @@ public class Document extends BaseEntity {
 	private String sourceGmail;
 
 	/**
+	 * True for the demo bills of "Try with sample data", so they can be shown with a badge and
+	 * removed in one go without touching the user's own bills. A Boolean (null = false) so that
+	 * Hibernate can add the column to a table that already has rows.
+	 */
+	@Column(name = "sample")
+	private Boolean sample;
+
+	/**
 	 * The products on the bill, in the order they appear. orphanRemoval: an item
 	 * taken out of this list is deleted from the table when the document is saved.
 	 */
@@ -158,6 +166,15 @@ public class Document extends BaseEntity {
 		// A manual read or save takes the document out of the reading queue.
 		this.readQueuedAt = null;
 		this.readError = null;
+	}
+
+	/** Part of "Try with sample data". */
+	void markSample() {
+		this.sample = true;
+	}
+
+	public boolean isSample() {
+		return Boolean.TRUE.equals(sample);
 	}
 
 	void queueForReading() {

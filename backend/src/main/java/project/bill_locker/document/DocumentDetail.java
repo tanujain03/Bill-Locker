@@ -32,7 +32,9 @@ public record DocumentDetail(
 		Instant updatedAt,
 		boolean readQueued,
 		String readError,
-		String sourceGmail) {
+		String sourceGmail,
+		/** A demo bill from "Try with sample data". */
+		boolean sample) {
 
 	static DocumentDetail of(Document d) {
 		return new DocumentDetail(d.getId(), d.getFileName(), d.getContentType(), d.getSizeBytes(), d.getStatus(),
@@ -44,6 +46,6 @@ public record DocumentDetail(
 				d.getItems().stream().map(DocumentItemView::of).toList(),
 				BillCategory.parse(d.getCategory()),
 				d.getCreatedAt(), d.getUpdatedAt(),
-				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail());
+				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail(), d.isSample());
 	}
 }
