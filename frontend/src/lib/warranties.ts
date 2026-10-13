@@ -9,6 +9,8 @@ export type WarrantyStatus = 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'NO_INFO';
 
 export type WarrantyView = {
   documentId: string;
+  /** The product's place on its bill: with documentId it names the product (claim kit). */
+  position: number;
   productName: string | null;
   modelNumber: string | null;
   serialNumber: string | null;

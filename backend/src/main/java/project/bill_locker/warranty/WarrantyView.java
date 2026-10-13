@@ -10,6 +10,8 @@ import java.util.UUID;
  */
 public record WarrantyView(
 		UUID documentId,
+		/** The product's place on its bill (0, 1, 2…): with documentId it names the product, e.g. for its claim kit. */
+		int position,
 		String productName,
 		String modelNumber,
 		String serialNumber,

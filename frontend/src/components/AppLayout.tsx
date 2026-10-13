@@ -120,7 +120,7 @@ export function AppLayout() {
         onBlur={(e: FocusEvent) => {
           if (!e.currentTarget.contains(e.relatedTarget)) setPeek(false);
         }}
-        className={`fixed inset-y-0 left-0 z-30 hidden overflow-hidden border-r border-slate-200 bg-white transition-[width,box-shadow] duration-200 lg:block ${
+        className={`fixed inset-y-0 left-0 z-30 hidden overflow-hidden border-r border-slate-200 bg-white transition-[width,box-shadow] duration-200 lg:block print:!hidden ${
           expanded ? 'w-64' : 'w-16'
         } ${peek && !pinned ? 'shadow-xl' : ''}`}
       >
@@ -151,9 +151,10 @@ export function AppLayout() {
       )}
 
       {/* Only a pinned sidebar takes room; a hovered one slides over the page.
-          Phones: room at the bottom for the tab bar. */}
-      <div className={`pb-16 transition-[padding] duration-200 sm:pb-0 ${pinned ? 'lg:pl-64' : 'lg:pl-16'}`}>
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:gap-3 sm:px-6">
+          Room at the bottom so the floating chat button (and on phones the tab bar) never
+          covers the end of a page. */}
+      <div className={`pb-36 transition-[padding] duration-200 sm:pb-24 print:!p-0 ${pinned ? 'lg:pl-64' : 'lg:pl-16'}`}>
+        <header className="sticky top-0 z-20 flex h-16 print:hidden items-center gap-2 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:gap-3 sm:px-6">
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -178,11 +179,14 @@ export function AppLayout() {
         <Outlet />
       </div>
 
-      <PhoneTabBar attention={attention} />
-      <DropAnywhere />
-      <WarrantyReminder expiring={attention?.expiring} />
-      {/* Here, not in a page, so the chat stays open while you move between pages. */}
-      <AssistantChat />
+      {/* None of this belongs on paper (e.g. the printed warranty claim sheet). */}
+      <div className="print:hidden">
+        <PhoneTabBar attention={attention} />
+        <DropAnywhere />
+        <WarrantyReminder expiring={attention?.expiring} />
+        {/* Here, not in a page, so the chat stays open while you move between pages. */}
+        <AssistantChat />
+      </div>
     </div>
   );
 }

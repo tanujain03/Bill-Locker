@@ -94,6 +94,11 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   recurring payments (same shop in ≥ 2 months, amounts within ±25% of the median, last 6 months), spending per weekday,
   Export CSV (client-side from the Documents list, formula-safe).
   Guide: `docs/task-9-expenses.md`.
+- Task 10: warranty claim kit (`/warranties/claim/:documentId/:position`, `ClaimKitPage`; "Claim" on Warranties rows,
+  "Claim kit" on saved products). `GET /api/documents/{id}/items/{position}/claim-kit` (`ClaimKitService`, uses
+  `WarrantyRules`): facts, status, brand support + Google Maps service-centre search links, missing facts. The claim email
+  is written in the browser (`lib/claims.ts` `claimEmail`) and opened with `mailto:` — the app never sends anything.
+  `WarrantyView.position`. Print sheet: `print:hidden` on the app chrome. Guide: `docs/task-10-claim-kit.md`.
 
 ## Repository
 

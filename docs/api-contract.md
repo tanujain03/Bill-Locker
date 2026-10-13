@@ -4,7 +4,7 @@ This is the full REST API Bill Locker is heading towards. The backend and the
 frontend are rebuilt from scratch on the `restart` branch, one task at a time;
 each task implements a part of this contract.
 
-### Implemented so far (restart branch, tasks 1–9)
+### Implemented so far (restart branch, tasks 1–10)
 
 | Endpoint | Notes |
 |---|---|
@@ -17,6 +17,7 @@ each task implements a part of this contract.
 | Bills & receipts | A document read as `RECEIPT` is saved straight away (`status: SAVED`); documents and list rows carry `category` (`TRAVEL`, `FOOD`, `GROCERIES`, `FUEL`, `UTILITIES`, `PHONE_INTERNET`, `SHOPPING`, `HEALTH`, `ELECTRONICS`, `APPLIANCES`, `FASHION`, `HOME`, `ENTERTAINMENT`, `OTHER`; any document type since task 9, also accepted by `PUT /api/documents/{id}`) |
 | `POST /api/documents/{id}/registration-page` | Complete (task 5). Warranty registration links: from the bill (printed / QR code, during reading); without one, the user confirms the detected brand and this finds its official page (Gemini + Google Search); items carry `brand`, `registrationUrl`, `registrationSource`. See [`task-5-warranty-registration.md`](task-5-warranty-registration.md) |
 | `GET /api/expenses?from=YYYY-MM-DD&to=YYYY-MM-DD`, `PUT /api/expenses/budget` | Complete (task 9). Spending of a period (default: this month) from saved bills: total, the period before, daily average, pace, budget, per category / product / shop / day, months. `400 INVALID_DATE` / `INVALID_RANGE` / `RANGE_TOO_LONG` (over ~3 years). Budget `{amount}` per month (null removes it). Category limits: `PUT /api/expenses/budgets/{category}` `{amount}` (null removes); the report adds `categories[].budget`, `weekdays` and `recurring`. The assistant's `ai_me` view has `monthly_budget`, and `ai_category_budgets` holds the limits. See [`task-9-expenses.md`](task-9-expenses.md) |
+| `GET /api/documents/{id}/items/{position}/claim-kit` | Complete (task 10). A product's warranty claim kit: product and purchase facts, warranty end/status/days left, brand support and service-centre search links, the missing facts. `404 ITEM_NOT_FOUND` for a position the bill doesn't have. `GET /api/warranties` rows now carry `position`. See [`task-10-claim-kit.md`](task-10-claim-kit.md) |
 | `POST /api/assistant/chat` | Complete (task 6). Chat assistant: Gemini writes one SELECT on user-filtered `ai_*` views, run read-only as the `bill_locker_ai` role; answers from the rows. See section 11 and [`task-6-assistant.md`](task-6-assistant.md) |
 
 Everything else is not built yet. How tasks 1–4 work is explained in

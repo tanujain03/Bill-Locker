@@ -1,9 +1,18 @@
 import type { ReactNode } from 'react';
 
-/** A row of tabs (Warranties, Gmail): the chosen one is underlined; counts sit in a pill. */
+/**
+ * A row of tabs (Warranties, Gmail): the chosen one is underlined; counts sit in a pill.
+ * On a narrow screen the row scrolls sideways (swipe) without showing a scrollbar. The grey
+ * line is an inset shadow, not a border: the tabs' underline covers it without reaching
+ * outside the row, so the row never gets a vertical scrollbar (Windows drew ▲▼ arrows).
+ */
 export function TabList({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div role="tablist" aria-label={label} className="-mx-1 flex gap-1 overflow-x-auto border-b border-slate-200 px-1">
+    <div
+      role="tablist"
+      aria-label={label}
+      className="-mx-1 flex gap-1 overflow-x-auto overflow-y-hidden px-1 shadow-[inset_0_-1px_0_var(--color-slate-200)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {children}
     </div>
   );
@@ -16,7 +25,7 @@ export function Tab(props: { label: string; count?: number; active: boolean; onC
       role="tab"
       aria-selected={props.active}
       onClick={props.onClick}
-      className={`-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap ${
+      className={`inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap ${
         props.active ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-600 hover:text-slate-900'
       }`}
     >
