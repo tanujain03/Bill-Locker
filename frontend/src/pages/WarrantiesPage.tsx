@@ -6,6 +6,7 @@ import { Tab, TabList } from '../components/Tabs';
 import { WarrantyStatusPill } from '../components/warranties/WarrantyStatusPill';
 import { errorMessage } from '../lib/api';
 import { claimKitLink } from '../lib/claims';
+import { productLink } from '../lib/products';
 import { usePageTitle } from '../lib/usePageTitle';
 import { formatDate } from '../lib/document-form';
 import {
@@ -174,7 +175,9 @@ function WarrantyRows({ items }: { items: WarrantyView[] }) {
           {items.map((w, i) => (
             <tr key={`${w.documentId}-${i}`} className="hover:bg-slate-50">
               <td className="max-w-xs px-4 py-3">
-                <p className="truncate font-medium">{w.productName ?? 'Unnamed product'}</p>
+                <Link to={productLink(w.documentId, w.position)} className="block truncate font-medium hover:text-brand-700 hover:underline">
+                  {w.productName ?? 'Unnamed product'}
+                </Link>
                 <ProductMeta warranty={w} />
               </td>
               <td className="max-w-[12rem] truncate px-4 py-3 text-slate-600">{w.sellerName ?? '—'}</td>
@@ -197,7 +200,9 @@ function WarrantyRows({ items }: { items: WarrantyView[] }) {
           <li key={`${w.documentId}-${i}`} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-medium">{w.productName ?? 'Unnamed product'}</p>
+                <Link to={productLink(w.documentId, w.position)} className="block truncate font-medium hover:text-brand-700 hover:underline">
+                  {w.productName ?? 'Unnamed product'}
+                </Link>
                 <p className="truncate text-sm text-slate-500">
                   {[w.sellerName, w.endDate && `Ends ${formatDate(w.endDate)}`].filter(Boolean).join(' · ')}
                 </p>

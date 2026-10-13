@@ -26,6 +26,16 @@ export type Dashboard = {
   topShops: ShopSpend[];
   /** The 5 newest bills, any status. */
   recentBills: DocumentSummary[];
+  /** Saved bills that can still be returned, soonest first (daysLeft 0 = today is the last day). */
+  openReturns: OpenReturn[];
+};
+
+export type OpenReturn = {
+  documentId: string;
+  sellerName: string | null;
+  productName: string | null;
+  returnByDate: string;
+  daysLeft: number;
 };
 
 export const getDashboard = () => api<Dashboard>('/dashboard');

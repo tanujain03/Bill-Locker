@@ -35,7 +35,8 @@ import project.bill_locker.user.User;
 @Entity
 @Table(name = "documents", indexes = {
 		@Index(name = "idx_documents_user", columnList = "user_id"),
-		@Index(name = "idx_documents_read_queued", columnList = "read_queued_at")})
+		@Index(name = "idx_documents_read_queued", columnList = "read_queued_at"),
+		@Index(name = "idx_documents_user_hash", columnList = "user_id, content_hash")})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Document extends BaseEntity {
@@ -53,6 +54,10 @@ public class Document extends BaseEntity {
 
 	@Column(name = "size_bytes", nullable = false)
 	private long sizeBytes;
+
+	/** SHA-256 of the file's bytes (hex), to notice the same file uploaded twice. Null on old rows. */
+	@Column(name = "content_hash", length = 64)
+	private String contentHash;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "status", nullable = false, length = 20)
@@ -94,9 +99,13 @@ public class Document extends BaseEntity {
 	@Column(name = "total_amount", precision = 12, scale = 2)
 	private BigDecimal totalAmount;
 
-	/** What the bill was spent on: a BillCategory name, as plain text (see BillCategory). */
+	/** What the money was spent on: a BillCategory name, as plain text (see BillCategory). */
 	@Column(name = "category", length = 30)
 	private String category;
+
+	/** The last day the purchase can be returned (printed return policy, or set by the user); null = unknown. */
+	@Column(name = "return_by_date")
+	private LocalDate returnByDate;
 
 	// ---- Background reading (see DocumentReadWorker) ----
 
@@ -113,6 +122,22 @@ public class Document extends BaseEntity {
 	private String sourceGmail;
 
 	/**
+	 * True for the demo bills of "Try with sample data", so they can be shown with a badge and
+	 * removed in one go without touching the user's own bills. A Boolean (null = false) so that
+	 * Hibernate can add the column to a table that already has rows.
+	 */
+	@Column(name = "sample")
+	private Boolean sample;
+
+	/**
+	 * The user said "Keep both": this bill only looks like another one (e.g. two coffees on
+	 * the same day), so it is never shown as a possible copy again. Boolean for the same
+	 * reason as {@link #sample}.
+	 */
+	@Column(name = "not_duplicate")
+	private Boolean notDuplicate;
+
+	/**
 	 * The products on the bill, in the order they appear. orphanRemoval: an item
 	 * taken out of this list is deleted from the table when the document is saved.
 	 */
@@ -120,11 +145,9 @@ public class Document extends BaseEntity {
 	@OrderBy("position")
 	private List<DocumentItem> items = new ArrayList<>();
 
-	public Document(User user, String fileName, String contentType, long sizeBytes) {
-		this(user, fileName, contentType, sizeBytes, null);
-	}
-
-	public Document(User user, String fileName, String contentType, long sizeBytes, String sourceGmail) {
+	public Document(User user, String fileName, String contentType, long sizeBytes, String contentHash,
+			String sourceGmail) {
+		this.contentHash = contentHash;
 		this.sourceGmail = sourceGmail;
 		this.user = user;
 		this.fileName = fileName;
@@ -150,6 +173,7 @@ public class Document extends BaseEntity {
 		this.taxAmount = details.taxAmount();
 		this.totalAmount = details.totalAmount();
 		this.category = details.category() == null ? null : details.category().name();
+		this.returnByDate = details.returnByDate();
 		this.items.clear();
 		for (DocumentItemView item : details.items()) {
 			this.items.add(new DocumentItem(this, items.size(), item));
@@ -158,6 +182,24 @@ public class Document extends BaseEntity {
 		// A manual read or save takes the document out of the reading queue.
 		this.readQueuedAt = null;
 		this.readError = null;
+	}
+
+	/** Part of "Try with sample data". */
+	void markSample() {
+		this.sample = true;
+	}
+
+	public boolean isSample() {
+		return Boolean.TRUE.equals(sample);
+	}
+
+	/** "Keep both" on the possible-copy warning. */
+	void markNotDuplicate() {
+		this.notDuplicate = true;
+	}
+
+	public boolean isNotDuplicate() {
+		return Boolean.TRUE.equals(notDuplicate);
 	}
 
 	void queueForReading() {

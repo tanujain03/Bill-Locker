@@ -1,12 +1,25 @@
-import { File, FileImage, FileText, Mail, Upload } from 'lucide-react';
+import { File, FileImage, FileText, FlaskConical, Mail, Upload } from 'lucide-react';
 
 /**
- * Where a document came from: imported from a Gmail account, or uploaded by hand.
+ * Where a document came from: a demo bill of "Try with sample data", imported from a Gmail
+ * account, or uploaded by hand.
  * Like the status, the colour always comes with an icon and a label.
  * `showAccount`: also print the Gmail address (on the document page); in lists it
  * is in the tooltip, to keep rows short.
  */
-export function SourceBadge({ sourceGmail, showAccount = false }: { sourceGmail: string | null; showAccount?: boolean }) {
+export function SourceBadge(props: { sourceGmail: string | null; sample?: boolean; showAccount?: boolean }) {
+  const { sourceGmail, sample = false, showAccount = false } = props;
+  if (sample) {
+    return (
+      <span
+        title="Demo bill from “Try with sample data”. Remove all sample bills in Settings."
+        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 ring-1 ring-violet-200"
+      >
+        <FlaskConical className="size-3.5" aria-hidden />
+        Sample
+      </span>
+    );
+  }
   if (sourceGmail) {
     return (
       <span

@@ -19,6 +19,7 @@ import {
 import { useFeedback } from '../../lib/feedback-context';
 import { buttonClass } from '../Button';
 import { TextField } from '../FormParts';
+import { RETURN_PRESETS, returnText } from '../../lib/returns';
 import { CopyButton } from './CopyButton';
 import { RegistrationLink } from './RegistrationLink';
 
@@ -29,8 +30,11 @@ type Props = {
   fieldErrors: Record<string, string>;
   /** Task 5: finding a confirmed brand's registration page, run by the document page. */
   registration: RegistrationSearch;
-  /** The claim kit of product `index`, or null when it isn't saved as shown (new or edited). */
-  claimLink?: (index: number) => string | null;
+  /**
+   * Product `index`'s pages (claim kit, product page), or null when it isn't saved as shown
+   * (new or edited): both read the saved bill.
+   */
+  savedLinks?: (index: number) => { claim: string; product: string } | null;
 };
 
 type RegistrationSearch = {
@@ -43,7 +47,7 @@ type RegistrationSearch = {
 };
 
 /** The details of a bill, grouped like the CSV, each field with its own copy button. */
-export function DetailsForm({ value, onChange, fieldErrors, registration, claimLink }: Props) {
+export function DetailsForm({ value, onChange, fieldErrors, registration, savedLinks }: Props) {
   const { confirm } = useFeedback();
   type Field = keyof typeof FIELD_LABELS;
   const set = (field: Field) => (text: string) => onChange({ ...value, [field]: text });
@@ -150,6 +154,14 @@ export function DetailsForm({ value, onChange, fieldErrors, registration, claimL
             {field('totalAmount', 'number')}
           </div>
         </Wide>
+        <Wide>
+          <ReturnWindowField
+            purchaseDate={value.purchaseDate}
+            returnByDate={value.returnByDate}
+            error={fieldErrors.returnByDate}
+            onChange={set('returnByDate')}
+          />
+        </Wide>
       </Card>
 
       <section aria-labelledby="products-title" className="pt-2">
@@ -172,7 +184,7 @@ export function DetailsForm({ value, onChange, fieldErrors, registration, claimL
               onRemove={() => removeItem(index)}
               fieldErrors={fieldErrors}
               registration={registration}
-              claimLink={claimLink?.(index) ?? null}
+              links={savedLinks?.(index) ?? null}
             />
           ))}
           {/* At the end of the list: you add the next product where you finished the last one. */}
@@ -190,6 +202,50 @@ export function DetailsForm({ value, onChange, fieldErrors, registration, claimL
   );
 }
 
+/**
+ * "Return by": a date, or one click on "+7 / +10 / +15 / +30 days" counted from the purchase
+ * date (online orders often count from delivery: then pick the exact day). Empty = unknown.
+ */
+function ReturnWindowField(props: { purchaseDate: string; returnByDate: string; error?: string; onChange: (v: string) => void }) {
+  const plusDays = (days: number) =>
+    new Date(Date.parse(`${props.purchaseDate}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+  return (
+    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+      <Field
+        label={FIELD_LABELS.returnByDate}
+        type="date"
+        value={props.returnByDate}
+        onChange={props.onChange}
+        error={props.error}
+        hint={props.returnByDate ? returnText(props.returnByDate) : 'The last day it can be returned, if the shop allows returns'}
+      />
+      <div className="flex flex-wrap items-center gap-1.5 sm:pb-6" role="group" aria-label="Return window from the purchase date">
+        {RETURN_PRESETS.map((days) => (
+          <button
+            key={days}
+            type="button"
+            onClick={() => props.onChange(plusDays(days))}
+            disabled={!props.purchaseDate}
+            title={props.purchaseDate ? `Purchase date + ${days} days` : 'Add the purchase date first'}
+            className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            +{days} days
+          </button>
+        ))}
+        {props.returnByDate && (
+          <button
+            type="button"
+            onClick={() => props.onChange('')}
+            className="rounded-full px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ItemCard(props: {
   index: number;
   item: ItemValues;
@@ -197,7 +253,7 @@ function ItemCard(props: {
   onRemove: () => void;
   fieldErrors: Record<string, string>;
   registration: RegistrationSearch;
-  claimLink: string | null;
+  links: { claim: string; product: string } | null;
 }) {
   const { index, item } = props;
   const field = (name: keyof typeof ITEM_LABELS, type = 'text', hint?: string) => (
@@ -223,11 +279,17 @@ function ItemCard(props: {
           <h3 className="truncate font-semibold">{item.productName.trim() || 'Unnamed product'}</h3>
         </div>
         <div className="flex shrink-0 gap-1">
-          {props.claimLink && (
-            <Link to={props.claimLink} className={buttonClass({ size: 'sm' })} title="Everything you need to claim this warranty">
-              <Wrench className="size-4" aria-hidden />
-              Claim kit
-            </Link>
+          {props.links && (
+            <>
+              <Link to={props.links.product} className={buttonClass({ size: 'sm' })} title="Everything about this product on one page">
+                <Package className="size-4" aria-hidden />
+                Product page
+              </Link>
+              <Link to={props.links.claim} className={buttonClass({ size: 'sm' })} title="Everything you need to claim this warranty">
+                <Wrench className="size-4" aria-hidden />
+                Claim kit
+              </Link>
+            </>
           )}
           <CopyButton text={itemToText(item, index)} label={`Copy product ${index + 1}`}>
             Copy

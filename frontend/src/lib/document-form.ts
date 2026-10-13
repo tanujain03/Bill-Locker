@@ -54,6 +54,7 @@ export function fromForm(values: FormValues): DocumentDetails {
     purchaseDate: text(values.purchaseDate),
     taxAmount: number(values.taxAmount),
     totalAmount: number(values.totalAmount),
+    returnByDate: text(values.returnByDate),
     items: values.items.map((item) => ({
       productName: text(item.productName),
       modelNumber: text(item.modelNumber),

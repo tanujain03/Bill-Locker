@@ -174,6 +174,23 @@ class GmailImportTests extends GmailApiTestBase {
 	}
 
 	@Test
+	void sameAttachmentInTwoEmailsBecomesOneDocument() throws Exception {
+		String token = registerAndGetToken(uniqueEmail("imp-dup"));
+		add("impdup@gmail.com", "m1", "Your invoice", Instant.now().minusSeconds(20), "invoice.pdf", PDF);
+		add("impdup@gmail.com", "m2", "Re: Your invoice", Instant.now().minusSeconds(10), "invoice.pdf", PDF);
+		connect(token, "impdup@gmail.com");
+		scanWorker.runOnce();
+
+		act(token, "import", allFileIds(token, "TO_REVIEW")).andExpect(status().isOk());
+		assertThat(importWorker.runOnce()).isEqualTo(2);
+
+		// Both files count as imported and point at the one document.
+		assertThat(documentCount(token)).isEqualTo(1);
+		List<String> documentIds = JsonPath.read(viewBody(token, "IMPORTED"), "$[*].files[*].document.id");
+		assertThat(documentIds).hasSize(2).containsOnly(documentIds.getFirst());
+	}
+
+	@Test
 	void fakePdfFails() throws Exception {
 		String token = registerAndGetToken(uniqueEmail("imp5"));
 		add("imp5@gmail.com", "m1", "Your invoice", Instant.now().minusSeconds(10), "x.pdf",

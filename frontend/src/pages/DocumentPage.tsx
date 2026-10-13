@@ -15,6 +15,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { CopyButton } from '../components/documents/CopyButton';
 import { DetailsForm } from '../components/documents/DetailsForm';
 import { DocumentPreview } from '../components/documents/DocumentPreview';
+import { DuplicateWarning } from '../components/documents/DuplicateWarning';
+import { ReturnBanner } from '../components/documents/ReturnWindow';
 import { MoreMenu } from '../components/documents/MoreMenu';
 import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
 import { StatusBadge } from '../components/documents/StatusBadge';
@@ -28,10 +30,12 @@ import {
   extractDocument,
   findRegistrationPage,
   getDocument,
+  markNotDuplicate,
   saveDocument,
   type DocumentDetail,
 } from '../lib/documents';
 import { claimKitLink } from '../lib/claims';
+import { productLink } from '../lib/products';
 import { useFeedback } from '../lib/feedback-context';
 import { billShareText } from '../lib/share';
 import { usePageTitle } from '../lib/usePageTitle';
@@ -275,6 +279,16 @@ export function DocumentPage() {
     }
   }
 
+  /** "Keep both" on the possible-copy warning. Only the warning changes, so edits on screen stay. */
+  async function keepBoth() {
+    try {
+      setDocument(await markNotDuplicate(id));
+      toast('Kept both. This bill won’t be flagged as a copy again.');
+    } catch (error) {
+      toast(errorMessage(error), 'error');
+    }
+  }
+
   /** "All documents" with unsaved edits: ask first (the browser's own check only covers closing the tab). */
   async function leave() {
     const ok = await confirm({
@@ -318,7 +332,7 @@ export function DocumentPage() {
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                     <StatusBadge status={document.status} reading={document.readQueued} />
                     {/* Where it came from, with the Gmail address in full here. */}
-                    <SourceBadge sourceGmail={document.sourceGmail} showAccount />
+                    <SourceBadge sourceGmail={document.sourceGmail} sample={document.sample} showAccount />
                     {document.sellerName && <span className="truncate">{document.fileName}</span>}
                   </div>
                 </div>
@@ -348,6 +362,23 @@ export function DocumentPage() {
             {message && (
               <div className="mt-4">
                 <Alert tone={message.tone}>{message.text}</Alert>
+              </div>
+            )}
+
+            {document.possibleDuplicates.length > 0 && (
+              <div className="mt-4">
+                <DuplicateWarning
+                  matches={document.possibleDuplicates}
+                  busy={busy !== null}
+                  onDelete={remove}
+                  onKeepBoth={keepBoth}
+                />
+              </div>
+            )}
+
+            {document.returnByDate && (
+              <div className="mt-4">
+                <ReturnBanner returnByDate={document.returnByDate} />
               </div>
             )}
 
@@ -393,10 +424,10 @@ export function DocumentPage() {
                         document.status !== 'UPLOADED' && index < document.items.length && busy === null && finding === null,
                       onConfirm: (index, brand) => openRegistrationPage(index, brand),
                     }}
-                    // The kit reads the saved bill, so only for saved products without unsaved edits.
-                    claimLink={(index) =>
+                    // These pages read the saved bill, so only for saved products without unsaved edits.
+                    savedLinks={(index) =>
                       document.status === 'SAVED' && !dirty && index < document.items.length
-                        ? claimKitLink(document.id, index)
+                        ? { claim: claimKitLink(document.id, index), product: productLink(document.id, index) }
                         : null
                     }
                   />

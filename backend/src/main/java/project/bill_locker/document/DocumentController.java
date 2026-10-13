@@ -90,6 +90,12 @@ public class DocumentController {
 		return documentService.findRegistrationPage(CurrentUser.id(jwt), id, request);
 	}
 
+	/** "Keep both" on the possible-copy warning: this bill only looks like another one. */
+	@PostMapping("/{id}/not-duplicate")
+	public DocumentDetail markNotDuplicate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+		return documentService.markNotDuplicate(CurrentUser.id(jwt), id);
+	}
+
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {

@@ -1,9 +1,11 @@
 package project.bill_locker.document;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,6 +13,16 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
 	/** Finds a document only if it belongs to this user (anyone else's → empty → 404). */
 	Optional<Document> findByIdAndUserId(UUID id, UUID userId);
+
+	// ---- Duplicates (see DuplicateRules) ----
+
+	/** The user's earlier upload of exactly the same file, if any. */
+	Optional<Document> findFirstByUserIdAndContentHashOrderByCreatedAtAsc(UUID userId, String contentHash);
+
+	/** Candidates for "looks like the same bill": copies always share the purchase date. */
+	List<Document> findByUserIdAndPurchaseDate(UUID userId, LocalDate purchaseDate);
+
+	List<Document> findByUserIdAndPurchaseDateIsNotNull(UUID userId);
 
 	/** The document that has waited longest for the AI worker. */
 	Optional<Document> findFirstByReadQueuedAtIsNotNullOrderByReadQueuedAtAsc();
@@ -57,4 +69,29 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 	long countByUserIdAndStatusAndReadErrorIsNotNullAndReadQueuedAtIsNull(UUID userId, DocumentStatus status);
 
 	List<Document> findTop5ByUserIdOrderByCreatedAtDesc(UUID userId);
+
+	// ---- Product pages ----
+
+	/**
+	 * The user's other documents with a product of this serial or model number (lower case;
+	 * "" = don't match on it). E.g. a warranty card or a service bill uploaded on its own.
+	 */
+	@Query("""
+			select distinct d from Document d join d.items i
+			where d.user.id = :userId and d.id <> :excludeId
+			  and ((:serial <> '' and lower(trim(i.serialNumber)) = :serial)
+			       or (:model <> '' and lower(trim(i.modelNumber)) = :model))
+			order by d.createdAt desc
+			""")
+	List<Document> findMentioning(@Param("userId") UUID userId, @Param("excludeId") UUID excludeId,
+			@Param("serial") String serial, @Param("model") String model);
+
+	// ---- Sample data ----
+
+	long countByUserIdAndSampleTrue(UUID userId);
+
+	/** Removes the user's sample bills; the database removes their files and items too (ON DELETE CASCADE). */
+	@Modifying
+	@Query("delete from Document d where d.user.id = :userId and d.sample = true")
+	int deleteSamples(@Param("userId") UUID userId);
 }

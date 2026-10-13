@@ -28,13 +28,23 @@ public record DocumentDetail(
 		BigDecimal totalAmount,
 		List<DocumentItemView> items,
 		BillCategory category,
+		/** The last day it can be returned, or null. */
+		LocalDate returnByDate,
 		Instant createdAt,
 		Instant updatedAt,
 		boolean readQueued,
 		String readError,
-		String sourceGmail) {
+		String sourceGmail,
+		/** A demo bill from "Try with sample data". */
+		boolean sample,
+		/** Other documents that look like the same bill (see DuplicateRules); empty when none. */
+		List<DuplicateMatch> possibleDuplicates) {
 
 	static DocumentDetail of(Document d) {
+		return of(d, List.of());
+	}
+
+	static DocumentDetail of(Document d, List<Document> copies) {
 		return new DocumentDetail(d.getId(), d.getFileName(), d.getContentType(), d.getSizeBytes(), d.getStatus(),
 				"/api/documents/" + d.getId() + "/download",
 				d.getDocumentType(), d.getDocumentNumber(),
@@ -43,7 +53,9 @@ public record DocumentDetail(
 				d.getPurchaseDate(), d.getTaxAmount(), d.getTotalAmount(),
 				d.getItems().stream().map(DocumentItemView::of).toList(),
 				BillCategory.parse(d.getCategory()),
+				d.getReturnByDate(),
 				d.getCreatedAt(), d.getUpdatedAt(),
-				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail());
+				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail(), d.isSample(),
+				copies.stream().map(DuplicateMatch::of).toList());
 	}
 }

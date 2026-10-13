@@ -22,7 +22,9 @@ public record DocumentDetails(
 		BigDecimal totalAmount,
 		List<DocumentItemView> items,
 		/** What it was spent on (any document type). */
-		BillCategory category) {
+		BillCategory category,
+		/** The last day the purchase can be returned (task 14); null when unknown or not returnable. */
+		LocalDate returnByDate) {
 
 	public DocumentDetails {
 		items = items == null ? List.of() : List.copyOf(items);
@@ -33,12 +35,20 @@ public record DocumentDetails(
 			String sellerContact, String buyerName, String buyerAddress, String buyerEmail, LocalDate purchaseDate,
 			BigDecimal taxAmount, BigDecimal totalAmount, List<DocumentItemView> items) {
 		this(documentType, documentNumber, sellerName, sellerAddress, sellerContact, buyerName, buyerAddress, buyerEmail,
-				purchaseDate, taxAmount, totalAmount, items, null);
+				purchaseDate, taxAmount, totalAmount, items, null, null);
+	}
+
+	/** Without a return date (most callers and tests from before task 14). */
+	public DocumentDetails(DocumentType documentType, String documentNumber, String sellerName, String sellerAddress,
+			String sellerContact, String buyerName, String buyerAddress, String buyerEmail, LocalDate purchaseDate,
+			BigDecimal taxAmount, BigDecimal totalAmount, List<DocumentItemView> items, BillCategory category) {
+		this(documentType, documentNumber, sellerName, sellerAddress, sellerContact, buyerName, buyerAddress, buyerEmail,
+				purchaseDate, taxAmount, totalAmount, items, category, null);
 	}
 
 	/** The same details with other products. */
 	DocumentDetails withItems(List<DocumentItemView> newItems) {
 		return new DocumentDetails(documentType, documentNumber, sellerName, sellerAddress, sellerContact, buyerName,
-				buyerAddress, buyerEmail, purchaseDate, taxAmount, totalAmount, newItems, category);
+				buyerAddress, buyerEmail, purchaseDate, taxAmount, totalAmount, newItems, category, returnByDate);
 	}
 }

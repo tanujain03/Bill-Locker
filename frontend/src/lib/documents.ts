@@ -76,6 +76,8 @@ export type DocumentDetails = {
   items: DocumentItem[];
   /** What it was spent on. */
   category: BillCategory | null;
+  /** The last day the purchase can be returned ("YYYY-MM-DD"), or null. */
+  returnByDate: string | null;
 };
 
 export type DocumentDetail = DocumentDetails & {
@@ -91,8 +93,24 @@ export type DocumentDetail = DocumentDetails & {
   readError: string | null;
   /** The Gmail address an imported document came from; null for uploads. */
   sourceGmail: string | null;
+  /** A demo bill from "Try with sample data". */
+  sample: boolean;
+  /** Other documents that look like the same bill (same date + number, or same date + shop + total). */
+  possibleDuplicates: DuplicateMatch[];
   createdAt: string;
   updatedAt: string;
+};
+
+/** Another document that looks like the same bill. */
+export type DuplicateMatch = {
+  id: string;
+  fileName: string;
+  sellerName: string | null;
+  documentNumber: string | null;
+  purchaseDate: string | null;
+  totalAmount: number | null;
+  status: DocumentStatus;
+  createdAt: string;
 };
 
 export type DocumentSummary = {
@@ -109,9 +127,15 @@ export type DocumentSummary = {
   itemCount: number;
   firstProductName: string | null;
   category: BillCategory | null;
+  /** The last day the purchase can be returned, or null. */
+  returnByDate: string | null;
   readQueued: boolean;
   readError: string | null;
   sourceGmail: string | null;
+  /** A demo bill from "Try with sample data". */
+  sample: boolean;
+  /** Looks like a copy of another document. */
+  possibleDuplicate: boolean;
   createdAt: string;
 };
 
@@ -137,6 +161,7 @@ export const FIELD_LABELS = {
   purchaseDate: 'Purchase date',
   taxAmount: 'Tax amount',
   totalAmount: 'Total amount',
+  returnByDate: 'Return by',
 } as const satisfies Partial<Record<keyof DocumentDetails, string>>;
 
 export const ITEM_LABELS = {
@@ -179,6 +204,9 @@ export const getDocument = (id: string) => api<DocumentDetail>(`/documents/${id}
 export const extractDocument = (id: string) => api<DocumentDetail>(`/documents/${id}/extract`, { method: 'POST' });
 export const saveDocument = (id: string, details: DocumentDetails) =>
   api<DocumentDetail>(`/documents/${id}`, { method: 'PUT', body: details });
+/** "Keep both": this bill only looks like another one, so stop warning about it. */
+export const markNotDuplicate = (id: string) =>
+  api<DocumentDetail>(`/documents/${id}/not-duplicate`, { method: 'POST' });
 export const deleteDocument = (id: string) => api<null>(`/documents/${id}`, { method: 'DELETE' });
 export const downloadDocument = (id: string) => fetchBlob(`/documents/${id}/download`);
 

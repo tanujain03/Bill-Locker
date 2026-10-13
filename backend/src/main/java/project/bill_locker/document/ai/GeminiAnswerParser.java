@@ -54,11 +54,24 @@ final class GeminiAnswerParser {
 					date(item, "warrantyStartDate"), date(item, "warrantyEndDate"), text(item, "warrantyProvider"),
 					shortText(item, "brand", 100), webLink(item, "warrantyRegistrationUrl"), null));
 		}
+		LocalDate purchaseDate = date(root, "purchaseDate");
 		return new DocumentDetails(documentType(root), text(root, "documentNumber"),
 				text(root, "sellerName"), text(root, "sellerAddress"), text(root, "sellerContact"),
 				text(root, "buyerName"), text(root, "buyerAddress"), text(root, "buyerEmail"),
-				date(root, "purchaseDate"), number(root, "taxAmount"), number(root, "totalAmount"), items,
-				BillCategory.parse(text(root, "category")));
+				purchaseDate, number(root, "taxAmount"), number(root, "totalAmount"), items,
+				BillCategory.parse(text(root, "category")),
+				returnBy(purchaseDate, wholeNumber(root, "returnWindowDays")));
+	}
+
+	/**
+	 * "10 days return" printed on a bill bought on 3 Oct → returnable up to 13 Oct. Needs the
+	 * purchase date; 0, a negative or an unlikely long window (over a year) is ignored.
+	 */
+	static LocalDate returnBy(LocalDate purchaseDate, Integer days) {
+		if (purchaseDate == null || days == null || days <= 0 || days > 365) {
+			return null;
+		}
+		return purchaseDate.plusDays(days);
 	}
 
 	private static ExtractionException unreadable() {

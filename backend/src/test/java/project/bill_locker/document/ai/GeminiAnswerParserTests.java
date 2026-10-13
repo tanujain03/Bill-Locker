@@ -130,4 +130,22 @@ class GeminiAnswerParserTests {
 				{"documentType": "INVOICE", "category": "ELECTRONICS"}
 				""").category()).isEqualTo(project.bill_locker.document.BillCategory.ELECTRONICS);
 	}
+
+	@Test
+	void aPrintedReturnPolicyBecomesAReturnDate() {
+		// "10 days return" on a bill of 3 Oct: returnable up to 13 Oct.
+		assertThat(GeminiAnswerParser.parse("""
+				{"purchaseDate": "2026-10-03", "returnWindowDays": 10}
+				""").returnByDate()).isEqualTo(java.time.LocalDate.of(2026, 10, 13));
+		// Without a purchase date there is nothing to count from; nonsense windows are ignored.
+		assertThat(GeminiAnswerParser.parse("""
+				{"returnWindowDays": 10}
+				""").returnByDate()).isNull();
+		assertThat(GeminiAnswerParser.parse("""
+				{"purchaseDate": "2026-10-03", "returnWindowDays": 0}
+				""").returnByDate()).isNull();
+		assertThat(GeminiAnswerParser.parse("""
+				{"purchaseDate": "2026-10-03"}
+				""").returnByDate()).isNull();
+	}
 }

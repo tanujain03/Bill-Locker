@@ -1,4 +1,4 @@
-import { ArrowRight, CircleAlert, Mail, Package, ReceiptText, Wallet } from 'lucide-react';
+import { ArrowRight, CircleAlert, FlaskConical, Mail, Package, ReceiptText, Trash2, Undo2, Wallet } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ExpiringList } from '../components/dashboard/ExpiringList';
@@ -8,15 +8,18 @@ import { SpendingChart } from '../components/dashboard/SpendingChart';
 import { StatCard } from '../components/dashboard/StatCard';
 import { TopShops } from '../components/dashboard/TopShops';
 import { WarrantyHealth } from '../components/dashboard/WarrantyHealth';
-import { buttonClass } from '../components/Button';
+import { Button, buttonClass } from '../components/Button';
 import { ErrorState } from '../components/ErrorState';
 import { UploadButton } from '../components/UploadButton';
 import { errorMessage } from '../lib/api';
 import { usePageTitle } from '../lib/usePageTitle';
 import { useAuth } from '../lib/auth-context';
-import { getDashboard, type Dashboard } from '../lib/dashboard';
+import { getDashboard, type Dashboard, type OpenReturn } from '../lib/dashboard';
+import { formatDate } from '../lib/document-form';
+import { CLOSING_DAYS } from '../lib/returns';
 import { formatAmount } from '../lib/documents';
 import { getGmail, type GmailOverview } from '../lib/gmail';
+import { useSampleData } from '../lib/useSampleData';
 
 /**
  * /home: how your bills stand today. The backend sends every number ready-made
@@ -42,6 +45,8 @@ export function DashboardPage() {
   }, []);
 
   useEffect(load, [load]);
+  // Adding or removing the sample data reloads the numbers.
+  const sample = useSampleData(load);
 
   const firstName = user?.name?.split(' ')[0] ?? '';
 
@@ -72,9 +77,14 @@ export function DashboardPage() {
           ) : !data ? (
             <Skeleton />
           ) : data.savedBills === 0 && data.recentBills.length === 0 ? (
-            <Welcome />
+            <Welcome onTrySample={sample.add} adding={sample.busy === 'adding'} />
           ) : (
-            <Overview data={data} gmail={gmail} />
+            <div className="space-y-6">
+              {sample.count !== null && sample.count > 0 && (
+                <SampleBanner count={sample.count} removing={sample.busy === 'removing'} onRemove={sample.remove} />
+              )}
+              <Overview data={data} gmail={gmail} />
+            </div>
           )}
         </div>
       </main>
@@ -114,6 +124,8 @@ function Overview({ data, gmail }: { data: Dashboard; gmail: GmailOverview | nul
           </span>
         </Link>
       )}
+
+      {data.openReturns.length > 0 && <OpenReturns items={data.openReturns} />}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -162,6 +174,40 @@ function Overview({ data, gmail }: { data: Dashboard; gmail: GmailOverview | nul
 }
 
 /**
+ * Purchases that can still be returned, the one closing first at the top (at most 3, then
+ * "and 2 more"). Each line opens its bill; the last 3 days are amber, with words to match.
+ */
+function OpenReturns({ items }: { items: OpenReturn[] }) {
+  const shown = items.slice(0, 3);
+  return (
+    <section className="rounded-2xl border border-sky-200 bg-sky-50/60 px-5 py-4" aria-labelledby="open-returns">
+      <h2 id="open-returns" className="flex items-center gap-2 text-sm font-semibold text-sky-900">
+        <Undo2 className="size-4" aria-hidden />
+        Return windows open
+      </h2>
+      <ul className="mt-2 space-y-1">
+        {shown.map((r) => {
+          const closing = r.daysLeft <= CLOSING_DAYS;
+          return (
+            <li key={r.documentId}>
+              <Link to={`/documents/${r.documentId}`} className="flex flex-wrap items-center gap-x-2 rounded-lg px-2 py-1.5 text-sm hover:bg-white">
+                <span className="font-medium text-slate-900">{r.productName ?? r.sellerName ?? 'A purchase'}</span>
+                {r.productName && r.sellerName && <span className="text-slate-500">from {r.sellerName}</span>}
+                <span className={`ml-auto inline-flex items-center gap-1 text-xs font-medium ${closing ? 'text-amber-800' : 'text-sky-800'}`}>
+                  {closing && <CircleAlert className="size-3.5" aria-hidden />}
+                  {r.daysLeft === 0 ? 'Last day today' : `${r.daysLeft === 1 ? '1 day' : `${r.daysLeft} days`} left · until ${formatDate(r.returnByDate)}`}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      {items.length > shown.length && <p className="mt-1 px-2 text-xs text-sky-900">and {items.length - shown.length} more</p>}
+    </section>
+  );
+}
+
+/**
  * Where "Needs your attention" leads: bills to review first; else bills whose AI read
  * failed or is still running (they are "Not read yet"); else the Gmail files waiting.
  * So the card never opens an empty list.
@@ -173,8 +219,24 @@ function attentionLink(toReview: number, notRead: number, gmailFiles: number): s
   return '/documents';
 }
 
-/** First visit: one clear next step instead of a grid of zeros. */
-function Welcome() {
+/** While the demo bills are in the account: say so, and offer to remove them. */
+function SampleBanner({ count, removing, onRemove }: { count: number; removing: boolean; onRemove: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-5 py-3 text-violet-900">
+      <FlaskConical className="size-5 shrink-0 text-violet-600" aria-hidden />
+      <p className="min-w-0 flex-1 text-sm">
+        <span className="font-semibold">You’re exploring with sample data.</span> {count} demo bills fill every page; your
+        own bills are kept apart and stay when you remove them.
+      </p>
+      <Button size="sm" variant="secondary" icon={Trash2} busy={removing} onClick={onRemove}>
+        Remove sample data
+      </Button>
+    </div>
+  );
+}
+
+/** First visit: one clear next step instead of a grid of zeros, or a full demo in one click. */
+function Welcome({ onTrySample, adding }: { onTrySample: () => void; adding: boolean }) {
   return (
     <div className="flex flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
       <span className="grid size-14 place-items-center rounded-2xl bg-brand-50 text-brand-600">
@@ -194,6 +256,13 @@ function Welcome() {
           <Mail className="size-4" aria-hidden />
           Connect Gmail
         </Link>
+      </div>
+      <div className="mt-8 w-full max-w-md border-t border-slate-200 pt-6">
+        <p className="text-sm text-slate-600">Just looking around? See every feature filled with realistic bills.</p>
+        <Button icon={FlaskConical} busy={adding} onClick={onTrySample} className="mt-3">
+          {adding ? 'Adding sample bills…' : 'Try with sample data'}
+        </Button>
+        <p className="mt-2 text-xs text-slate-500">About 30 demo bills, marked “Sample”. Remove them any time.</p>
       </div>
     </div>
   );

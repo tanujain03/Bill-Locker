@@ -99,6 +99,27 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   `WarrantyRules`): facts, status, brand support + Google Maps service-centre search links, missing facts. The claim email
   is written in the browser (`lib/claims.ts` `claimEmail`) and opened with `mailto:` — the app never sends anything.
   `WarrantyView.position`. Print sheet: `print:hidden` on the app chrome. Guide: `docs/task-10-claim-kit.md`.
+- Task 11: sample data ("Try with sample data" on the empty dashboard, Settings → Sample data, violet dashboard banner).
+  Package `sample`: `SampleBills` (~30 bills dated from today: every warranty state + 3 months of receipts, monthly ones
+  recurring), `SamplePdf` (PDFBox one-pager "SAMPLE BILL"), `SampleDataService` (one transaction; again → 409
+  `SAMPLE_DATA_EXISTS`). `documents.sample` (nullable Boolean) + `sample` on DocumentSummary/Detail → "Sample" badge;
+  `DELETE /api/sample-data` removes only flagged bills. Frontend `lib/useSampleData.ts`. Guide: `docs/task-11-sample-data.md`.
+- Task 12: duplicate bills. Same file: `documents.content_hash` (SHA-256 hex); upload → 409 `DUPLICATE_FILE` with
+  `documentId` (new optional field on `ApiErrorBody`/`ApiException`), the browser opens that bill; a Gmail import of the same
+  bytes links to the existing document. Same bill, other file: `DuplicateRules` (same purchase date + same normalised number
+  and no different shop, or same shop + same total) → `DocumentDetail.possibleDuplicates`, `DocumentSummary.possibleDuplicate`
+  ("Possible copy" badge, `DuplicateWarning.tsx`); "Keep both" = `POST /api/documents/{id}/not-duplicate`
+  (`documents.not_duplicate`). Test `pdfBytes()` is unique per call. Guide: `docs/task-12-duplicate-bills.md`.
+- Task 13: product pages (`/products/:documentId/:position`, `ProductPage`; linked from Warranties names, dashboard
+  "Expiring soon", "Product page" on saved bill products (`DetailsForm.savedLinks`), the claim kit title). Package `product`:
+  `GET /api/documents/{id}/items/{position}/product` (`ProductService`: `WarrantyRules`, owned days, cost per month = price ÷
+  whole months owned (min 1), related documents via `DocumentRepository.findMentioning` by serial, else model number, missing
+  facts). Guide: `docs/task-13-product-pages.md`.
+- Task 14: return windows. `documents.return_by_date` (`DocumentDetails.returnByDate`, 14th component + a constructor
+  without it); save rejects a date before the purchase (`checkDates`); Gemini `returnWindowDays` (only if printed) →
+  purchase + days (`GeminiAnswerParser.returnBy`); dashboard `openReturns`. Frontend `lib/returns.ts` (closing = ≤ 3 days),
+  form field with +7/+10/+15/+30, `ReturnBadge`/`ReturnBanner`, dashboard strip, 🔔. View `ai_documents.return_by_date`.
+  Sample air fryer: bought 5 days ago, 10-day window. Guide: `docs/task-14-return-windows.md`.
 
 ## Repository
 
@@ -110,9 +131,9 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
   Packages: `security` (SecurityConfig, JWT), `user` (incl. Settings endpoints), `auth` (incl. password reset),
   `common` (BaseEntity, ApiException, GlobalExceptionHandler), `document` (+ `document.ai`,
-  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`.
+  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`, `expense`, `sample`, `product`.
   Tables: `users`, `password_reset_tokens`, `documents`, `document_items`, `document_files`,
-  `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`.
+  `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`, `category_budgets`.
 - `docs/api-contract.md` — the full target REST API; its top lists what is built so far.
   `docs/database-design.md` — the target design (13 tables); entity classes at tag
   `step-2-database`. Hibernate `ddl-auto=update` creates tables. No migration scripts or

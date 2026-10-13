@@ -49,6 +49,8 @@ public class GeminiDetailExtractor implements DetailExtractor {
 			- unitPrice is the price of one unit before tax; taxAmount is the total tax (GST/VAT); totalAmount is the final amount paid.
 			- warrantyPeriodMonths: the warranty length in months (1 year = 12). warrantyStartDate is usually the purchase date.
 			- serialNumber: the serial number or IMEI of that exact unit.
+			- returnWindowDays: only when the document prints a return or replacement policy for this purchase
+			  ("10 days return", "returnable within 7 days"): that number of days. Otherwise null; never guess.
 			- brand: the manufacturer's brand of the product (e.g. Samsung, Noise, boAt), from the product name or the
 			  document. null for services such as rides, food, delivery or bills for utilities.
 			- warrantyRegistrationUrl: a web link printed on the document for registering this product's warranty
@@ -176,6 +178,8 @@ public class GeminiDetailExtractor implements DetailExtractor {
 			"purchaseDate", text("Date of purchase, YYYY-MM-DD"),
 			"taxAmount", number("Total tax (GST/VAT/sales tax)"),
 			"totalAmount", number("Final amount paid"),
+			"returnWindowDays", Map.of("type", "INTEGER", "nullable", true, "description",
+					"Days allowed to return the purchase, ONLY if a return policy is printed (e.g. '10 days return')"),
 			"category", Map.of("type", "STRING", "nullable", true, "description", "What the money was spent on",
 					"enum", List.of("TRAVEL", "FOOD", "GROCERIES", "FUEL", "UTILITIES", "PHONE_INTERNET", "SHOPPING",
 							"HEALTH", "ELECTRONICS", "APPLIANCES", "FASHION", "HOME", "ENTERTAINMENT", "OTHER")),

@@ -26,7 +26,14 @@ public record DashboardResponse(
 		long billsWithoutDateOrTotal,
 		List<ShopSpend> topShops,
 		/** The 5 newest bills of any status. */
-		List<DocumentSummary> recentBills) {
+		List<DocumentSummary> recentBills,
+		/** Saved bills that can still be returned (return date today or later), soonest first. */
+		List<OpenReturn> openReturns) {
+
+	/** {@code daysLeft} 0 = today is the last day. {@code productName}: the bill's first product, or null. */
+	public record OpenReturn(java.util.UUID documentId, String sellerName, String productName,
+			java.time.LocalDate returnByDate, long daysLeft) {
+	}
 
 	public record Attention(long toReview, long readFailed, long reading) {
 	}

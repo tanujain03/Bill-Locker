@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -67,10 +68,12 @@ class DocumentApiTests extends DocumentApiTestBase {
 	@Test
 	void downloadReturnsSameBytes() throws Exception {
 		String token = registerAndGetToken(uniqueEmail("down"));
-		String id = uploadPdf(token, "bill.pdf");
+		byte[] file = pdfBytes();
+		String id = JsonPath.read(upload(token, "bill.pdf", "application/pdf", file)
+				.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.id");
 		mvc.perform(get("/api/documents/" + id + "/download").header("Authorization", bearer(token)))
 				.andExpect(status().isOk())
-				.andExpect(content().bytes(pdfBytes()))
+				.andExpect(content().bytes(file))
 				.andExpect(header().string("Content-Type", "application/pdf"))
 				.andExpect(header().string("Content-Disposition", containsString("inline")))
 				.andExpect(header().string("Content-Disposition", containsString("bill.pdf")));

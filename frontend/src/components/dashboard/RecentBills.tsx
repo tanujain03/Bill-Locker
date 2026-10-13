@@ -21,7 +21,7 @@ export function RecentBills({ bills }: { bills: DocumentSummary[] }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <p className="truncate text-sm font-medium">{d.sellerName ?? d.fileName}</p>
-                    <SourceBadge sourceGmail={d.sourceGmail} />
+                    <SourceBadge sourceGmail={d.sourceGmail} sample={d.sample} />
                   </div>
                   <p className="truncate text-xs text-slate-600">
                     {[d.documentType && DOCUMENT_TYPE_LABELS[d.documentType], d.purchaseDate && formatDate(d.purchaseDate)]

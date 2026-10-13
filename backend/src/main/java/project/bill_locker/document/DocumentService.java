@@ -4,14 +4,18 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,7 +72,14 @@ public class DocumentService {
 		if (file.getSize() > MAX_FILE_BYTES) {
 			throw fileTooLarge();
 		}
-		return DocumentDetail.of(create(userId, file.getOriginalFilename(), readBytes(file), null));
+		byte[] bytes = readBytes(file);
+		Optional<Document> earlier = sameFile(userId, bytes);
+		if (earlier.isPresent()) {
+			// 409 with the earlier document's id, so the browser can open that one instead.
+			throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_FILE",
+					"You already uploaded this file, so it was not added again.", null, earlier.get().getId());
+		}
+		return DocumentDetail.of(create(userId, file.getOriginalFilename(), bytes, null));
 	}
 
 	/**
@@ -83,9 +94,19 @@ public class DocumentService {
 		if (bytes.length > MAX_FILE_BYTES) {
 			throw fileTooLarge();
 		}
+		// The same attachment often comes in several emails (replies, reminders): keep one copy.
+		Optional<Document> earlier = sameFile(userId, bytes);
+		if (earlier.isPresent()) {
+			return DocumentDetail.of(earlier.get());
+		}
 		Document document = create(userId, fileName, bytes, sourceGmail);
 		document.queueForReading();
 		return DocumentDetail.of(document);
+	}
+
+	/** The user's earlier document with exactly these bytes (compared by SHA-256), if any. */
+	private Optional<Document> sameFile(UUID userId, byte[] bytes) {
+		return documents.findFirstByUserIdAndContentHashOrderByCreatedAtAsc(userId, sha256(bytes));
 	}
 
 	private Document create(UUID userId, String fileName, byte[] bytes, String sourceGmail) {
@@ -94,21 +115,65 @@ public class DocumentService {
 
 		// getReferenceById: we only need the user's id for the foreign key, not a SELECT.
 		Document document = documents.save(new Document(users.getReferenceById(userId),
-				cleanFileName(fileName), contentType, bytes.length, sourceGmail));
+				cleanFileName(fileName), contentType, bytes.length, sha256(bytes), sourceGmail));
 		files.save(new DocumentFile(document, bytes));
 		return document;
+	}
+
+	/**
+	 * Stores one demo bill of "Try with sample data": already saved (no AI read), marked as
+	 * sample, warranty end dates filled in like a normal save.
+	 */
+	@Transactional
+	public void createSample(UUID userId, String fileName, byte[] pdf, DocumentDetails details) {
+		Document document = create(userId, fileName, pdf, null);
+		document.replaceDetails(withWarrantyEndDates(details), DocumentStatus.SAVED);
+		document.markSample();
+	}
+
+	@Transactional(readOnly = true)
+	public long countSamples(UUID userId) {
+		return documents.countByUserIdAndSampleTrue(userId);
+	}
+
+	/** Removes only the sample bills; the user's own bills stay. Returns how many were removed. */
+	@Transactional
+	public int deleteSamples(UUID userId) {
+		return documents.deleteSamples(userId);
 	}
 
 	@Transactional(readOnly = true)
 	public List<DocumentSummary> list(UUID userId, String q, DocumentType type, DocumentStatus status) {
 		// LIKE treats % and _ as wildcards; escaping them isn't worth it for a search box.
 		String search = (q == null || q.isBlank()) ? "" : "%" + q.strip().toLowerCase(Locale.ROOT) + "%";
-		return documents.search(userId, type, status, search).stream().map(DocumentSummary::of).toList();
+		// Checked against all the user's bills, not just the search results: the copy may not match the search.
+		Set<UUID> copies = DuplicateRules.withCopies(documents.findByUserIdAndPurchaseDateIsNotNull(userId));
+		return documents.search(userId, type, status, search).stream()
+				.map(d -> DocumentSummary.of(d, copies.contains(d.getId())))
+				.toList();
 	}
 
 	@Transactional(readOnly = true)
 	public DocumentDetail get(UUID userId, UUID id) {
-		return DocumentDetail.of(findOwned(userId, id));
+		return withCopies(findOwned(userId, id));
+	}
+
+	/** "Keep both": this document is not a copy, so stop warning about it. */
+	@Transactional
+	public DocumentDetail markNotDuplicate(UUID userId, UUID id) {
+		Document document = findOwned(userId, id);
+		document.markNotDuplicate();
+		return withCopies(document);
+	}
+
+	/** The document plus the other documents that look like the same bill. */
+	private DocumentDetail withCopies(Document document) {
+		if (document.getPurchaseDate() == null) {
+			return DocumentDetail.of(document);
+		}
+		List<Document> sameDay = documents.findByUserIdAndPurchaseDate(document.getUser().getId(),
+				document.getPurchaseDate());
+		return DocumentDetail.of(document, DuplicateRules.copiesOf(document, sameDay));
 	}
 
 	@Transactional(readOnly = true)
@@ -123,9 +188,9 @@ public class DocumentService {
 	public DocumentDetail save(UUID userId, UUID id, SaveDocumentRequest request) {
 		Document document = findOwned(userId, id);
 		DocumentDetails details = request.toDetails();
-		checkWarrantyDates(details); // checks what the user typed, before we fill anything in
+		checkDates(details); // checks what the user typed, before we fill anything in
 		document.replaceDetails(withWarrantyEndDates(details), DocumentStatus.SAVED);
-		return DocumentDetail.of(document);
+		return withCopies(document);
 	}
 
 	/**
@@ -151,7 +216,7 @@ public class DocumentService {
 		return transaction.execute(status -> {
 			Document document = findOwned(userId, id); // it may have been deleted meanwhile → 404
 			document.replaceDetails(details, statusAfterRead(details));
-			return DocumentDetail.of(document);
+			return withCopies(document);
 		});
 	}
 
@@ -317,8 +382,11 @@ public class DocumentService {
 		return documents.findByIdAndUserId(id, userId).orElseThrow(DocumentService::notFound);
 	}
 
-	/** A warranty can't end before it starts. Reported under the item's own field. */
-	private static void checkWarrantyDates(DocumentDetails details) {
+	/**
+	 * A warranty can't end before it starts, and a purchase can't have to be returned before it was
+	 * bought. Reported under the field's own name.
+	 */
+	private static void checkDates(DocumentDetails details) {
 		Map<String, String> errors = new LinkedHashMap<>();
 		for (int i = 0; i < details.items().size(); i++) {
 			DocumentItemView item = details.items().get(i);
@@ -326,6 +394,10 @@ public class DocumentService {
 					&& item.warrantyEndDate().isBefore(item.warrantyStartDate())) {
 				errors.put("items[" + i + "].warrantyEndDate", "Must be on or after the start date.");
 			}
+		}
+		if (details.returnByDate() != null && details.purchaseDate() != null
+				&& details.returnByDate().isBefore(details.purchaseDate())) {
+			errors.put("returnByDate", "Must be on or after the purchase date.");
 		}
 		if (!errors.isEmpty()) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Please check the highlighted fields.",
@@ -357,6 +429,15 @@ public class DocumentService {
 
 	private static ApiException notFound() {
 		return new ApiException(HttpStatus.NOT_FOUND, "DOCUMENT_NOT_FOUND", "The requested document was not found.");
+	}
+
+	/** The file's SHA-256 as 64 hex characters. */
+	private static String sha256(byte[] bytes) {
+		try {
+			return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+		} catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException(e); // every Java has SHA-256
+		}
 	}
 
 	private static byte[] readBytes(MultipartFile file) {
