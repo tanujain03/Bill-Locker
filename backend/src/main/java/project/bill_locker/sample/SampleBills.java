@@ -16,7 +16,8 @@ import project.bill_locker.document.RegistrationSource;
  * <ul>
  * <li>Warranties: a phone with about 3 months left, a fridge that ends in a few weeks
  * (expiring soon), headphones that ended last month (expired), a laptop and a mouse,
- * an air fryer, and running shoes without warranty details (no info).</li>
+ * an air fryer bought 5 days ago that can still be returned for 5 more days, and running
+ * shoes without warranty details (no info).</li>
  * <li>Bills and receipts over the last 3 months: Airtel, Netflix and electricity every month
  * (so they show as recurring payments), plus food, rides, fuel, groceries, a pharmacy and a
  * cinema.</li>
@@ -56,10 +57,11 @@ final class SampleBills {
 						"Dell India", null),
 				product("Logitech M331 Silent Mouse", "Logitech", "M331", null, "799.00", 12, laptopDay, "Logitech", null)));
 
-		LocalDate fryerDay = today.minusMonths(1).minusDays(10);
-		bills.add(invoice("Flipkart", "FK-OD3301", fryerDay, BillCategory.APPLIANCES, "1144.00",
+		// Bought 5 days ago with a 10-day return window: the "Return windows open" strip shows it.
+		LocalDate fryerDay = today.minusDays(5);
+		bills.add(withReturnBy(invoice("Flipkart", "FK-OD3301", fryerDay, BillCategory.APPLIANCES, "1144.00",
 				product("Philips HD9252 Air Fryer", "Philips", "HD9252/90", "AF2290017", "7499.00", 24, fryerDay,
-						"Philips India", null)));
+						"Philips India", null)), fryerDay.plusDays(10)));
 
 		LocalDate shoesDay = today.minusMonths(2).minusDays(4);
 		bills.add(invoice("Decathlon", "DC-11873", shoesDay, BillCategory.FASHION, "428.00",
@@ -102,6 +104,13 @@ final class SampleBills {
 		}
 		return new SampleBill(fileName(seller, number), new DocumentDetails(DocumentType.INVOICE, number, seller, null,
 				null, null, null, null, date, new BigDecimal(tax), total, List.of(items), category));
+	}
+
+	private static SampleBill withReturnBy(SampleBill bill, LocalDate returnBy) {
+		DocumentDetails d = bill.details();
+		return new SampleBill(bill.fileName(), new DocumentDetails(d.documentType(), d.documentNumber(), d.sellerName(),
+				d.sellerAddress(), d.sellerContact(), d.buyerName(), d.buyerAddress(), d.buyerEmail(), d.purchaseDate(),
+				d.taxAmount(), d.totalAmount(), d.items(), d.category(), returnBy));
 	}
 
 	/** A receipt on day {@code day} of the month {@code monthsAgo} months back; skipped if that day is still to come. */

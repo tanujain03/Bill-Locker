@@ -188,7 +188,7 @@ public class DocumentService {
 	public DocumentDetail save(UUID userId, UUID id, SaveDocumentRequest request) {
 		Document document = findOwned(userId, id);
 		DocumentDetails details = request.toDetails();
-		checkWarrantyDates(details); // checks what the user typed, before we fill anything in
+		checkDates(details); // checks what the user typed, before we fill anything in
 		document.replaceDetails(withWarrantyEndDates(details), DocumentStatus.SAVED);
 		return withCopies(document);
 	}
@@ -382,8 +382,11 @@ public class DocumentService {
 		return documents.findByIdAndUserId(id, userId).orElseThrow(DocumentService::notFound);
 	}
 
-	/** A warranty can't end before it starts. Reported under the item's own field. */
-	private static void checkWarrantyDates(DocumentDetails details) {
+	/**
+	 * A warranty can't end before it starts, and a purchase can't have to be returned before it was
+	 * bought. Reported under the field's own name.
+	 */
+	private static void checkDates(DocumentDetails details) {
 		Map<String, String> errors = new LinkedHashMap<>();
 		for (int i = 0; i < details.items().size(); i++) {
 			DocumentItemView item = details.items().get(i);
@@ -391,6 +394,10 @@ public class DocumentService {
 					&& item.warrantyEndDate().isBefore(item.warrantyStartDate())) {
 				errors.put("items[" + i + "].warrantyEndDate", "Must be on or after the start date.");
 			}
+		}
+		if (details.returnByDate() != null && details.purchaseDate() != null
+				&& details.returnByDate().isBefore(details.purchaseDate())) {
+			errors.put("returnByDate", "Must be on or after the purchase date.");
 		}
 		if (!errors.isEmpty()) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Please check the highlighted fields.",

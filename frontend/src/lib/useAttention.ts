@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
-import { getDashboard } from './dashboard';
+import { getDashboard, type OpenReturn } from './dashboard';
+import { CLOSING_DAYS } from './returns';
 import { getGmail } from './gmail';
 import type { WarrantyView } from './warranties';
 
@@ -11,6 +12,8 @@ export type Attention = {
   gmailFiles: number;
   /** Warranties ending in the next 30 days (the 5 nearest). */
   expiring: WarrantyView[];
+  /** Purchases whose return window closes within 3 days (today counts). */
+  closingReturns: OpenReturn[];
   total: number;
 };
 
@@ -29,12 +32,14 @@ export function useAttention(): Attention | null {
         if (!current) return;
         const gmailFiles = g?.configured ? g.counts.toReview : 0;
         const { toReview, readFailed } = d.attention;
+        const closingReturns = d.openReturns.filter((r) => r.daysLeft <= CLOSING_DAYS);
         setAttention({
           toReview,
           readFailed,
           gmailFiles,
           expiring: d.expiringSoon,
-          total: toReview + readFailed + gmailFiles + d.expiringSoon.length,
+          closingReturns,
+          total: toReview + readFailed + gmailFiles + d.expiringSoon.length + closingReturns.length,
         });
       })
       .catch(() => {});

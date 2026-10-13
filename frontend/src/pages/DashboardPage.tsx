@@ -1,4 +1,4 @@
-import { ArrowRight, CircleAlert, FlaskConical, Mail, Package, ReceiptText, Trash2, Wallet } from 'lucide-react';
+import { ArrowRight, CircleAlert, FlaskConical, Mail, Package, ReceiptText, Trash2, Undo2, Wallet } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ExpiringList } from '../components/dashboard/ExpiringList';
@@ -14,7 +14,9 @@ import { UploadButton } from '../components/UploadButton';
 import { errorMessage } from '../lib/api';
 import { usePageTitle } from '../lib/usePageTitle';
 import { useAuth } from '../lib/auth-context';
-import { getDashboard, type Dashboard } from '../lib/dashboard';
+import { getDashboard, type Dashboard, type OpenReturn } from '../lib/dashboard';
+import { formatDate } from '../lib/document-form';
+import { CLOSING_DAYS } from '../lib/returns';
 import { formatAmount } from '../lib/documents';
 import { getGmail, type GmailOverview } from '../lib/gmail';
 import { useSampleData } from '../lib/useSampleData';
@@ -123,6 +125,8 @@ function Overview({ data, gmail }: { data: Dashboard; gmail: GmailOverview | nul
         </Link>
       )}
 
+      {data.openReturns.length > 0 && <OpenReturns items={data.openReturns} />}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={ReceiptText}
@@ -166,6 +170,40 @@ function Overview({ data, gmail }: { data: Dashboard; gmail: GmailOverview | nul
         <GmailCard gmail={gmail} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Purchases that can still be returned, the one closing first at the top (at most 3, then
+ * "and 2 more"). Each line opens its bill; the last 3 days are amber, with words to match.
+ */
+function OpenReturns({ items }: { items: OpenReturn[] }) {
+  const shown = items.slice(0, 3);
+  return (
+    <section className="rounded-2xl border border-sky-200 bg-sky-50/60 px-5 py-4" aria-labelledby="open-returns">
+      <h2 id="open-returns" className="flex items-center gap-2 text-sm font-semibold text-sky-900">
+        <Undo2 className="size-4" aria-hidden />
+        Return windows open
+      </h2>
+      <ul className="mt-2 space-y-1">
+        {shown.map((r) => {
+          const closing = r.daysLeft <= CLOSING_DAYS;
+          return (
+            <li key={r.documentId}>
+              <Link to={`/documents/${r.documentId}`} className="flex flex-wrap items-center gap-x-2 rounded-lg px-2 py-1.5 text-sm hover:bg-white">
+                <span className="font-medium text-slate-900">{r.productName ?? r.sellerName ?? 'A purchase'}</span>
+                {r.productName && r.sellerName && <span className="text-slate-500">from {r.sellerName}</span>}
+                <span className={`ml-auto inline-flex items-center gap-1 text-xs font-medium ${closing ? 'text-amber-800' : 'text-sky-800'}`}>
+                  {closing && <CircleAlert className="size-3.5" aria-hidden />}
+                  {r.daysLeft === 0 ? 'Last day today' : `${r.daysLeft === 1 ? '1 day' : `${r.daysLeft} days`} left · until ${formatDate(r.returnByDate)}`}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      {items.length > shown.length && <p className="mt-1 px-2 text-xs text-sky-900">and {items.length - shown.length} more</p>}
+    </section>
   );
 }
 

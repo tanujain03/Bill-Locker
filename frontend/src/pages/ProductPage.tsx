@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { Button, buttonClass } from '../components/Button';
 import { ErrorState } from '../components/ErrorState';
+import { ReturnBanner } from '../components/documents/ReturnWindow';
 import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
 import { WARRANTY_STYLE, WarrantyStatusPill } from '../components/warranties/WarrantyStatusPill';
 import { errorMessage } from '../lib/api';
@@ -114,6 +115,8 @@ function Product({ p }: { p: ProductView }) {
           </Link>
         </div>
       </header>
+
+      {p.bill.returnByDate && <ReturnBanner returnByDate={p.bill.returnByDate} />}
 
       {p.missing.length > 0 && (
         <Link

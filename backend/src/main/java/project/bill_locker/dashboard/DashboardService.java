@@ -73,7 +73,19 @@ public class DashboardService {
 				spendingByMonth(saved, thisMonth),
 				saved.stream().filter(d -> d.getPurchaseDate() == null || d.getTotalAmount() == null).count(),
 				topShops(saved),
-				documents.findTop5ByUserIdOrderByCreatedAtDesc(userId).stream().map(DocumentSummary::of).toList());
+				documents.findTop5ByUserIdOrderByCreatedAtDesc(userId).stream().map(DocumentSummary::of).toList(),
+				openReturns(saved, LocalDate.now(clock)));
+	}
+
+	/** Saved bills whose return date is today or later, the one closing first at the top. */
+	private static List<DashboardResponse.OpenReturn> openReturns(List<Document> saved, LocalDate today) {
+		return saved.stream()
+				.filter(d -> d.getReturnByDate() != null && !d.getReturnByDate().isBefore(today))
+				.sorted(Comparator.comparing(Document::getReturnByDate))
+				.map(d -> new DashboardResponse.OpenReturn(d.getId(), d.getSellerName(),
+						d.getItems().isEmpty() ? null : d.getItems().getFirst().getProductName(), d.getReturnByDate(),
+						java.time.temporal.ChronoUnit.DAYS.between(today, d.getReturnByDate())))
+				.toList();
 	}
 
 	/** One entry per month for the last 12 months (zeros included), oldest first. */

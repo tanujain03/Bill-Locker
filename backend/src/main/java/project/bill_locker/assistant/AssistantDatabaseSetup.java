@@ -54,7 +54,7 @@ class AssistantDatabaseSetup {
 			new String[] {"ai_documents", """
 					SELECT id, file_name, content_type, size_bytes, status, document_type, document_number,
 					       seller_name, seller_address, seller_contact, buyer_name, buyer_address, buyer_email,
-					       purchase_date, tax_amount, total_amount, category, read_error, source_gmail,
+					       purchase_date, tax_amount, total_amount, category, return_by_date, read_error, source_gmail,
 					       created_at, updated_at
 					FROM documents WHERE user_id = """ + ME},
 			new String[] {"ai_items", """
@@ -82,13 +82,16 @@ class AssistantDatabaseSetup {
 			  to spend per month, in rupees (set on the Expenses page); null = no budget set.
 			ai_documents(id, file_name, content_type, size_bytes, status, document_type, document_number,
 			  seller_name, seller_address, seller_contact, buyer_name, buyer_address, buyer_email,
-			  purchase_date, tax_amount, total_amount, category, read_error, source_gmail, created_at, updated_at):
+			  purchase_date, tax_amount, total_amount, category, return_by_date, read_error, source_gmail, created_at,
+			  updated_at):
 			  one row per uploaded bill. status: UPLOADED (not read yet), EXTRACTED (read, waiting for review),
 			  SAVED (checked by the user). document_type: INVOICE, WARRANTY_CARD, RECEIPT (bills and receipts for
 			  rides, food, fuel, utilities, phone...), OTHER. category (what it was spent on, any type): TRAVEL,
 			  FOOD, GROCERIES, FUEL, UTILITIES, PHONE_INTERNET, SHOPPING, HEALTH, ELECTRONICS, APPLIANCES, FASHION, HOME,
 			  ENTERTAINMENT, OTHER, or null (not sorted yet). Amounts are in rupees.
 			  source_gmail: the Gmail address it was imported from, or null when uploaded by hand.
+			  return_by_date: the last day the purchase can be returned (null = unknown); "what can I still return"
+			  = return_by_date >= CURRENT_DATE.
 			ai_items(id, document_id, position, product_name, brand, model_number, serial_number, unit_price,
 			  warranty_period_months, warranty_start_date, warranty_end_date, warranty_provider,
 			  registration_url, registration_source): one row per product line; document_id -> ai_documents.id.

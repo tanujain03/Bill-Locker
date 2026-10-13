@@ -115,6 +115,11 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   `GET /api/documents/{id}/items/{position}/product` (`ProductService`: `WarrantyRules`, owned days, cost per month = price ÷
   whole months owned (min 1), related documents via `DocumentRepository.findMentioning` by serial, else model number, missing
   facts). Guide: `docs/task-13-product-pages.md`.
+- Task 14: return windows. `documents.return_by_date` (`DocumentDetails.returnByDate`, 14th component + a constructor
+  without it); save rejects a date before the purchase (`checkDates`); Gemini `returnWindowDays` (only if printed) →
+  purchase + days (`GeminiAnswerParser.returnBy`); dashboard `openReturns`. Frontend `lib/returns.ts` (closing = ≤ 3 days),
+  form field with +7/+10/+15/+30, `ReturnBadge`/`ReturnBanner`, dashboard strip, 🔔. View `ai_documents.return_by_date`.
+  Sample air fryer: bought 5 days ago, 10-day window. Guide: `docs/task-14-return-windows.md`.
 
 ## Repository
 

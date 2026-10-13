@@ -31,7 +31,9 @@ public record SaveDocumentRequest(
 		@PositiveOrZero @Digits(integer = 10, fraction = 2) BigDecimal taxAmount,
 		@PositiveOrZero @Digits(integer = 10, fraction = 2) BigDecimal totalAmount,
 		@Size(max = 50, message = "A document can have at most 50 products.") List<@Valid ItemRequest> items,
-		BillCategory category) {
+		BillCategory category,
+		/** The last day it can be returned; not before the purchase date (checked in DocumentService). */
+		LocalDate returnByDate) {
 
 	public record ItemRequest(
 			@Size(max = 500) String productName,
@@ -65,6 +67,6 @@ public record SaveDocumentRequest(
 		List<DocumentItemView> views = items == null ? List.of() : items.stream().map(ItemRequest::toView).toList();
 		return new DocumentDetails(documentType, documentNumber, sellerName, sellerAddress, sellerContact,
 				buyerName, buyerAddress, buyerEmail, purchaseDate, taxAmount, totalAmount, views,
-				category);
+				category, returnByDate);
 	}
 }

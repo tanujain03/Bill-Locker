@@ -20,6 +20,8 @@ public record DocumentSummary(
 		int itemCount,
 		String firstProductName,
 		BillCategory category,
+		/** The last day it can be returned, or null (the list shows "Return by …" while it is open). */
+		LocalDate returnByDate,
 		Instant createdAt,
 		boolean readQueued,
 		String readError,
@@ -39,7 +41,7 @@ public record DocumentSummary(
 		return new DocumentSummary(d.getId(), d.getFileName(), d.getContentType(), d.getSizeBytes(), d.getStatus(),
 				d.getDocumentType(), d.getDocumentNumber(), d.getSellerName(), d.getPurchaseDate(), d.getTotalAmount(),
 				items.size(), items.isEmpty() ? null : items.getFirst().getProductName(), BillCategory.parse(d.getCategory()),
-				d.getCreatedAt(),
+				d.getReturnByDate(), d.getCreatedAt(),
 				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail(), d.isSample(), possibleDuplicate);
 	}
 }

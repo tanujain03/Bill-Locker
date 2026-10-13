@@ -4,7 +4,7 @@ This is the full REST API Bill Locker is heading towards. The backend and the
 frontend are rebuilt from scratch on the `restart` branch, one task at a time;
 each task implements a part of this contract.
 
-### Implemented so far (restart branch, tasks 1–13)
+### Implemented so far (restart branch, tasks 1–14)
 
 | Endpoint | Notes |
 |---|---|
@@ -21,6 +21,7 @@ each task implements a part of this contract.
 | `GET`, `POST`, `DELETE /api/sample-data` | Complete (task 11). "Try with sample data": how many demo bills, add ~30 (dated from today, one transaction; again → `409 SAMPLE_DATA_EXISTS`), remove only those. Documents carry `sample`. See [`task-11-sample-data.md`](task-11-sample-data.md) |
 | `POST /api/documents/{id}/not-duplicate` | Complete (task 12). Duplicate bills: the same file again → `409 DUPLICATE_FILE` with `documentId` (the earlier bill; a Gmail import links there instead). Documents carry `possibleDuplicates` (same date + number, or same date + shop + total), list rows `possibleDuplicate`; this endpoint is "Keep both". See [`task-12-duplicate-bills.md`](task-12-duplicate-bills.md) |
 | `GET /api/documents/{id}/items/{position}/product` | Complete (task 13). A product's page: facts, warranty end/status/days left, owned days, cost per month, the bill, related documents (same serial or model number, `matchedBy`), missing facts. `404 ITEM_NOT_FOUND` for a position the bill doesn't have. See [`task-13-product-pages.md`](task-13-product-pages.md) |
+| Return windows (task 14) | Documents carry `returnByDate` (also accepted by `PUT /api/documents/{id}`; before the purchase date → `400` `fieldErrors.returnByDate`); the AI fills it from a printed return policy. `GET /api/dashboard` adds `openReturns` (return date today or later, soonest first, `daysLeft`). See [`task-14-return-windows.md`](task-14-return-windows.md) |
 | `POST /api/assistant/chat` | Complete (task 6). Chat assistant: Gemini writes one SELECT on user-filtered `ai_*` views, run read-only as the `bill_locker_ai` role; answers from the rows. See section 11 and [`task-6-assistant.md`](task-6-assistant.md) |
 
 Everything else is not built yet. How tasks 1–4 work is explained in

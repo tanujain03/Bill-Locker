@@ -1,11 +1,12 @@
-import { Bell, CircleAlert, Clock, Eye, Mail, type LucideIcon } from 'lucide-react';
+import { Bell, CircleAlert, Clock, Eye, Mail, Undo2, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import type { Attention } from '../lib/useAttention';
 
 /**
  * 🔔 in the top bar: everything that's waiting, on every page — bills to review, bills
- * that couldn't be read, files found in Gmail, warranties ending soon. Each line is a link.
+ * that couldn't be read, files found in Gmail, returns closing in 3 days, warranties ending soon.
+ * Each line is a link.
  */
 export function NotificationBell({ attention }: { attention: Attention | null }) {
   const [open, setOpen] = useState(false);
@@ -30,6 +31,14 @@ export function NotificationBell({ attention }: { attention: Attention | null })
     if (attention.toReview) items.push({ to: '/documents?status=EXTRACTED', Icon: Eye, tone: 'text-amber-600', text: `${bills(attention.toReview)} to review and save` });
     if (attention.readFailed) items.push({ to: '/documents?status=UPLOADED', Icon: CircleAlert, tone: 'text-rose-600', text: `${bills(attention.readFailed)} couldn’t be read` });
     if (attention.gmailFiles) items.push({ to: '/gmail', Icon: Mail, tone: 'text-brand-600', text: `${attention.gmailFiles === 1 ? '1 file' : `${attention.gmailFiles} files`} found in Gmail` });
+    for (const r of attention.closingReturns) {
+      items.push({
+        to: `/documents/${r.documentId}`,
+        Icon: Undo2,
+        tone: 'text-amber-600',
+        text: `${r.productName ?? r.sellerName ?? 'A purchase'}: ${r.daysLeft === 0 ? 'last day to return is today' : `return within ${r.daysLeft} day${r.daysLeft === 1 ? '' : 's'}`}`,
+      });
+    }
     for (const w of attention.expiring) {
       items.push({
         to: `/documents/${w.documentId}`,

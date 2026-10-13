@@ -99,9 +99,13 @@ public class Document extends BaseEntity {
 	@Column(name = "total_amount", precision = 12, scale = 2)
 	private BigDecimal totalAmount;
 
-	/** What the bill was spent on: a BillCategory name, as plain text (see BillCategory). */
+	/** What the money was spent on: a BillCategory name, as plain text (see BillCategory). */
 	@Column(name = "category", length = 30)
 	private String category;
+
+	/** The last day the purchase can be returned (printed return policy, or set by the user); null = unknown. */
+	@Column(name = "return_by_date")
+	private LocalDate returnByDate;
 
 	// ---- Background reading (see DocumentReadWorker) ----
 
@@ -169,6 +173,7 @@ public class Document extends BaseEntity {
 		this.taxAmount = details.taxAmount();
 		this.totalAmount = details.totalAmount();
 		this.category = details.category() == null ? null : details.category().name();
+		this.returnByDate = details.returnByDate();
 		this.items.clear();
 		for (DocumentItemView item : details.items()) {
 			this.items.add(new DocumentItem(this, items.size(), item));

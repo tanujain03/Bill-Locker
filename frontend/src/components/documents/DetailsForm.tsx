@@ -19,6 +19,7 @@ import {
 import { useFeedback } from '../../lib/feedback-context';
 import { buttonClass } from '../Button';
 import { TextField } from '../FormParts';
+import { RETURN_PRESETS, returnText } from '../../lib/returns';
 import { CopyButton } from './CopyButton';
 import { RegistrationLink } from './RegistrationLink';
 
@@ -153,6 +154,14 @@ export function DetailsForm({ value, onChange, fieldErrors, registration, savedL
             {field('totalAmount', 'number')}
           </div>
         </Wide>
+        <Wide>
+          <ReturnWindowField
+            purchaseDate={value.purchaseDate}
+            returnByDate={value.returnByDate}
+            error={fieldErrors.returnByDate}
+            onChange={set('returnByDate')}
+          />
+        </Wide>
       </Card>
 
       <section aria-labelledby="products-title" className="pt-2">
@@ -189,6 +198,50 @@ export function DetailsForm({ value, onChange, fieldErrors, registration, savedL
           </button>
         </div>
       </section>
+    </div>
+  );
+}
+
+/**
+ * "Return by": a date, or one click on "+7 / +10 / +15 / +30 days" counted from the purchase
+ * date (online orders often count from delivery: then pick the exact day). Empty = unknown.
+ */
+function ReturnWindowField(props: { purchaseDate: string; returnByDate: string; error?: string; onChange: (v: string) => void }) {
+  const plusDays = (days: number) =>
+    new Date(Date.parse(`${props.purchaseDate}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+  return (
+    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+      <Field
+        label={FIELD_LABELS.returnByDate}
+        type="date"
+        value={props.returnByDate}
+        onChange={props.onChange}
+        error={props.error}
+        hint={props.returnByDate ? returnText(props.returnByDate) : 'The last day it can be returned, if the shop allows returns'}
+      />
+      <div className="flex flex-wrap items-center gap-1.5 sm:pb-6" role="group" aria-label="Return window from the purchase date">
+        {RETURN_PRESETS.map((days) => (
+          <button
+            key={days}
+            type="button"
+            onClick={() => props.onChange(plusDays(days))}
+            disabled={!props.purchaseDate}
+            title={props.purchaseDate ? `Purchase date + ${days} days` : 'Add the purchase date first'}
+            className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            +{days} days
+          </button>
+        ))}
+        {props.returnByDate && (
+          <button
+            type="button"
+            onClick={() => props.onChange('')}
+            className="rounded-full px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+          >
+            Clear
+          </button>
+        )}
+      </div>
     </div>
   );
 }

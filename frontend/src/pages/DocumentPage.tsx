@@ -16,6 +16,7 @@ import { CopyButton } from '../components/documents/CopyButton';
 import { DetailsForm } from '../components/documents/DetailsForm';
 import { DocumentPreview } from '../components/documents/DocumentPreview';
 import { DuplicateWarning } from '../components/documents/DuplicateWarning';
+import { ReturnBanner } from '../components/documents/ReturnWindow';
 import { MoreMenu } from '../components/documents/MoreMenu';
 import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
 import { StatusBadge } from '../components/documents/StatusBadge';
@@ -372,6 +373,12 @@ export function DocumentPage() {
                   onDelete={remove}
                   onKeepBoth={keepBoth}
                 />
+              </div>
+            )}
+
+            {document.returnByDate && (
+              <div className="mt-4">
+                <ReturnBanner returnByDate={document.returnByDate} />
               </div>
             )}
 

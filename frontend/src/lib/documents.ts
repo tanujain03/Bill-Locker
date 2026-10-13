@@ -76,6 +76,8 @@ export type DocumentDetails = {
   items: DocumentItem[];
   /** What it was spent on. */
   category: BillCategory | null;
+  /** The last day the purchase can be returned ("YYYY-MM-DD"), or null. */
+  returnByDate: string | null;
 };
 
 export type DocumentDetail = DocumentDetails & {
@@ -125,6 +127,8 @@ export type DocumentSummary = {
   itemCount: number;
   firstProductName: string | null;
   category: BillCategory | null;
+  /** The last day the purchase can be returned, or null. */
+  returnByDate: string | null;
   readQueued: boolean;
   readError: string | null;
   sourceGmail: string | null;
@@ -157,6 +161,7 @@ export const FIELD_LABELS = {
   purchaseDate: 'Purchase date',
   taxAmount: 'Tax amount',
   totalAmount: 'Total amount',
+  returnByDate: 'Return by',
 } as const satisfies Partial<Record<keyof DocumentDetails, string>>;
 
 export const ITEM_LABELS = {
