@@ -89,6 +89,10 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   longer periods. Every document type keeps a `category` now (Gemini picks it); bills without one show as "Not sorted yet".
   Documents page filters `?from=&to=` and `?category=` (`NONE` = no category). Dashboard "Total spent" → `/expenses`. The
   chat assistant's `ai_me` has `monthly_budget` and its prompt has the same spending/period rules.
+  Level 2: period dropdown `PeriodMenu` (This month … Last 12 months, This year, Custom range; ‹ › via `shiftRange`),
+  category limits (table `category_budgets`, `PUT /api/expenses/budgets/{category}`, view `ai_category_budgets`),
+  recurring payments (same shop in ≥ 2 months, amounts within ±25% of the median, last 6 months), spending per weekday,
+  Export CSV (client-side from the Documents list, formula-safe).
   Guide: `docs/task-9-expenses.md`.
 
 ## Repository

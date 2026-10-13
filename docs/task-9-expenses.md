@@ -165,3 +165,78 @@ number of days before, no calendar), a custom range of 6 days, bad ranges, setti
 removing a budget, and sign-in required. `ReadOnlyQueryRunnerTests` checks the assistant
 can read `monthly_budget`. `BillsAndReceiptsApiTests` and `GeminiAnswerParserTests` now check
 that an invoice keeps its category.
+
+## 7. Level 2: period dropdown, category limits, recurring payments, weekdays, CSV
+
+### 7.1 The period dropdown (`components/expenses/PeriodMenu.tsx`)
+
+The period buttons became one dropdown button ("This month · Oct 2026 ▾") with ‹ › beside it.
+
+| Menu item | From | To |
+|---|---|---|
+| This month / Last month | the 1st | the month's last day |
+| Last 3 / 6 / 12 months | the 1st of the month 2 / 5 / 11 months ago | today |
+| This year | 1 January | today |
+| Custom range | the date you pick | the date you pick (date fields inside the menu) |
+
+Each item shows its dates. The menu works with the keyboard (↑ ↓ to move, Enter to choose, Escape
+to close) and closes on a click outside. ‹ › move to the period before or after of the same length
+(`shiftRange` in `lib/expenses.ts`): a period starting on the 1st moves by whole months
+(1 May – 13 Oct → 1 Nov – 30 Apr), any other by its number of days; › is disabled when the next
+period would start after today, and no period ends after today. A range that equals a menu item
+shows as that item; any other is named by its dates. `?period=year` from older links still works
+(now labelled "Last 12 months"). The menu hangs from the left of the ‹ ▾ › group so it stays on a
+phone screen.
+
+### 7.2 Category limits
+
+A monthly limit per category ("Food: ₹6,000 a month"), in a new table `category_budgets`
+(`expense/CategoryBudget.java`: user, category, amount; unique per user and category; created by
+Hibernate, no reset needed).
+
+- `PUT /api/expenses/budgets/{category}` with `{"amount": 6000}` sets or changes it; `{"amount": null}`
+  removes it. An unknown category → 400; 0 or less → 400 with `fieldErrors.amount`.
+- `categories[].budget` in the report is the monthly limit (or null). A category with a limit is
+  listed even when nothing was spent on it (₹0 of ₹6,000).
+- On the page (`CategoryBreakdown.tsx`) the pencil on a row sets, changes or removes its limit, and
+  "Add a monthly limit for a category" adds one for any category. With a limit, the row's bar shows
+  how much of it is used, scaled to the period (`periodMonths`: a 6-month period gets 6 × the
+  limit): green "Within limit" under 80%, amber "Close to limit" from 80%, red "Over limit by ₹…"
+  above 100%, always with an icon and words.
+
+### 7.3 Recurring payments (`ExpenseService.recurring`)
+
+In the 6 calendar months up to the period's end, a shop counts as a recurring payment when it was
+paid in **at least 2 different months** and **every amount is within ±25% of the median amount**
+("Airtel" and "airtel " are one shop). So a phone bill or Netflix counts; a shop where you buy
+different things at different prices does not. For each: the average amount, in how many months it
+was paid, the last date and an estimated next date (last + 1 month). Biggest first, at most 8. The
+panel (`RecurringPayments.tsx`) also shows the monthly total; a next date already passed shows as
+"was due".
+
+### 7.4 By weekday
+
+`weekdays` lists all seven days (Monday first) with the money spent on that weekday in the period.
+`WeekdayChart.tsx` draws seven bars; the busiest day is the dark bar and is also named in words.
+
+### 7.5 Export CSV
+
+"Export CSV" downloads the saved bills of the period (`exportCsv` in `lib/expenses.ts`, using the
+existing Documents list, no new endpoint): date, shop, category, type, products, amount and bill
+number. The file starts with a UTF-8 marker so Excel shows ₹ and accents, and a value that starts
+with = + - or @ (read from a bill) gets a leading apostrophe so a spreadsheet never runs it as a
+formula.
+
+### 7.6 Insights and the assistant
+
+Insights (now up to five) also say which category is furthest over its limit, what the recurring
+payments cost a month, and on which weekday you spend the most (from 3 bills on). The chat assistant
+gets a seventh view, `ai_category_budgets(category, amount)`, and its prompt explains limits and
+recurring payments, so "Am I over my food limit?" works.
+
+### 7.7 Tests
+
+`ExpenseApiTests`: limits listed without spending, changed (not doubled), removed, bad category and
+zero amount rejected; spending per weekday; recurring payments need two months and similar amounts
+(Airtel ₹499 × 3 counts, Amazon ₹100/₹3,000 and a one-month Netflix do not).
+`ReadOnlyQueryRunnerTests`: the new view is a security barrier and shows only the user's own limits.

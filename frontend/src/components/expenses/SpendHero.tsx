@@ -4,8 +4,8 @@ import { ApiError, errorMessage } from '../../lib/api';
 import { formatAmount } from '../../lib/documents';
 import {
   change,
-  daysBetween,
   monthsTouched,
+  periodMonths,
   previousLabel,
   rangeLabel,
   setBudget,
@@ -79,9 +79,7 @@ export function SpendHero({ report, onChanged }: { report: ExpenseReport; onChan
  */
 function periodBudget(report: ExpenseReport): { amount: number; months: number } | null {
   if (report.budget === null) return null;
-  const months = report.from.endsWith('-01')
-    ? monthsTouched(report)
-    : Math.round((daysBetween(report.from, report.to) / 30.44) * 10) / 10;
+  const months = periodMonths(report);
   return { amount: report.budget * months, months };
 }
 

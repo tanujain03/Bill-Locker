@@ -174,6 +174,80 @@ class ExpenseApiTests extends DocumentApiTestBase {
 	}
 
 	@Test
+	void categoryLimitsShowEvenWithoutSpending() throws Exception {
+		String token = registerAndGetToken(uniqueEmail("e-limits"));
+		saveBill(token, """
+				{"category": "FOOD", "purchaseDate": "2026-10-02", "totalAmount": 500}""");
+		categoryBudget(token, "FOOD", "{\"amount\": 6000}").andExpect(status().isOk());
+		categoryBudget(token, "TRAVEL", "{\"amount\": 2000}").andExpect(status().isOk());
+
+		report(token, null)
+				.andExpect(jsonPath("$.categories.length()").value(2))
+				.andExpect(jsonPath("$.categories[0].category").value("FOOD"))
+				.andExpect(jsonPath("$.categories[0].budget").value(6000.00))
+				.andExpect(jsonPath("$.categories[1].category").value("TRAVEL")) // nothing spent, but it has a limit
+				.andExpect(jsonPath("$.categories[1].amount").value(0))
+				.andExpect(jsonPath("$.categories[1].budget").value(2000.00));
+
+		categoryBudget(token, "FOOD", "{\"amount\": 7500}").andExpect(status().isOk()); // changed, not added twice
+		categoryBudget(token, "TRAVEL", "{\"amount\": null}").andExpect(status().isOk()); // removed
+		report(token, null)
+				.andExpect(jsonPath("$.categories.length()").value(1))
+				.andExpect(jsonPath("$.categories[0].budget").value(7500.00));
+
+		categoryBudget(token, "NOT_A_CATEGORY", "{\"amount\": 10}").andExpect(status().isBadRequest());
+		categoryBudget(token, "FOOD", "{\"amount\": 0}").andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void spendingPerWeekday() throws Exception {
+		String token = registerAndGetToken(uniqueEmail("e-weekday"));
+		saveBill(token, """
+				{"purchaseDate": "2026-10-05", "totalAmount": 300}"""); // a Monday
+		saveBill(token, """
+				{"purchaseDate": "2026-10-04", "totalAmount": 120}"""); // a Sunday
+
+		report(token, null)
+				.andExpect(jsonPath("$.weekdays.length()").value(7))
+				.andExpect(jsonPath("$.weekdays[0].day").value("MONDAY"))
+				.andExpect(jsonPath("$.weekdays[0].amount").value(300.00))
+				.andExpect(jsonPath("$.weekdays[6].day").value("SUNDAY"))
+				.andExpect(jsonPath("$.weekdays[6].amount").value(120.00))
+				.andExpect(jsonPath("$.weekdays[2].bills").value(0));
+	}
+
+	@Test
+	void recurringPaymentsNeedTwoMonthsAndSimilarAmounts() throws Exception {
+		String token = registerAndGetToken(uniqueEmail("e-recurring"));
+		for (String date : new String[] {"2026-08-03", "2026-09-03", "2026-10-03"}) {
+			saveBill(token, """
+					{"category": "PHONE_INTERNET", "sellerName": "Airtel", "purchaseDate": "%s", "totalAmount": 499}""".formatted(date));
+		}
+		// Different amounts every time: shopping, not a subscription.
+		saveBill(token, """
+				{"sellerName": "Amazon", "purchaseDate": "2026-09-10", "totalAmount": 100}""");
+		saveBill(token, """
+				{"sellerName": "Amazon", "purchaseDate": "2026-10-10", "totalAmount": 3000}""");
+		// Only one month: not recurring yet.
+		saveBill(token, """
+				{"sellerName": "Netflix", "purchaseDate": "2026-10-01", "totalAmount": 649}""");
+
+		report(token, null)
+				.andExpect(jsonPath("$.recurring.length()").value(1))
+				.andExpect(jsonPath("$.recurring[0].name").value("Airtel"))
+				.andExpect(jsonPath("$.recurring[0].category").value("PHONE_INTERNET"))
+				.andExpect(jsonPath("$.recurring[0].averageAmount").value(499.00))
+				.andExpect(jsonPath("$.recurring[0].months").value(3))
+				.andExpect(jsonPath("$.recurring[0].lastDate").value("2026-10-03"))
+				.andExpect(jsonPath("$.recurring[0].nextDate").value("2026-11-03"));
+	}
+
+	private ResultActions categoryBudget(String token, String category, String json) throws Exception {
+		return mvc.perform(put("/api/expenses/budgets/" + category).header("Authorization", bearer(token))
+				.contentType(MediaType.APPLICATION_JSON).content(json));
+	}
+
+	@Test
 	void needsSignIn() throws Exception {
 		mvc.perform(get("/api/expenses")).andExpect(status().isUnauthorized());
 	}

@@ -3,12 +3,14 @@ package project.bill_locker.expense;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -42,14 +44,22 @@ public class ExpenseService {
 	private static final int MAX_CALENDAR_DAYS = 62;
 	/** About 3 years: enough for any question, small enough to stay quick. */
 	private static final int MAX_DAYS = 1100;
+	/** Recurring payments are looked for in the 6 months up to the period's end. */
+	private static final int RECURRING_MONTHS = 6;
+	/** Amounts of a recurring payment stay within ±25% of their median. */
+	private static final BigDecimal RECURRING_TOLERANCE = new BigDecimal("0.25");
+	private static final int TOP_RECURRING = 8;
 
 	private final DocumentRepository documents;
 	private final UserRepository users;
+	private final CategoryBudgetRepository categoryBudgets;
 	private final Clock clock;
 
-	public ExpenseService(DocumentRepository documents, UserRepository users, Clock clock) {
+	public ExpenseService(DocumentRepository documents, UserRepository users, CategoryBudgetRepository categoryBudgets,
+			Clock clock) {
 		this.documents = documents;
 		this.users = users;
+		this.categoryBudgets = categoryBudgets;
 		this.clock = clock;
 	}
 
@@ -85,19 +95,40 @@ public class ExpenseService {
 				dailyAverage(total, from, to),
 				projectedTotal(total, from, to),
 				user.getMonthlyBudget(),
-				categories(bills, previous),
+				categories(bills, previous, budgetsOf(userId)),
 				topProducts(bills),
 				topShops(bills),
 				ChronoUnit.DAYS.between(from, to) < MAX_CALENDAR_DAYS ? days(bills, from, to) : List.of(),
 				months(dated, from, to),
 				bills.stream().filter(d -> d.getTotalAmount() != null)
 						.max(Comparator.comparing(Document::getTotalAmount)).map(DocumentSummary::of).orElse(null),
-				bills.stream().filter(d -> BillCategory.parse(d.getCategory()) == null).count());
+				bills.stream().filter(d -> BillCategory.parse(d.getCategory()) == null).count(),
+				weekdays(bills),
+				recurring(dated, to));
 	}
 
 	@Transactional
 	public void setBudget(UUID userId, BigDecimal amount) {
 		users.findById(userId).orElseThrow().setMonthlyBudget(amount);
+	}
+
+	/** Sets one category's monthly limit; null removes it. */
+	@Transactional
+	public void setCategoryBudget(UUID userId, BillCategory category, BigDecimal amount) {
+		var existing = categoryBudgets.findByUserIdAndCategory(userId, category);
+		if (amount == null) {
+			existing.ifPresent(categoryBudgets::delete);
+		} else if (existing.isPresent()) {
+			existing.get().setAmount(amount);
+		} else {
+			categoryBudgets.save(new CategoryBudget(users.getReferenceById(userId), category, amount));
+		}
+	}
+
+	private Map<BillCategory, BigDecimal> budgetsOf(UUID userId) {
+		Map<BillCategory, BigDecimal> map = new EnumMap<>(BillCategory.class);
+		categoryBudgets.findByUserId(userId).forEach(b -> map.put(b.getCategory(), b.getAmount()));
+		return map;
 	}
 
 	/** "2026-10-07" → that date; no value → the fallback. A future date is fine: it is just empty. */
@@ -151,15 +182,68 @@ public class ExpenseService {
 		return total.multiply(BigDecimal.valueOf(all)).divide(BigDecimal.valueOf(soFar), 2, RoundingMode.HALF_UP);
 	}
 
-	/** Money per category in the period (biggest first), with the previous period's amount to compare. */
-	private static List<ExpenseReport.CategorySpend> categories(List<Document> bills, List<Document> previous) {
+	/**
+	 * Money per category in the period (biggest first), with the previous period's amount and
+	 * the monthly limit. Categories with a limit are listed even without spending, so the user
+	 * sees "₹0 of ₹6,000".
+	 */
+	private static List<ExpenseReport.CategorySpend> categories(List<Document> bills, List<Document> previous,
+			Map<BillCategory, BigDecimal> budgets) {
 		Map<BillCategory, List<Document>> now = byCategory(bills);
 		Map<BillCategory, List<Document>> before = byCategory(previous);
+		budgets.keySet().forEach(category -> now.putIfAbsent(category, List.of()));
 		return now.entrySet().stream()
 				.map(e -> new ExpenseReport.CategorySpend(e.getKey(), sum(e.getValue()), e.getValue().size(),
-						sum(before.getOrDefault(e.getKey(), List.of()))))
+						sum(before.getOrDefault(e.getKey(), List.of())), e.getKey() == null ? null : budgets.get(e.getKey())))
 				.sorted(Comparator.comparing(ExpenseReport.CategorySpend::amount).reversed())
 				.toList();
+	}
+
+	/** All seven weekdays, Monday first (zeros included). */
+	private static List<ExpenseReport.WeekdaySpend> weekdays(List<Document> bills) {
+		List<ExpenseReport.WeekdaySpend> days = new ArrayList<>();
+		for (DayOfWeek day : DayOfWeek.values()) {
+			List<Document> that = bills.stream().filter(d -> d.getPurchaseDate().getDayOfWeek() == day).toList();
+			days.add(new ExpenseReport.WeekdaySpend(day, sum(that), that.size()));
+		}
+		return days;
+	}
+
+	/**
+	 * Payments that come back every month, found in the 6 months up to the period's end: the
+	 * same shop ("Airtel" = "airtel "), paid in at least 2 different months, every amount
+	 * within ±25% of the median amount. So a phone bill or Netflix counts; a shop where you
+	 * buy different things at different prices does not.
+	 */
+	private static List<ExpenseReport.RecurringSpend> recurring(List<Document> dated, LocalDate to) {
+		LocalDate since = YearMonth.from(to).minusMonths(RECURRING_MONTHS - 1).atDay(1);
+		Map<String, List<Document>> byShop = new LinkedHashMap<>();
+		for (Document d : between(dated, since, to)) {
+			if (d.getSellerName() != null && !d.getSellerName().isBlank() && d.getTotalAmount() != null) {
+				byShop.computeIfAbsent(d.getSellerName().strip().toLowerCase(Locale.ROOT), k -> new ArrayList<>()).add(d);
+			}
+		}
+		List<ExpenseReport.RecurringSpend> found = new ArrayList<>();
+		for (List<Document> shop : byShop.values()) {
+			long months = shop.stream().map(d -> YearMonth.from(d.getPurchaseDate())).distinct().count();
+			if (months < 2 || !similarAmounts(shop)) {
+				continue;
+			}
+			Document latest = shop.stream().max(Comparator.comparing(Document::getPurchaseDate)).orElseThrow();
+			BigDecimal average = sum(shop).divide(BigDecimal.valueOf(shop.size()), 2, RoundingMode.HALF_UP);
+			found.add(new ExpenseReport.RecurringSpend(latest.getSellerName().strip(), BillCategory.parse(latest.getCategory()),
+					average, months, latest.getPurchaseDate(), latest.getPurchaseDate().plusMonths(1)));
+		}
+		found.sort(Comparator.comparing(ExpenseReport.RecurringSpend::averageAmount).reversed());
+		return found.stream().limit(TOP_RECURRING).toList();
+	}
+
+	/** Every amount within ±25% of the median (the middle amount, so one odd bill can't hide the rest). */
+	private static boolean similarAmounts(List<Document> bills) {
+		List<BigDecimal> amounts = bills.stream().map(Document::getTotalAmount).sorted().toList();
+		BigDecimal median = amounts.get(amounts.size() / 2);
+		BigDecimal allowed = median.multiply(RECURRING_TOLERANCE);
+		return median.signum() > 0 && amounts.stream().allMatch(a -> a.subtract(median).abs().compareTo(allowed) <= 0);
 	}
 
 	/** Bills per category; the key null holds the bills nobody sorted yet. */

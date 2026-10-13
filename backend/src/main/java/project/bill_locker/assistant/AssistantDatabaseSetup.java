@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * <li>A login {@code bill_locker_ai} (password: AI_DATABASE_PASSWORD) that may only SELECT
  * from the views below and belongs to no other role. {@link ReadOnlyQueryRunner} runs the AI's
  * SQL logged in as it, so {@code set_config('role', …)} has no role to switch to.</li>
- * <li>Six {@code ai_*} views: the user's own data. Secrets (password hash, reset tokens, Gmail
+ * <li>Seven {@code ai_*} views: the user's own data. Secrets (password hash, reset tokens, Gmail
  * tokens) and file bytes are left out. Views read the tables with their owner's rights, so the
  * login never needs rights on a table. They are {@code security_barrier} views: Postgres
  * applies the user filter first. A plain view lets the planner test the AI's own conditions
@@ -69,6 +69,8 @@ class AssistantDatabaseSetup {
 			new String[] {"ai_gmail_emails", """
 					SELECT id, account_id, from_name, from_email, subject, snippet, received_at, kind
 					FROM gmail_emails WHERE user_id = """ + ME},
+			new String[] {"ai_category_budgets", """
+					SELECT category, amount FROM category_budgets WHERE user_id = """ + ME},
 			new String[] {"ai_gmail_files", """
 					SELECT f.id, f.email_id, f.file_name, f.content_type, f.size_bytes, f.status, f.document_id, f.error
 					FROM gmail_files f JOIN gmail_emails e ON e.id = f.email_id
@@ -95,6 +97,8 @@ class AssistantDatabaseSetup {
 			ai_gmail_emails(id, account_id, from_name, from_email, subject, snippet, received_at, kind):
 			  scanned emails; account_id -> ai_gmail_accounts.id; kind: INVOICE, WARRANTY, SERVICE, RECEIPT,
 			  ORDER, UNSURE.
+			ai_category_budgets(category, amount): the user's monthly spending limit per category (set on the
+			  Expenses page), in rupees; a category without a row has no limit.
 			ai_gmail_files(id, email_id, file_name, content_type, size_bytes, status, document_id, error):
 			  bill files found in emails; status: NEW (to review), IGNORED, IMPORTING, IMPORTED, FAILED;
 			  document_id -> ai_documents.id once imported; email_id -> ai_gmail_emails.id.

@@ -1,17 +1,18 @@
-import { CalendarDays, Crown, Lightbulb, PiggyBank, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
+import { CalendarDays, CircleAlert, Crown, Lightbulb, PiggyBank, Repeat, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router';
 import { BILL_CATEGORY_LABELS, formatAmount } from '../../lib/documents';
-import { change, daysBetween, previousLabel, singleMonth, today, type ExpenseReport } from '../../lib/expenses';
+import { change, daysBetween, expenseLink, periodMonths, previousLabel, singleMonth, today, type ExpenseReport } from '../../lib/expenses';
+import { WEEKDAY_NAMES } from './WeekdayChart';
 import { Panel } from '../dashboard/Panel';
 
 type Insight = { icon: LucideIcon; text: string; to?: string };
 
 /**
  * A few plain sentences about the period, worked out from the report: what changed,
- * what took the most, how the budget is going. At most four, the most useful first.
+ * what took the most, how the budget and the limits are going. At most five, the most useful first.
  */
 export function Insights({ report }: { report: ExpenseReport }) {
-  const insights = buildInsights(report).slice(0, 4);
+  const insights = buildInsights(report).slice(0, 5);
   if (insights.length === 0) return null;
   return (
     <Panel icon={Lightbulb} title="Insights">
@@ -64,7 +65,20 @@ function buildInsights(r: ExpenseReport): Insight[] {
     }
   }
 
-  const top = r.categories.find((c) => c.category);
+  // A category over its monthly limit (the one furthest over).
+  const months = periodMonths(r);
+  const over = r.categories
+    .filter((c) => c.category && c.budget !== null && c.amount > c.budget * months)
+    .sort((a, b) => b.amount - b.budget! * months - (a.amount - a.budget! * months))[0];
+  if (over) {
+    list.push({
+      icon: CircleAlert,
+      text: `${BILL_CATEGORY_LABELS[over.category!]} is over its limit by ${money(over.amount - over.budget! * months)} (${money(over.amount)} of ${money(over.budget! * months)}).`,
+      to: expenseLink(r, over.category),
+    });
+  }
+
+  const top = r.categories.find((c) => c.category && c.amount > 0);
   if (top && r.total > 0) {
     const share = Math.round((top.amount / r.total) * 100);
     list.push({
@@ -86,9 +100,23 @@ function buildInsights(r: ExpenseReport): Insight[] {
     });
   }
 
+  if (r.recurring.length > 0) {
+    const monthly = r.recurring.reduce((sum, x) => sum + x.averageAmount, 0);
+    list.push({
+      icon: Repeat,
+      text: `${r.recurring.length === 1 ? '1 recurring payment' : `${r.recurring.length} recurring payments`} cost about ${money(monthly)} a month, the biggest is ${r.recurring[0].name}.`,
+    });
+  }
+
   const diff = change(r.total, r.previousTotal);
   if (diff !== null && diff < 0) {
     list.push({ icon: TrendingDown, text: `Nice: you spent ${money(r.previousTotal - r.total)} less than in ${previous}.` });
+  }
+
+  // The weekday pattern only means something with a few bills.
+  const weekday = r.weekdays.reduce((best, d) => (d.amount > best.amount ? d : best), r.weekdays[0]);
+  if (weekday && r.bills >= 3 && weekday.amount > 0) {
+    list.push({ icon: CalendarDays, text: `You spend the most on ${WEEKDAY_NAMES[weekday.day]}s: ${money(weekday.amount)} in this period.` });
   }
 
   const busiest = r.days.reduce((best, d) => (d.amount > best.amount ? d : best), r.days[0]);
