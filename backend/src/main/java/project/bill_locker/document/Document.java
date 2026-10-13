@@ -94,7 +94,7 @@ public class Document extends BaseEntity {
 	@Column(name = "total_amount", precision = 12, scale = 2)
 	private BigDecimal totalAmount;
 
-	/** Bills and receipts only: a BillCategory name, as plain text (see BillCategory). */
+	/** What the bill was spent on: a BillCategory name, as plain text (see BillCategory). */
 	@Column(name = "category", length = 30)
 	private String category;
 

@@ -65,6 +65,6 @@ public record SaveDocumentRequest(
 		List<DocumentItemView> views = items == null ? List.of() : items.stream().map(ItemRequest::toView).toList();
 		return new DocumentDetails(documentType, documentNumber, sellerName, sellerAddress, sellerContact,
 				buyerName, buyerAddress, buyerEmail, purchaseDate, taxAmount, totalAmount, views,
-				documentType == DocumentType.RECEIPT ? category : null); // only bills and receipts have one
+				category);
 	}
 }

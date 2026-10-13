@@ -136,7 +136,8 @@ function Overview({ data, gmail }: { data: Dashboard; gmail: GmailOverview | nul
           value={formatAmount(data.totalSpent, { whole: true })}
           // A zero reads like bad news on every visit, so say it in words instead.
           sub={data.spentThisMonth ? `${formatAmount(data.spentThisMonth, { whole: true })} this month` : 'No spending this month'}
-          to="/documents?status=SAVED"
+          // Opens the Expenses page: this month by category, product, shop and day.
+          to="/expenses"
         />
         <StatCard
           icon={CircleAlert}

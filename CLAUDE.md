@@ -59,9 +59,9 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   local DB has a CHECK constraint on `documents.document_type`. `components/documents/DocumentList.tsx` is shared.
   Bills/receipts are light: after the AI read a RECEIPT goes straight to SAVED (`DocumentService.statusAfterRead`;
   invoices stay EXTRACTED for review), with `documents.category` (`BillCategory`: TRAVEL, FOOD, GROCERIES, FUEL,
-  UTILITIES, PHONE_INTERNET, SHOPPING, HEALTH, OTHER; plain varchar, parsed in Java, so no DB enum constraint;
-  only kept for RECEIPT). The form shows only type, category, shop, date, amount, number for a RECEIPT; `/bills`
-  has category chips (`?category=`).
+  UTILITIES, PHONE_INTERNET, SHOPPING, HEALTH, OTHER, + since task 9 ELECTRONICS, APPLIANCES, FASHION, HOME,
+  ENTERTAINMENT; plain varchar, parsed in Java, so no DB enum constraint; kept for every type since task 9). The form
+  shows only type, category, shop, date, amount, number for a RECEIPT; `/bills` has category chips (`?category=`).
 - UI/UX pass: icon-rail sidebar (hover opens, pin button; navigation + Settings only), top bar with search
   (`Ctrl K` → `/documents?q=`), 🔔 (`useAttention`), one-click `UploadButton` + `DropAnywhere`, phone tab bar,
   `/settings` (`PUT /api/users/me`, `PUT /api/users/me/password`; wrong current password = 400 `WRONG_PASSWORD`,
@@ -82,6 +82,23 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   `server.port=${PORT:8080}`, `server.forward-headers-strategy=framework`. Guide: `docs/task-7-deploy.md`.
 - Task 8: chat assistant without superuser rights (Neon): see Task 6 above. Plan and reasons:
   `docs/task-8-assistant-on-neon-plan.md`.
+- Task 9: expense tracker (`/expenses`, `ExpensesPage`, package `expense`): `GET /api/expenses?from=&to=` adds up a period
+  of **saved** bills (total, the period before, daily average, pace, per category / product line / shop / day, months).
+  Period buttons This month / Last month / Last 6 months / Last year / Custom range (`presetRange` in `lib/expenses.ts`;
+  URL `?period=…&from=&to=`). Monthly budget in `users.monthly_budget` (`PUT /api/expenses/budget`), scaled by months for
+  longer periods. Every document type keeps a `category` now (Gemini picks it); bills without one show as "Not sorted yet".
+  Documents page filters `?from=&to=` and `?category=` (`NONE` = no category). Dashboard "Total spent" → `/expenses`. The
+  chat assistant's `ai_me` has `monthly_budget` and its prompt has the same spending/period rules.
+  Level 2: period dropdown `PeriodMenu` (This month … Last 12 months, This year, Custom range; ‹ › via `shiftRange`),
+  category limits (table `category_budgets`, `PUT /api/expenses/budgets/{category}`, view `ai_category_budgets`),
+  recurring payments (same shop in ≥ 2 months, amounts within ±25% of the median, last 6 months), spending per weekday,
+  Export CSV (client-side from the Documents list, formula-safe).
+  Guide: `docs/task-9-expenses.md`.
+- Task 10: warranty claim kit (`/warranties/claim/:documentId/:position`, `ClaimKitPage`; "Claim" on Warranties rows,
+  "Claim kit" on saved products). `GET /api/documents/{id}/items/{position}/claim-kit` (`ClaimKitService`, uses
+  `WarrantyRules`): facts, status, brand support + Google Maps service-centre search links, missing facts. The claim email
+  is written in the browser (`lib/claims.ts` `claimEmail`) and opened with `mailto:` — the app never sends anything.
+  `WarrantyView.position`. Print sheet: `print:hidden` on the app chrome. Guide: `docs/task-10-claim-kit.md`.
 
 ## Repository
 

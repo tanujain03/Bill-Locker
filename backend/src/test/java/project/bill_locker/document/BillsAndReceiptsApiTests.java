@@ -87,17 +87,17 @@ class BillsAndReceiptsApiTests extends DocumentApiTestBase {
 	}
 
 	@Test
-	void theCategoryIsKeptOnlyForBillsAndReceipts() throws Exception {
+	void everyDocumentTypeKeepsItsCategory() throws Exception {
 		String token = registerAndGetToken(uniqueEmail("category"));
 		String id = uploadPdf(token, "bill.pdf");
 
 		save(token, id, """
 				{"documentType": "RECEIPT", "sellerName": "Swiggy", "category": "FOOD"}
 				""").andExpect(jsonPath("$.category").value("FOOD"));
-		// Turned into an invoice: an invoice has no category.
+		// An invoice has one too: the Expenses page adds up money per category.
 		save(token, id, """
-				{"documentType": "INVOICE", "sellerName": "Croma", "category": "FOOD"}
-				""").andExpect(jsonPath("$.category").doesNotExist());
+				{"documentType": "INVOICE", "sellerName": "Croma", "category": "ELECTRONICS"}
+				""").andExpect(jsonPath("$.category").value("ELECTRONICS"));
 	}
 
 	private org.springframework.test.web.servlet.ResultActions save(String token, String id, String json) throws Exception {

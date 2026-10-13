@@ -1,5 +1,6 @@
-import { FileText, Package, Plus, ReceiptText, ShieldCheck, Store, Trash2, UserRound, type LucideIcon } from 'lucide-react';
+import { FileText, Package, Plus, ReceiptText, ShieldCheck, Store, Trash2, UserRound, Wrench, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import {
   emptyItem,
   formatDate,
@@ -16,6 +17,7 @@ import {
   type RegistrationSource,
 } from '../../lib/documents';
 import { useFeedback } from '../../lib/feedback-context';
+import { buttonClass } from '../Button';
 import { TextField } from '../FormParts';
 import { CopyButton } from './CopyButton';
 import { RegistrationLink } from './RegistrationLink';
@@ -27,6 +29,8 @@ type Props = {
   fieldErrors: Record<string, string>;
   /** Task 5: finding a confirmed brand's registration page, run by the document page. */
   registration: RegistrationSearch;
+  /** The claim kit of product `index`, or null when it isn't saved as shown (new or edited). */
+  claimLink?: (index: number) => string | null;
 };
 
 type RegistrationSearch = {
@@ -39,7 +43,7 @@ type RegistrationSearch = {
 };
 
 /** The details of a bill, grouped like the CSV, each field with its own copy button. */
-export function DetailsForm({ value, onChange, fieldErrors, registration }: Props) {
+export function DetailsForm({ value, onChange, fieldErrors, registration, claimLink }: Props) {
   const { confirm } = useFeedback();
   type Field = keyof typeof FIELD_LABELS;
   const set = (field: Field) => (text: string) => onChange({ ...value, [field]: text });
@@ -115,7 +119,15 @@ export function DetailsForm({ value, onChange, fieldErrors, registration }: Prop
     <div className="space-y-4">
       <Card icon={FileText} title="Document">
         {typePicker}
-        {field('documentNumber')}
+        {/* What it was spent on: the Expenses page adds money up per category. */}
+        <Select
+          label={FIELD_LABELS.category}
+          value={value.category}
+          onChange={set('category')}
+          options={Object.entries(BILL_CATEGORY_LABELS)}
+          empty="Not set"
+        />
+        <Wide>{field('documentNumber')}</Wide>
       </Card>
 
       <Card icon={Store} title="Seller" description="The shop or company that sold it">
@@ -160,6 +172,7 @@ export function DetailsForm({ value, onChange, fieldErrors, registration }: Prop
               onRemove={() => removeItem(index)}
               fieldErrors={fieldErrors}
               registration={registration}
+              claimLink={claimLink?.(index) ?? null}
             />
           ))}
           {/* At the end of the list: you add the next product where you finished the last one. */}
@@ -184,6 +197,7 @@ function ItemCard(props: {
   onRemove: () => void;
   fieldErrors: Record<string, string>;
   registration: RegistrationSearch;
+  claimLink: string | null;
 }) {
   const { index, item } = props;
   const field = (name: keyof typeof ITEM_LABELS, type = 'text', hint?: string) => (
@@ -209,6 +223,12 @@ function ItemCard(props: {
           <h3 className="truncate font-semibold">{item.productName.trim() || 'Unnamed product'}</h3>
         </div>
         <div className="flex shrink-0 gap-1">
+          {props.claimLink && (
+            <Link to={props.claimLink} className={buttonClass({ size: 'sm' })} title="Everything you need to claim this warranty">
+              <Wrench className="size-4" aria-hidden />
+              Claim kit
+            </Link>
+          )}
           <CopyButton text={itemToText(item, index)} label={`Copy product ${index + 1}`}>
             Copy
           </CopyButton>

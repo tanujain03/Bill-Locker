@@ -165,12 +165,34 @@ class ReadOnlyQueryRunnerTests extends DocumentApiTestBase {
 
 	@Test
 	void everyViewWorksAndShowsOwnRows() {
-		for (String view : List.of("ai_me", "ai_documents", "ai_items", "ai_gmail_accounts", "ai_gmail_emails", "ai_gmail_files")) {
+		for (String view : List.of("ai_me", "ai_documents", "ai_items", "ai_category_budgets", "ai_gmail_accounts", "ai_gmail_emails",
+				"ai_gmail_files")) {
 			assertThatCode(() -> runner.run(userA, "SELECT * FROM " + view)).doesNotThrowAnyException();
 		}
 		assertThat(runner.run(userA, "SELECT email FROM ai_me")).extracting(r -> r.get("email")).containsExactly(emailA);
 		assertThat(runner.run(userA, "SELECT product_name FROM ai_items")).extracting(r -> r.get("product_name"))
 				.containsExactly("Thing");
+	}
+
+	@Test
+	void categoryLimitsAreOwnRowsOnly() throws Exception {
+		// "Am I over my food limit?" reads ai_category_budgets; B's limits stay invisible to A.
+		jdbc.update("""
+				INSERT INTO category_budgets (id, user_id, category, amount, created_at, updated_at)
+				VALUES (gen_random_uuid(), ?, 'FOOD', 6000, now(), now()), (gen_random_uuid(), ?, 'FOOD', 99, now(), now())
+				""", userA, userB);
+		assertThat(runner.run(userA, "SELECT category, amount FROM ai_category_budgets"))
+				.extracting(r -> r.get("category") + "=" + new java.math.BigDecimal(String.valueOf(r.get("amount"))).intValue())
+				.containsExactly("FOOD=6000");
+	}
+
+	@Test
+	void theMonthlyBudgetIsReadable() {
+		// "How much of my budget is left?" needs it (set on the Expenses page).
+		jdbc.update("UPDATE users SET monthly_budget = 25000 WHERE id = ?", userA);
+		assertThat(runner.run(userA, "SELECT monthly_budget FROM ai_me"))
+				.extracting(r -> new java.math.BigDecimal(String.valueOf(r.get("monthly_budget"))).intValue())
+				.containsExactly(25000);
 	}
 
 	@Test
@@ -194,7 +216,7 @@ class ReadOnlyQueryRunnerTests extends DocumentApiTestBase {
 				""", String.class);
 		assertThat(plain).isEmpty();
 		assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_class WHERE relkind = 'v' AND relname LIKE 'ai\\_%'", Long.class))
-				.isEqualTo(6);
+				.isEqualTo(7);
 	}
 
 	@Test

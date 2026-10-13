@@ -21,7 +21,7 @@ public record DocumentDetails(
 		BigDecimal taxAmount,
 		BigDecimal totalAmount,
 		List<DocumentItemView> items,
-		/** Only for bills and receipts (RECEIPT): what it was for. */
+		/** What it was spent on (any document type). */
 		BillCategory category) {
 
 	public DocumentDetails {

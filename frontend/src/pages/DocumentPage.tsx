@@ -31,6 +31,7 @@ import {
   saveDocument,
   type DocumentDetail,
 } from '../lib/documents';
+import { claimKitLink } from '../lib/claims';
 import { useFeedback } from '../lib/feedback-context';
 import { billShareText } from '../lib/share';
 import { usePageTitle } from '../lib/usePageTitle';
@@ -392,6 +393,12 @@ export function DocumentPage() {
                         document.status !== 'UPLOADED' && index < document.items.length && busy === null && finding === null,
                       onConfirm: (index, brand) => openRegistrationPage(index, brand),
                     }}
+                    // The kit reads the saved bill, so only for saved products without unsaved edits.
+                    claimLink={(index) =>
+                      document.status === 'SAVED' && !dirty && index < document.items.length
+                        ? claimKitLink(document.id, index)
+                        : null
+                    }
                   />
                 )}
 

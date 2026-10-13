@@ -1,10 +1,11 @@
-import { ArrowRight, ExternalLink, Search, ShieldCheck } from 'lucide-react';
+import { ExternalLink, FileText, Search, ShieldCheck, Wrench, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ErrorState } from '../components/ErrorState';
 import { Tab, TabList } from '../components/Tabs';
 import { WarrantyStatusPill } from '../components/warranties/WarrantyStatusPill';
 import { errorMessage } from '../lib/api';
+import { claimKitLink } from '../lib/claims';
 import { usePageTitle } from '../lib/usePageTitle';
 import { formatDate } from '../lib/document-form';
 import {
@@ -164,8 +165,8 @@ function WarrantyRows({ items }: { items: WarrantyView[] }) {
             <th className="px-4 py-3">Shop</th>
             <th className="px-4 py-3">Ends</th>
             <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">
-              <span className="sr-only">Bill</span>
+            <th className="w-px py-3 pr-3 pl-2">
+              <span className="sr-only">Actions</span>
             </th>
           </tr>
         </thead>
@@ -180,10 +181,10 @@ function WarrantyRows({ items }: { items: WarrantyView[] }) {
               <td className="px-4 py-3 whitespace-nowrap text-slate-600 tabular-nums">
                 {w.endDate ? formatDate(w.endDate) : '—'}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-4 py-3 whitespace-nowrap">
                 <WarrantyStatusPill status={w.status} daysLeft={w.daysLeft} />
               </td>
-              <td className="px-4 py-3 text-right">
+              <td className="w-px py-3 pr-3 pl-2 text-right whitespace-nowrap">
                 <RowLinks warranty={w} />
               </td>
             </tr>
@@ -221,29 +222,72 @@ function ProductMeta({ warranty: w }: { warranty: WarrantyView }) {
   return meta ? <p className="truncate text-xs text-slate-600">{meta}</p> : <span />;
 }
 
-/** "Register ↗" (the brand's page, in a new tab) when we have it, and "Open bill". */
+/**
+ * The row's three actions as square icon buttons: Claim (the claim kit), Register (the
+ * brand's registration page, new tab) and Open bill. Each has a tooltip on hover and keyboard
+ * focus, and a label for screen readers. Without a registration page the Register icon stays
+ * in place but faded and not clickable, so the icons line up in the same columns on every row.
+ */
 function RowLinks({ warranty: w }: { warranty: WarrantyView }) {
+  const product = w.productName ?? 'this product';
+  const canRegister = Boolean(w.registrationUrl && /^https?:\/\//i.test(w.registrationUrl));
   return (
-    <span className="inline-flex shrink-0 items-center gap-3">
-      {w.registrationUrl && /^https?:\/\//i.test(w.registrationUrl) && (
-        <a
-          href={w.registrationUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Register this product's warranty on the brand's site"
-          className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800"
+    <span className="inline-flex shrink-0 items-center gap-1.5">
+      <IconAction
+        to={claimKitLink(w.documentId, w.position)}
+        icon={Wrench}
+        tip="Claim kit"
+        label={`Claim kit for ${product}`}
+        tone="text-amber-700 hover:bg-amber-50 hover:border-amber-300"
+      />
+      {canRegister ? (
+        <IconAction
+          href={w.registrationUrl!}
+          icon={ExternalLink}
+          tip="Register warranty"
+          label={`Register the warranty of ${product} on the brand's site (opens a new tab)`}
+          tone="text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300"
+        />
+      ) : (
+        <span
+          title="No registration page saved for this product"
+          aria-hidden
+          className="grid size-8 place-items-center rounded-lg border border-slate-200 text-slate-300"
         >
-          Register
-          <ExternalLink className="size-3.5" aria-hidden />
-        </a>
+          <ExternalLink className="size-4" />
+        </span>
       )}
-      <Link
+      <IconAction
         to={`/documents/${w.documentId}`}
-        className="inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:text-brand-800"
-      >
-        Open bill
-        <ArrowRight className="size-4" aria-hidden />
-      </Link>
+        icon={FileText}
+        tip="Open bill"
+        label={`Open the bill of ${product}`}
+        tone="text-brand-700 hover:bg-brand-50 hover:border-brand-200"
+      />
     </span>
+  );
+}
+
+/** One square icon button: a link inside the app (`to`) or a page in a new tab (`href`). */
+function IconAction(props: { to?: string; href?: string; icon: LucideIcon; tip: string; label: string; tone: string }) {
+  const Icon = props.icon;
+  const className = `group relative grid size-8 place-items-center rounded-lg border border-slate-200 bg-white transition ${props.tone}`;
+  const body = (
+    <>
+      <Icon className="size-4" aria-hidden />
+      {/* Tooltip: pure CSS, above the button, on hover and on keyboard focus. */}
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 hidden -translate-x-1/2 rounded-md bg-slate-900 px-2 py-1 text-xs font-medium whitespace-nowrap text-white shadow-lg group-hover:block group-focus-visible:block">
+        {props.tip}
+      </span>
+    </>
+  );
+  return props.href ? (
+    <a href={props.href} target="_blank" rel="noopener noreferrer" aria-label={props.label} className={className}>
+      {body}
+    </a>
+  ) : (
+    <Link to={props.to!} aria-label={props.label} className={className}>
+      {body}
+    </Link>
   );
 }

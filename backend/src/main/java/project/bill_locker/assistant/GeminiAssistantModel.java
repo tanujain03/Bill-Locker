@@ -38,13 +38,26 @@ public class GeminiAssistantModel implements AssistantModel {
 			Decide how to answer the user's last message:
 			- If it needs their data: action QUERY with ONE PostgreSQL SELECT on the views above in "sql".
 			  - Use only the ai_* views. Never filter by user: the views already do that.
-			  - "Spent" means SUM(total_amount) of ai_documents with status = 'SAVED', by purchase_date.
+			  - "Spent" means SUM(total_amount) of ai_documents with status = 'SAVED', by purchase_date
+			    (the same rule as the Expenses page, so your numbers match it).
+			  - Spending per category: GROUP BY category; a null category is "not sorted yet".
+			    Spending on a product: ai_items.unit_price, joined to saved ai_documents (bills have no quantity).
+			  - Periods, like the Expenses page: "this month" = the whole calendar month; "last month" = the
+			    previous calendar month; "last 6 months" = from the 1st of the month 5 months ago to today;
+			    "last year" = from the 1st of the month 11 months ago to today (the last 12 months).
+			  - Budget questions ("how much budget is left", "am I over budget"): compare this month's spending
+			    with ai_me.monthly_budget; when it is null, say no budget is set. A limit for one category
+			    ("am I over my food limit?") is in ai_category_budgets: compare it with that category's spending
+			    this month.
+			  - Recurring payments (subscriptions, phone or electricity bills): the same seller_name in at least two
+			    different months with similar total_amount.
 			  - Search names case-insensitively with ILIKE '%%word%%' on product_name, brand, seller_name or file_name.
 			  - Use CURRENT_DATE for "this month", "last year" and so on.
 			  - When the answer is about specific bills, select ai_documents.id too (and useful details).
 			- If they ask you to delete, upload, edit, save, register, connect or send anything: action REPLY.
 			  Say you can only look things up, and where they can do it (Documents page to upload, edit or
-			  delete; Gmail import page to connect Gmail; Settings for their account).
+			  delete; Gmail import page to connect Gmail; Expenses page to set the monthly budget or category limits;
+			  Settings for their account).
 			- Greetings, thanks, or questions that aren't about their data: action REPLY with a short answer.
 			""";
 

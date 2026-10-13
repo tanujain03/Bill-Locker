@@ -9,6 +9,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Wallet,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -34,8 +35,10 @@ type NavItem = {
 
 const LINKS: NavItem[] = [
   { to: '/home', label: 'Dashboard', Icon: LayoutDashboard },
+  // Where the money went, month by month.
+  { to: '/expenses', label: 'Expenses', Icon: Wallet },
   // The badges say how much waits there, without opening the dashboard.
-  { to: '/documents', label: 'Documents', Icon: FileText, badge: (a) => a.toReview + a.readFailed },
+  { to: '/documents', label: 'Documents', short: 'Docs', Icon: FileText, badge: (a) => a.toReview + a.readFailed },
   // Everyday spending (rides, food, utilities): documents of type "Bill / receipt".
   { to: '/bills', label: 'Bills & receipts', short: 'Bills', Icon: Receipt },
   { to: '/warranties', label: 'Warranties', Icon: ShieldCheck, badge: (a) => a.expiring.length },
@@ -117,7 +120,7 @@ export function AppLayout() {
         onBlur={(e: FocusEvent) => {
           if (!e.currentTarget.contains(e.relatedTarget)) setPeek(false);
         }}
-        className={`fixed inset-y-0 left-0 z-30 hidden overflow-hidden border-r border-slate-200 bg-white transition-[width,box-shadow] duration-200 lg:block ${
+        className={`fixed inset-y-0 left-0 z-30 hidden overflow-hidden border-r border-slate-200 bg-white transition-[width,box-shadow] duration-200 lg:block print:!hidden ${
           expanded ? 'w-64' : 'w-16'
         } ${peek && !pinned ? 'shadow-xl' : ''}`}
       >
@@ -148,9 +151,10 @@ export function AppLayout() {
       )}
 
       {/* Only a pinned sidebar takes room; a hovered one slides over the page.
-          Phones: room at the bottom for the tab bar. */}
-      <div className={`pb-16 transition-[padding] duration-200 sm:pb-0 ${pinned ? 'lg:pl-64' : 'lg:pl-16'}`}>
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:gap-3 sm:px-6">
+          Room at the bottom so the floating chat button (and on phones the tab bar) never
+          covers the end of a page. */}
+      <div className={`pb-36 transition-[padding] duration-200 sm:pb-24 print:!p-0 ${pinned ? 'lg:pl-64' : 'lg:pl-16'}`}>
+        <header className="sticky top-0 z-20 flex h-16 print:hidden items-center gap-2 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:gap-3 sm:px-6">
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -175,11 +179,14 @@ export function AppLayout() {
         <Outlet />
       </div>
 
-      <PhoneTabBar attention={attention} />
-      <DropAnywhere />
-      <WarrantyReminder expiring={attention?.expiring} />
-      {/* Here, not in a page, so the chat stays open while you move between pages. */}
-      <AssistantChat />
+      {/* None of this belongs on paper (e.g. the printed warranty claim sheet). */}
+      <div className="print:hidden">
+        <PhoneTabBar attention={attention} />
+        <DropAnywhere />
+        <WarrantyReminder expiring={attention?.expiring} />
+        {/* Here, not in a page, so the chat stays open while you move between pages. */}
+        <AssistantChat />
+      </div>
     </div>
   );
 }
@@ -333,7 +340,8 @@ function PhoneTabBar({ attention }: { attention: Attention | null }) {
       </NavLink>
     );
   };
-  const [home, documents, bills, warranties, gmail] = LINKS;
+  // Gmail has no tab here (the dashboard has an "Import from Gmail" button); the 🔔 counts its files.
+  const [home, expenses, documents, bills, warranties] = LINKS;
 
   return (
     <nav
@@ -341,13 +349,13 @@ function PhoneTabBar({ attention }: { attention: Attention | null }) {
       className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center border-t border-slate-200 bg-white/95 px-1 backdrop-blur sm:hidden"
     >
       {tab(home)}
+      {tab(expenses)}
       {tab(documents)}
       <div className="flex flex-1 justify-center">
         <UploadButton iconOnlyOnPhones className="rounded-full shadow-lg shadow-brand-600/30" />
       </div>
       {tab(bills)}
       {tab(warranties)}
-      {tab(gmail)}
     </nav>
   );
 }

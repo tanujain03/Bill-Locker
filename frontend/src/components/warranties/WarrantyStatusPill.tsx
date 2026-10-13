@@ -22,7 +22,7 @@ export function warrantyText(status: WarrantyStatus, daysLeft: number | null): s
 export function WarrantyStatusPill({ status, daysLeft }: { status: WarrantyStatus; daysLeft: number | null }) {
   const { Icon, pill } = WARRANTY_STYLE[status];
   return (
-    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ${pill}`}>
+    <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ${pill}`}>
       <Icon className="size-3.5" aria-hidden />
       {warrantyText(status, daysLeft)}
     </span>

@@ -8,7 +8,7 @@ export type DocumentType = 'INVOICE' | 'WARRANTY_CARD' | 'RECEIPT' | 'OTHER';
 /** UPLOADED = not read yet, EXTRACTED = AI filled it (needs review), SAVED = the user saved it. */
 export type DocumentStatus = 'UPLOADED' | 'EXTRACTED' | 'SAVED';
 
-/** What a bill or receipt was for (only documents of type RECEIPT have one). */
+/** What a bill was spent on (any document type; the Expenses page adds money up per category). */
 export type BillCategory =
   | 'TRAVEL'
   | 'FOOD'
@@ -18,6 +18,11 @@ export type BillCategory =
   | 'PHONE_INTERNET'
   | 'SHOPPING'
   | 'HEALTH'
+  | 'ELECTRONICS'
+  | 'APPLIANCES'
+  | 'FASHION'
+  | 'HOME'
+  | 'ENTERTAINMENT'
   | 'OTHER';
 
 export const BILL_CATEGORY_LABELS: Record<BillCategory, string> = {
@@ -29,6 +34,11 @@ export const BILL_CATEGORY_LABELS: Record<BillCategory, string> = {
   PHONE_INTERNET: 'Phone & internet',
   SHOPPING: 'Shopping',
   HEALTH: 'Health',
+  ELECTRONICS: 'Electronics',
+  APPLIANCES: 'Appliances',
+  FASHION: 'Fashion',
+  HOME: 'Home & furniture',
+  ENTERTAINMENT: 'Entertainment',
   OTHER: 'Other',
 };
 
@@ -64,7 +74,7 @@ export type DocumentDetails = {
   taxAmount: number | null;
   totalAmount: number | null;
   items: DocumentItem[];
-  /** Bills and receipts only. */
+  /** What it was spent on. */
   category: BillCategory | null;
 };
 
