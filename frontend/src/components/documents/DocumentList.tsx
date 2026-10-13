@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import { BILL_CATEGORY_LABELS, DOCUMENT_TYPE_LABELS, formatAmount, type DocumentSummary } from '../../lib/documents';
+import { DuplicateBadge } from './DuplicateWarning';
 import { FileTypeIcon, SourceBadge } from './SourceBadge';
 import { StatusBadge } from './StatusBadge';
 
@@ -27,6 +28,7 @@ export function DocumentList({ documents, filtered, emptyText }: {
               <div className="flex min-w-0 items-center gap-2">
                 <p className="truncate font-medium">{d.sellerName ?? d.fileName}</p>
                 <SourceBadge sourceGmail={d.sourceGmail} sample={d.sample} />
+                {d.possibleDuplicate && <DuplicateBadge />}
               </div>
               <p className="mt-0.5 truncate text-sm text-slate-500">
                 {[

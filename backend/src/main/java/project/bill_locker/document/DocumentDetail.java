@@ -34,9 +34,15 @@ public record DocumentDetail(
 		String readError,
 		String sourceGmail,
 		/** A demo bill from "Try with sample data". */
-		boolean sample) {
+		boolean sample,
+		/** Other documents that look like the same bill (see DuplicateRules); empty when none. */
+		List<DuplicateMatch> possibleDuplicates) {
 
 	static DocumentDetail of(Document d) {
+		return of(d, List.of());
+	}
+
+	static DocumentDetail of(Document d, List<Document> copies) {
 		return new DocumentDetail(d.getId(), d.getFileName(), d.getContentType(), d.getSizeBytes(), d.getStatus(),
 				"/api/documents/" + d.getId() + "/download",
 				d.getDocumentType(), d.getDocumentNumber(),
@@ -46,6 +52,7 @@ public record DocumentDetail(
 				d.getItems().stream().map(DocumentItemView::of).toList(),
 				BillCategory.parse(d.getCategory()),
 				d.getCreatedAt(), d.getUpdatedAt(),
-				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail(), d.isSample());
+				d.getReadQueuedAt() != null, d.getReadError(), d.getSourceGmail(), d.isSample(),
+				copies.stream().map(DuplicateMatch::of).toList());
 	}
 }

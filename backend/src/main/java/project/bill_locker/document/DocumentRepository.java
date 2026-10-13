@@ -1,5 +1,6 @@
 package project.bill_locker.document;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,16 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
 	/** Finds a document only if it belongs to this user (anyone else's → empty → 404). */
 	Optional<Document> findByIdAndUserId(UUID id, UUID userId);
+
+	// ---- Duplicates (see DuplicateRules) ----
+
+	/** The user's earlier upload of exactly the same file, if any. */
+	Optional<Document> findFirstByUserIdAndContentHashOrderByCreatedAtAsc(UUID userId, String contentHash);
+
+	/** Candidates for "looks like the same bill": copies always share the purchase date. */
+	List<Document> findByUserIdAndPurchaseDate(UUID userId, LocalDate purchaseDate);
+
+	List<Document> findByUserIdAndPurchaseDateIsNotNull(UUID userId);
 
 	/** The document that has waited longest for the AI worker. */
 	Optional<Document> findFirstByReadQueuedAtIsNotNullOrderByReadQueuedAtAsc();

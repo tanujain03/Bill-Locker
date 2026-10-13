@@ -4,7 +4,7 @@ This is the full REST API Bill Locker is heading towards. The backend and the
 frontend are rebuilt from scratch on the `restart` branch, one task at a time;
 each task implements a part of this contract.
 
-### Implemented so far (restart branch, tasks 1–11)
+### Implemented so far (restart branch, tasks 1–12)
 
 | Endpoint | Notes |
 |---|---|
@@ -19,6 +19,7 @@ each task implements a part of this contract.
 | `GET /api/expenses?from=YYYY-MM-DD&to=YYYY-MM-DD`, `PUT /api/expenses/budget` | Complete (task 9). Spending of a period (default: this month) from saved bills: total, the period before, daily average, pace, budget, per category / product / shop / day, months. `400 INVALID_DATE` / `INVALID_RANGE` / `RANGE_TOO_LONG` (over ~3 years). Budget `{amount}` per month (null removes it). Category limits: `PUT /api/expenses/budgets/{category}` `{amount}` (null removes); the report adds `categories[].budget`, `weekdays` and `recurring`. The assistant's `ai_me` view has `monthly_budget`, and `ai_category_budgets` holds the limits. See [`task-9-expenses.md`](task-9-expenses.md) |
 | `GET /api/documents/{id}/items/{position}/claim-kit` | Complete (task 10). A product's warranty claim kit: product and purchase facts, warranty end/status/days left, brand support and service-centre search links, the missing facts. `404 ITEM_NOT_FOUND` for a position the bill doesn't have. `GET /api/warranties` rows now carry `position`. See [`task-10-claim-kit.md`](task-10-claim-kit.md) |
 | `GET`, `POST`, `DELETE /api/sample-data` | Complete (task 11). "Try with sample data": how many demo bills, add ~30 (dated from today, one transaction; again → `409 SAMPLE_DATA_EXISTS`), remove only those. Documents carry `sample`. See [`task-11-sample-data.md`](task-11-sample-data.md) |
+| `POST /api/documents/{id}/not-duplicate` | Complete (task 12). Duplicate bills: the same file again → `409 DUPLICATE_FILE` with `documentId` (the earlier bill; a Gmail import links there instead). Documents carry `possibleDuplicates` (same date + number, or same date + shop + total), list rows `possibleDuplicate`; this endpoint is "Keep both". See [`task-12-duplicate-bills.md`](task-12-duplicate-bills.md) |
 | `POST /api/assistant/chat` | Complete (task 6). Chat assistant: Gemini writes one SELECT on user-filtered `ai_*` views, run read-only as the `bill_locker_ai` role; answers from the rows. See section 11 and [`task-6-assistant.md`](task-6-assistant.md) |
 
 Everything else is not built yet. How tasks 1–4 work is explained in

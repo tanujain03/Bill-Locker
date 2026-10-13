@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { errorMessage } from './api';
+import { ApiError, errorMessage } from './api';
 import { uploadDocument } from './documents';
 import { useFeedback } from './feedback-context';
 
@@ -24,6 +24,12 @@ export function useUploadBill() {
         const document = await uploadDocument(file);
         navigate(`/documents/${document.id}?read=1`);
       } catch (error) {
+        if (error instanceof ApiError && error.code === 'DUPLICATE_FILE' && error.documentId) {
+          // The very same file is already in the locker: open that one instead of a copy.
+          navigate(`/documents/${error.documentId}`);
+          toast('You already uploaded this file, so here it is.', 'info');
+          return;
+        }
         toast(errorMessage(error), 'error'); // e.g. "Only PDF, JPG, PNG or WebP files"
       } finally {
         setUploading(false);

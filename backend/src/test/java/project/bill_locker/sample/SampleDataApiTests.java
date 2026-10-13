@@ -39,7 +39,8 @@ class SampleDataApiTests extends DocumentApiTestBase {
 		// Saved, flagged as sample, shown on the dashboard.
 		call(token, get("/api/documents")).andExpect(jsonPath("$.length()").value(count))
 				.andExpect(jsonPath("$[*].sample", everyItem(is(true))))
-				.andExpect(jsonPath("$[*].status", everyItem(is("SAVED"))));
+				.andExpect(jsonPath("$[*].status", everyItem(is("SAVED"))))
+				.andExpect(jsonPath("$[*].possibleDuplicate", everyItem(is(false)))); // no two look alike
 		call(token, get("/api/dashboard")).andExpect(jsonPath("$.savedBills").value(count));
 
 		// Every warranty state appears (the end dates were worked out from start + months).

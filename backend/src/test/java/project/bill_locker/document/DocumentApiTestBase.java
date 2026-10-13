@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.ResultActions;
@@ -14,9 +15,12 @@ import project.bill_locker.ApiTest;
 /** Helpers shared by the document API tests. */
 public abstract class DocumentApiTestBase extends ApiTest {
 
-	/** The smallest "file" our type check accepts as a PDF: it starts with %PDF. */
+	/**
+	 * The smallest "file" our type check accepts as a PDF: it starts with %PDF. Different on
+	 * every call, because the same file twice is refused as a duplicate (DUPLICATE_FILE).
+	 */
 	protected static byte[] pdfBytes() {
-		return "%PDF-1.4\n%test\n".getBytes(StandardCharsets.US_ASCII);
+		return ("%PDF-1.4\n%test " + UUID.randomUUID() + "\n").getBytes(StandardCharsets.US_ASCII);
 	}
 
 	protected ResultActions upload(String token, String fileName, String contentType, byte[] bytes) throws Exception {

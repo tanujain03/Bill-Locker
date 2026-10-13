@@ -93,8 +93,22 @@ export type DocumentDetail = DocumentDetails & {
   sourceGmail: string | null;
   /** A demo bill from "Try with sample data". */
   sample: boolean;
+  /** Other documents that look like the same bill (same date + number, or same date + shop + total). */
+  possibleDuplicates: DuplicateMatch[];
   createdAt: string;
   updatedAt: string;
+};
+
+/** Another document that looks like the same bill. */
+export type DuplicateMatch = {
+  id: string;
+  fileName: string;
+  sellerName: string | null;
+  documentNumber: string | null;
+  purchaseDate: string | null;
+  totalAmount: number | null;
+  status: DocumentStatus;
+  createdAt: string;
 };
 
 export type DocumentSummary = {
@@ -116,6 +130,8 @@ export type DocumentSummary = {
   sourceGmail: string | null;
   /** A demo bill from "Try with sample data". */
   sample: boolean;
+  /** Looks like a copy of another document. */
+  possibleDuplicate: boolean;
   createdAt: string;
 };
 
@@ -183,6 +199,9 @@ export const getDocument = (id: string) => api<DocumentDetail>(`/documents/${id}
 export const extractDocument = (id: string) => api<DocumentDetail>(`/documents/${id}/extract`, { method: 'POST' });
 export const saveDocument = (id: string, details: DocumentDetails) =>
   api<DocumentDetail>(`/documents/${id}`, { method: 'PUT', body: details });
+/** "Keep both": this bill only looks like another one, so stop warning about it. */
+export const markNotDuplicate = (id: string) =>
+  api<DocumentDetail>(`/documents/${id}/not-duplicate`, { method: 'POST' });
 export const deleteDocument = (id: string) => api<null>(`/documents/${id}`, { method: 'DELETE' });
 export const downloadDocument = (id: string) => fetchBlob(`/documents/${id}/download`);
 

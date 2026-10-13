@@ -15,6 +15,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { CopyButton } from '../components/documents/CopyButton';
 import { DetailsForm } from '../components/documents/DetailsForm';
 import { DocumentPreview } from '../components/documents/DocumentPreview';
+import { DuplicateWarning } from '../components/documents/DuplicateWarning';
 import { MoreMenu } from '../components/documents/MoreMenu';
 import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
 import { StatusBadge } from '../components/documents/StatusBadge';
@@ -28,6 +29,7 @@ import {
   extractDocument,
   findRegistrationPage,
   getDocument,
+  markNotDuplicate,
   saveDocument,
   type DocumentDetail,
 } from '../lib/documents';
@@ -275,6 +277,16 @@ export function DocumentPage() {
     }
   }
 
+  /** "Keep both" on the possible-copy warning. Only the warning changes, so edits on screen stay. */
+  async function keepBoth() {
+    try {
+      setDocument(await markNotDuplicate(id));
+      toast('Kept both. This bill won’t be flagged as a copy again.');
+    } catch (error) {
+      toast(errorMessage(error), 'error');
+    }
+  }
+
   /** "All documents" with unsaved edits: ask first (the browser's own check only covers closing the tab). */
   async function leave() {
     const ok = await confirm({
@@ -348,6 +360,17 @@ export function DocumentPage() {
             {message && (
               <div className="mt-4">
                 <Alert tone={message.tone}>{message.text}</Alert>
+              </div>
+            )}
+
+            {document.possibleDuplicates.length > 0 && (
+              <div className="mt-4">
+                <DuplicateWarning
+                  matches={document.possibleDuplicates}
+                  busy={busy !== null}
+                  onDelete={remove}
+                  onKeepBoth={keepBoth}
+                />
               </div>
             )}
 

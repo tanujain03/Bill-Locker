@@ -27,7 +27,8 @@ public class GlobalExceptionHandler {
 	/** Errors we throw on purpose, e.g. 401 INVALID_CREDENTIALS. */
 	@ExceptionHandler(ApiException.class)
 	ResponseEntity<ApiErrorBody> handleApiException(ApiException ex) {
-		return respond(ex.getStatus(), ex.getCode(), ex.getMessage(), ex.getFieldErrors());
+		return ResponseEntity.status(ex.getStatus())
+				.body(new ApiErrorBody(ex.getCode(), ex.getMessage(), ex.getFieldErrors(), ex.getDocumentId()));
 	}
 
 	/** A {@code @Valid} request body broke a rule: tell the form which fields are wrong. */

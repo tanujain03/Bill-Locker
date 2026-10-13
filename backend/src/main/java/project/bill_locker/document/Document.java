@@ -35,7 +35,8 @@ import project.bill_locker.user.User;
 @Entity
 @Table(name = "documents", indexes = {
 		@Index(name = "idx_documents_user", columnList = "user_id"),
-		@Index(name = "idx_documents_read_queued", columnList = "read_queued_at")})
+		@Index(name = "idx_documents_read_queued", columnList = "read_queued_at"),
+		@Index(name = "idx_documents_user_hash", columnList = "user_id, content_hash")})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Document extends BaseEntity {
@@ -53,6 +54,10 @@ public class Document extends BaseEntity {
 
 	@Column(name = "size_bytes", nullable = false)
 	private long sizeBytes;
+
+	/** SHA-256 of the file's bytes (hex), to notice the same file uploaded twice. Null on old rows. */
+	@Column(name = "content_hash", length = 64)
+	private String contentHash;
 
 	@Enumerated(EnumType.STRING)
 	@Column(name = "status", nullable = false, length = 20)
@@ -121,6 +126,14 @@ public class Document extends BaseEntity {
 	private Boolean sample;
 
 	/**
+	 * The user said "Keep both": this bill only looks like another one (e.g. two coffees on
+	 * the same day), so it is never shown as a possible copy again. Boolean for the same
+	 * reason as {@link #sample}.
+	 */
+	@Column(name = "not_duplicate")
+	private Boolean notDuplicate;
+
+	/**
 	 * The products on the bill, in the order they appear. orphanRemoval: an item
 	 * taken out of this list is deleted from the table when the document is saved.
 	 */
@@ -128,11 +141,9 @@ public class Document extends BaseEntity {
 	@OrderBy("position")
 	private List<DocumentItem> items = new ArrayList<>();
 
-	public Document(User user, String fileName, String contentType, long sizeBytes) {
-		this(user, fileName, contentType, sizeBytes, null);
-	}
-
-	public Document(User user, String fileName, String contentType, long sizeBytes, String sourceGmail) {
+	public Document(User user, String fileName, String contentType, long sizeBytes, String contentHash,
+			String sourceGmail) {
+		this.contentHash = contentHash;
 		this.sourceGmail = sourceGmail;
 		this.user = user;
 		this.fileName = fileName;
@@ -175,6 +186,15 @@ public class Document extends BaseEntity {
 
 	public boolean isSample() {
 		return Boolean.TRUE.equals(sample);
+	}
+
+	/** "Keep both" on the possible-copy warning. */
+	void markNotDuplicate() {
+		this.notDuplicate = true;
+	}
+
+	public boolean isNotDuplicate() {
+		return Boolean.TRUE.equals(notDuplicate);
 	}
 
 	void queueForReading() {

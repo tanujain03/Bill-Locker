@@ -104,6 +104,12 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   recurring), `SamplePdf` (PDFBox one-pager "SAMPLE BILL"), `SampleDataService` (one transaction; again → 409
   `SAMPLE_DATA_EXISTS`). `documents.sample` (nullable Boolean) + `sample` on DocumentSummary/Detail → "Sample" badge;
   `DELETE /api/sample-data` removes only flagged bills. Frontend `lib/useSampleData.ts`. Guide: `docs/task-11-sample-data.md`.
+- Task 12: duplicate bills. Same file: `documents.content_hash` (SHA-256 hex); upload → 409 `DUPLICATE_FILE` with
+  `documentId` (new optional field on `ApiErrorBody`/`ApiException`), the browser opens that bill; a Gmail import of the same
+  bytes links to the existing document. Same bill, other file: `DuplicateRules` (same purchase date + same normalised number
+  and no different shop, or same shop + same total) → `DocumentDetail.possibleDuplicates`, `DocumentSummary.possibleDuplicate`
+  ("Possible copy" badge, `DuplicateWarning.tsx`); "Keep both" = `POST /api/documents/{id}/not-duplicate`
+  (`documents.not_duplicate`). Test `pdfBytes()` is unique per call. Guide: `docs/task-12-duplicate-bills.md`.
 
 ## Repository
 

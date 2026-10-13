@@ -23,18 +23,27 @@ export const tokenStore = {
   },
 };
 
-/** The backend's error body: { success: false, code, message, fieldErrors? }. */
+/** The backend's error body: { success: false, code, message, fieldErrors?, documentId? }. */
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   /** Form field name → message to show under that input. */
   readonly fieldErrors: Record<string, string>;
+  /** The existing document the error is about (409 DUPLICATE_FILE: the earlier upload). */
+  readonly documentId: string | null;
 
-  constructor(status: number, code: string, message: string, fieldErrors: Record<string, string> = {}) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    fieldErrors: Record<string, string> = {},
+    documentId: string | null = null,
+  ) {
     super(message);
     this.status = status;
     this.code = code;
     this.fieldErrors = fieldErrors;
+    this.documentId = documentId;
   }
 }
 
@@ -95,10 +104,12 @@ async function send(path: string, options: { method?: string; body?: unknown }):
   return response;
 }
 
-function toApiError(status: number, data: { code: string; message: string; fieldErrors?: Record<string, string> } | null) {
+type ErrorBody = { code: string; message: string; fieldErrors?: Record<string, string>; documentId?: string };
+
+function toApiError(status: number, data: ErrorBody | null) {
   // No JSON body usually means Vite couldn't reach Spring Boot at all.
   if (!data) return new ApiError(status, 'NETWORK_ERROR', SERVER_DOWN);
-  return new ApiError(status, data.code, data.message, data.fieldErrors);
+  return new ApiError(status, data.code, data.message, data.fieldErrors, data.documentId);
 }
 
 /** A message that is safe to show for any thrown value. */
