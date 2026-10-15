@@ -31,20 +31,25 @@ export function BillsPage() {
     );
   const [bills, setBills] = useState<DocumentSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const deletedIds = useRef(new Set<string>());
   const latest = useRef(0); // only the newest answer may update the page
 
   const load = useCallback(() => {
     const mine = ++latest.current;
     setError(null);
     listDocuments({ q, type: 'RECEIPT' })
-      .then((list) => mine === latest.current && setBills(list))
+      .then((list) => mine === latest.current && setBills(list.filter((d) => !deletedIds.current.has(d.id))))
       .catch((e) => mine === latest.current && setError(errorMessage(e)));
   }, [q]);
 
   // The search waits 300 ms after the last key press, so we don't ask for every letter.
   useEffect(() => {
+    setBills(null);
     const timer = setTimeout(load, 300);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      ++latest.current;
+    };
   }, [load]);
 
   const thisMonth = new Date().toISOString().slice(0, 7); // "2026-10"
@@ -124,6 +129,11 @@ export function BillsPage() {
         <DocumentList
           documents={shown}
           filtered={Boolean(q || category)}
+          selectionScope={params.toString()}
+          onDeleted={(ids) => {
+            for (const id of ids) deletedIds.current.add(id);
+            setBills((current) => current?.filter((b) => !deletedIds.current.has(b.id)) ?? null);
+          }}
           emptyText="No bills or receipts yet. Upload one (top right): rides, food, fuel, utility and phone bills are filed here automatically."
         />
       )}

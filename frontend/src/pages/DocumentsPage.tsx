@@ -1,5 +1,5 @@
 import { CalendarDays, FilterX, Search, Tag, Upload, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { DocumentList } from '../components/documents/DocumentList';
 import { Button } from '../components/Button';
@@ -54,15 +54,26 @@ export function DocumentsPage() {
   const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
 
+  // Exclude successful deletions even from list requests that started before deletion.
+  const deletedIds = useRef(new Set<string>());
+  const requestScope = JSON.stringify([q, type, status]);
+  const latestScope = useRef(requestScope);
+  latestScope.current = requestScope;
+  function onDeleted(ids: string[]) {
+    for (const id of ids) deletedIds.current.add(id);
+    setDocuments((current) => current?.filter((d) => !deletedIds.current.has(d.id)) ?? null);
+  }
+
   // Reload the list when a filter changes. The search waits 300 ms after the last
   // key press, so we don't call the backend for every letter.
   useEffect(() => {
+    setDocuments(null);
     let current = true; // ignore answers that arrive after a newer request started
     const timer = setTimeout(() => {
       listDocuments({ q, type, status })
         .then((list) => {
           if (!current) return;
-          setDocuments(list);
+          setDocuments(list.filter((d) => !deletedIds.current.has(d.id)));
           setListError(null);
         })
         .catch((error) => {
@@ -79,7 +90,9 @@ export function DocumentsPage() {
   // filters, so "Reading…" turns into "Needs review" without a reload.
   usePolling(documents?.some((d) => d.readQueued) ?? false, () => {
     listDocuments({ q, type, status })
-      .then(setDocuments)
+      .then((list) => {
+        if (latestScope.current === requestScope) setDocuments(list.filter((d) => !deletedIds.current.has(d.id)));
+      })
       .catch(() => {}); // the next tick tries again
   });
 
@@ -202,6 +215,8 @@ export function DocumentsPage() {
                 (!category || (d.category ?? 'NONE') === category),
             )}
             filtered={filtered}
+            selectionScope={params.toString()}
+            onDeleted={onDeleted}
           />
         )}
       </main>
