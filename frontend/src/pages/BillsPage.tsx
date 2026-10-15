@@ -130,6 +130,7 @@ export function BillsPage() {
           documents={shown}
           filtered={Boolean(q || category)}
           selectionScope={params.toString()}
+          onRead={load}
           onDeleted={(ids) => {
             for (const id of ids) deletedIds.current.add(id);
             setBills((current) => current?.filter((b) => !deletedIds.current.has(b.id)) ?? null);

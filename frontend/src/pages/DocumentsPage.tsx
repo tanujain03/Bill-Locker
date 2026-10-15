@@ -217,6 +217,13 @@ export function DocumentsPage() {
             filtered={filtered}
             selectionScope={params.toString()}
             onDeleted={onDeleted}
+            onRead={() => {
+              listDocuments({ q, type, status }).then((list) => {
+                if (latestScope.current === requestScope) setDocuments(list.filter((d) => !deletedIds.current.has(d.id)));
+              }).catch((error) => {
+                if (latestScope.current === requestScope) setListError(errorMessage(error));
+              });
+            }}
           />
         )}
       </main>

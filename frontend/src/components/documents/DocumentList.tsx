@@ -1,18 +1,19 @@
 import { Link } from 'react-router';
 import { useEffect, useRef, useState } from 'react';
-import { Trash2 } from 'lucide-react';
-import { BILL_CATEGORY_LABELS, DOCUMENT_TYPE_LABELS, deleteDocument, formatAmount, type DocumentSummary } from '../../lib/documents';
+import { BILL_CATEGORY_LABELS, DOCUMENT_TYPE_LABELS, deleteDocument, extractDocument, formatAmount, type DocumentSummary } from '../../lib/documents';
 import { deleteSelectedDocuments } from '../../lib/bulk-delete';
+import { runDocumentAction } from '../../lib/document-actions';
+import { ShareDocumentsDialog } from './ShareDocumentsDialog';
 import { errorMessage } from '../../lib/api';
 import { useFeedback } from '../../lib/feedback-context';
-import { Button } from '../Button';
+import { SelectionActionsMenu } from './SelectionActionsMenu';
 import { DuplicateBadge } from './DuplicateWarning';
 import { ReturnBadge } from './ReturnWindow';
 import { FileTypeIcon, SourceBadge } from './SourceBadge';
 import { StatusBadge } from './StatusBadge';
 
 /** The list of bills on the Documents and Bills & receipts pages: each row opens the bill. */
-export function DocumentList({ documents, filtered, emptyText, selectionScope, onDeleted }: {
+export function DocumentList({ documents, filtered, emptyText, selectionScope, onDeleted, onRead }: {
   documents: DocumentSummary[];
   filtered: boolean;
   /** What an empty, unfiltered list says (each page has its own). */
@@ -20,10 +21,13 @@ export function DocumentList({ documents, filtered, emptyText, selectionScope, o
   /** Changing search or filters clears selection, including when old rows are still loading. */
   selectionScope: string;
   onDeleted: (ids: string[]) => void;
+  onRead: () => void;
 }) {
   const { confirm, toast } = useFeedback();
   const [selection, setSelection] = useState({ scope: selectionScope, ids: new Set<string>() });
-  const [busy, setBusy] = useState(false);
+  const [activeAction, setActiveAction] = useState<'deleting' | 'reading' | null>(null);
+  const busy = activeAction !== null;
+  const [sharing, setSharing] = useState<DocumentSummary[] | null>(null);
   const locked = useRef(false);
   const [failure, setFailure] = useState<{ scope: string; text: string } | null>(null);
   const selected = new Set(documents.filter((d) => selection.scope === selectionScope && selection.ids.has(d.id)).map((d) => d.id));
@@ -53,7 +57,7 @@ export function DocumentList({ documents, filtered, emptyText, selectionScope, o
         confirmLabel: `Delete ${count} document${count === 1 ? '' : 's'}`,
         danger: true,
       }))) return;
-      setBusy(true);
+      setActiveAction('deleting');
       setFailure(null);
       const result = await deleteSelectedDocuments(ids, deleteDocument);
       if (result.deleted.length) {
@@ -66,7 +70,36 @@ export function DocumentList({ documents, filtered, emptyText, selectionScope, o
       }
     } finally {
       locked.current = false;
-      setBusy(false);
+      setActiveAction(null);
+    }
+  }
+
+  async function readSelected() {
+    if (locked.current || selected.size === 0) return;
+    locked.current = true;
+    const ids = [...selected];
+    try {
+      if (!(await confirm({
+        title: `Read ${ids.length} document${ids.length === 1 ? '' : 's'} again?`,
+        message: 'A new AI reading will replace the saved details, including any corrections and warranty registration status. Review the new details afterward.',
+        confirmLabel: 'Read again',
+      }))) return;
+      setActiveAction('reading');
+      setFailure(null);
+      // AI reads are slow: process one at a time to avoid overwhelming the service.
+      const result = await runDocumentAction(ids, extractDocument, 1);
+      if (result.completed.length) {
+        onRead();
+        toast(`Read ${result.completed.length} document${result.completed.length === 1 ? '' : 's'}. Open them to review the details.`);
+      }
+      const completed = new Set(result.completed.map((r) => r.id));
+      setSelection((current) => ({ ...current, ids: new Set([...current.ids].filter((id) => !completed.has(id))) }));
+      if (result.failed.length) {
+        setFailure({ scope: selectionScope, text: `${result.failed.length} document${result.failed.length === 1 ? '' : 's'} could not be read. ${errorMessage(result.failed[0].error)} Failed documents remain selected so you can retry.` });
+      }
+    } finally {
+      locked.current = false;
+      setActiveAction(null);
     }
   }
 
@@ -79,6 +112,7 @@ export function DocumentList({ documents, filtered, emptyText, selectionScope, o
   }
   return (
     <div className="mt-4">
+      {sharing && <ShareDocumentsDialog documents={sharing} onClose={() => setSharing(null)} />}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-xl border border-slate-200 bg-white px-4 py-3">
         <label className="flex items-center gap-3 text-sm text-slate-700">
           <input
@@ -91,13 +125,19 @@ export function DocumentList({ documents, filtered, emptyText, selectionScope, o
           />
           Select all shown ({documents.length})
         </label>
-        <div className="flex flex-wrap items-center gap-2">
-          <span role="status" className="text-sm text-slate-600">{selected.size} selected</span>
-          {selected.size > 0 && <Button size="sm" variant="ghost" disabled={busy} onClick={() => { setSelection({ scope: selectionScope, ids: new Set() }); setFailure(null); }}>Clear selection</Button>}
-          <Button size="sm" variant="dangerGhost" icon={Trash2} disabled={!selected.size} busy={busy} onClick={removeSelected}>
-            {busy ? 'Deleting…' : 'Delete selected'}
-          </Button>
-        </div>
+        {selected.size > 0 && (
+          <div role="group" aria-label="Actions for selected documents" className="flex flex-wrap items-center gap-2">
+            <span role="status" className="text-sm font-medium text-slate-700">{selected.size} selected</span>
+            {busy && <span role="status" className="text-sm text-slate-500">{activeAction === 'reading' ? 'Reading...' : 'Deleting...'}</span>}
+            <SelectionActionsMenu
+              busy={busy}
+              onShare={() => setSharing(documents.filter((d) => selected.has(d.id)))}
+              onRead={readSelected}
+              onDelete={removeSelected}
+              onClear={() => { setSelection({ scope: selectionScope, ids: new Set() }); setFailure(null); }}
+            />
+          </div>
+        )}
       </div>
       {failure?.scope === selectionScope && <p role="alert" className="border-x border-slate-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{failure.text}</p>}
       <ul aria-label="Documents" aria-busy={busy} className="divide-y divide-slate-200 overflow-hidden rounded-b-xl border border-t-0 border-slate-200 bg-white">
