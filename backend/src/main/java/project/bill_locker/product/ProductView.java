@@ -36,6 +36,7 @@ public record ProductView(
 		Long daysLeft,
 		WarrantyStatus status,
 		String registrationUrl,
+		boolean warrantyRegistered,
 		// ---- owning it ----
 		/** Whole days since the purchase date (0 on the day itself); null without a purchase date. */
 		Long ownedDays,

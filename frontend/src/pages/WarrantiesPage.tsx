@@ -1,4 +1,4 @@
-import { ExternalLink, FileText, Search, ShieldCheck, Wrench, type LucideIcon } from 'lucide-react';
+import { BadgeCheck, ExternalLink, FileText, Search, ShieldCheck, Wrench, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ErrorState } from '../components/ErrorState';
@@ -235,7 +235,7 @@ function ProductMeta({ warranty: w }: { warranty: WarrantyView }) {
  */
 function RowLinks({ warranty: w }: { warranty: WarrantyView }) {
   const product = w.productName ?? 'this product';
-  const canRegister = Boolean(w.registrationUrl && /^https?:\/\//i.test(w.registrationUrl));
+  const canRegister = !w.warrantyRegistered && Boolean(w.registrationUrl && /^https?:\/\//i.test(w.registrationUrl));
   return (
     <span className="inline-flex shrink-0 items-center gap-1.5">
       <IconAction
@@ -255,11 +255,12 @@ function RowLinks({ warranty: w }: { warranty: WarrantyView }) {
         />
       ) : (
         <span
-          title="No registration page saved for this product"
-          aria-hidden
+          title={w.warrantyRegistered ? "Warranty already registered" : "No registration page saved for this product"}
+          role="img"
+          aria-label={w.warrantyRegistered ? `Warranty registered for ${product}` : `No registration page for ${product}`}
           className="grid size-8 place-items-center rounded-lg border border-slate-200 text-slate-300"
         >
-          <ExternalLink className="size-4" />
+          {w.warrantyRegistered ? <BadgeCheck className="size-4 text-emerald-600" /> : <ExternalLink className="size-4" />}
         </span>
       )}
       <IconAction

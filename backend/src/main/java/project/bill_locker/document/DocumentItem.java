@@ -75,10 +75,22 @@ public class DocumentItem extends BaseEntity {
 	@Column(name = "registration_source", length = 20)
 	private RegistrationSource registrationSource;
 
+	@Column(name = "warranty_registered")
+	private Boolean warrantyRegistered;
+
+	public boolean isWarrantyRegistered() {
+		return Boolean.TRUE.equals(warrantyRegistered);
+	}
+
+	public void setWarrantyRegistered(boolean registered) {
+		this.warrantyRegistered = registered;
+	}
+
 	DocumentItem(Document document, int position, DocumentItemView values) {
 		this.document = document;
 		this.position = position;
 		this.productName = values.productName();
+		this.warrantyRegistered = values.warrantyRegistered();
 		this.modelNumber = values.modelNumber();
 		this.serialNumber = values.serialNumber();
 		this.unitPrice = values.unitPrice();

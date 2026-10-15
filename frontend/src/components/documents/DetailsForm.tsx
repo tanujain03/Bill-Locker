@@ -325,6 +325,8 @@ function ItemCard(props: {
           {field('warrantyEndDate', 'date', endHint)}
         </div>
         <RegistrationLink
+          registered={item.warrantyRegistered === 'true'}
+          onRegisteredChange={(registered) => props.onChange({ ...item, warrantyRegistered: String(registered) })}
           url={item.registrationUrl}
           source={item.registrationSource as RegistrationSource | ''}
           brand={item.brand}

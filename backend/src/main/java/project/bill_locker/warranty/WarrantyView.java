@@ -23,5 +23,6 @@ public record WarrantyView(
 		Long daysLeft,
 		WarrantyStatus status,
 		/** The brand's warranty registration page (task 5), or null. */
-		String registrationUrl) {
+		String registrationUrl,
+		boolean warrantyRegistered) {
 }

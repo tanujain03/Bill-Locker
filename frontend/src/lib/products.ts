@@ -28,6 +28,7 @@ export type ProductView = {
   daysLeft: number | null;
   status: WarrantyStatus;
   registrationUrl: string | null;
+  warrantyRegistered: boolean;
   /** Days since the purchase; null without a purchase date. */
   ownedDays: number | null;
   /** Price ÷ whole months owned (at least 1). */
@@ -42,6 +43,9 @@ export type ProductView = {
 
 export const getProduct = (documentId: string, position: number) =>
   api<ProductView>(`/documents/${documentId}/items/${position}/product`);
+
+export const setWarrantyRegistration = (documentId: string, position: number, registered: boolean) =>
+  api<ProductView>(`/documents/${documentId}/items/${position}/registration`, { method: 'PUT', body: { registered } });
 
 export const productLink = (documentId: string, position: number) => `/products/${documentId}/${position}`;
 

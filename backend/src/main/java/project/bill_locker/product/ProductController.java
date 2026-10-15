@@ -1,6 +1,10 @@
 package project.bill_locker.product;
 
 import java.util.UUID;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +20,14 @@ class ProductController {
 
 	ProductController(ProductService products) {
 		this.products = products;
+	}
+
+	record RegistrationRequest(@NotNull Boolean registered) {}
+
+	@PutMapping("/api/documents/{id}/items/{position}/registration")
+	ProductView registration(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @PathVariable int position,
+			@Valid @RequestBody RegistrationRequest request) {
+		return products.setRegistration(CurrentUser.id(jwt), id, position, request.registered());
 	}
 
 	@GetMapping("/api/documents/{id}/items/{position}/product")

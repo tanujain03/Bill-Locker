@@ -25,6 +25,7 @@ export type WarrantyView = {
   status: WarrantyStatus;
   /** The brand's warranty registration page (task 5), or null. */
   registrationUrl: string | null;
+  warrantyRegistered: boolean;
 };
 
 export type WarrantyCounts = { all: number; active: number; expiringSoon: number; expired: number; noInfo: number };

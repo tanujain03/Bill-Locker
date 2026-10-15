@@ -50,9 +50,18 @@ public class ProductService {
 				BillCategory.parse(d.getCategory()),
 				d.getSellerName(), d.getDocumentNumber(), bought,
 				item.getWarrantyProvider(), item.getWarrantyPeriodMonths(), item.getWarrantyStartDate(), end,
-				WarrantyRules.daysLeft(end, today), WarrantyRules.status(end, today), item.getRegistrationUrl(),
+				WarrantyRules.daysLeft(end, today), WarrantyRules.status(end, today), item.getRegistrationUrl(), item.isWarrantyRegistered(),
 				ownedDays, costPerMonth(item.getUnitPrice(), bought, today),
 				DocumentSummary.of(d), related(userId, d, item), missing(d, item, end));
+	}
+
+	@Transactional
+	public ProductView setRegistration(UUID userId, UUID documentId, int position, boolean registered) {
+		Document d = documents.findByIdAndUserId(documentId, userId).orElseThrow(ProductService::notFound);
+		DocumentItem item = d.getItems().stream().filter(i -> i.getPosition() == position).findFirst()
+				.orElseThrow(ProductService::notFound);
+		item.setWarrantyRegistered(registered);
+		return product(userId, documentId, position);
 	}
 
 	/**

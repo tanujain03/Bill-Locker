@@ -57,6 +57,7 @@ export type DocumentItem = {
   /** The manufacturer's brand, e.g. "Noise": used to find its registration page. */
   brand: string | null;
   registrationUrl: string | null;
+  warrantyRegistered: boolean;
   registrationSource: RegistrationSource | null;
 };
 
@@ -175,7 +176,7 @@ export const ITEM_LABELS = {
   warrantyProvider: 'Warranty provider',
   brand: 'Brand',
   registrationUrl: 'Warranty registration link',
-} as const satisfies Record<Exclude<keyof DocumentItem, 'registrationSource'>, string>;
+} as const satisfies Record<Exclude<keyof DocumentItem, 'registrationSource' | 'warrantyRegistered'>, string>;
 
 /** The page to open: the brand's official one (WEB_SEARCH) or, if none was found, a Google search (SEARCH). */
 export type RegistrationPage = { url: string; source: RegistrationSource };

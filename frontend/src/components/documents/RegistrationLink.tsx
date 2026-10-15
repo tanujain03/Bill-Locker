@@ -15,6 +15,8 @@ import { CopyButton } from './CopyButton';
  * Bill Locker only opens the brand's page; the user registers there themselves.
  */
 export function RegistrationLink(props: {
+  registered: boolean;
+  onRegisteredChange: (registered: boolean) => void;
   url: string;
   source: RegistrationSource | '';
   brand: string;
@@ -32,7 +34,15 @@ export function RegistrationLink(props: {
     <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
       <p className="text-sm font-medium text-slate-700">Warranty registration</p>
 
-      {/^https?:\/\/\S+$/i.test(url) ? (
+      <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" checked={props.registered} onChange={(e) => props.onRegisteredChange(e.target.checked)} />
+        I have completed warranty registration
+      </label>
+      <p className="mt-1 text-xs text-slate-500">Save the bill to keep this status. Opening a link does not mark it registered.</p>
+
+      {props.registered ? (
+        <Button className="mt-3" size="sm" icon={BadgeCheck} disabled>Warranty registered</Button>
+      ) : /^https?:\/\/\S+$/i.test(url) ? (
         <>
           <div className="mt-1.5 flex items-start gap-2">
             {/* A new tab, without giving that page a way back into ours (noopener). */}

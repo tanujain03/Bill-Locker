@@ -25,7 +25,7 @@ import { formatDate } from '../lib/document-form';
 import { BILL_CATEGORY_LABELS, DOCUMENT_TYPE_LABELS, downloadDocument, formatAmount, type DocumentSummary } from '../lib/documents';
 import { categoryIcon, daysBetween, today } from '../lib/expenses';
 import { useFeedback } from '../lib/feedback-context';
-import { getProduct, ownedFor, type ProductView } from '../lib/products';
+import { getProduct, setWarrantyRegistration, ownedFor, type ProductView } from '../lib/products';
 import { usePageTitle } from '../lib/usePageTitle';
 
 /**
@@ -67,13 +67,27 @@ export function ProductPage() {
           </div>
         </div>
       ) : (
-        <Product p={product} />
+        <Product key={`${product.documentId}/${product.position}`} p={product} onUpdate={setProduct} />
       )}
     </main>
   );
 }
 
-function Product({ p }: { p: ProductView }) {
+function Product({ p, onUpdate }: { p: ProductView; onUpdate: (p: ProductView) => void }) {
+  const { toast } = useFeedback();
+  const [savingRegistration, setSavingRegistration] = useState(false);
+  async function changeRegistration() {
+    if (savingRegistration) return;
+    setSavingRegistration(true);
+    try {
+      onUpdate(await setWarrantyRegistration(p.documentId, p.position, !p.warrantyRegistered));
+      toast(p.warrantyRegistered ? 'Registration status cleared.' : 'Warranty marked as registered.');
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setSavingRegistration(false);
+    }
+  }
   const Icon = categoryIcon(p.category);
   const canRegister = Boolean(p.registrationUrl && /^https?:\/\//i.test(p.registrationUrl));
 
@@ -103,7 +117,9 @@ function Product({ p }: { p: ProductView }) {
             <Wrench className="size-4" aria-hidden />
             Claim kit
           </Link>
-          {canRegister && (
+          {p.warrantyRegistered ? (
+            <Button icon={ShieldCheck} disabled>Warranty registered</Button>
+          ) : canRegister && (
             <a href={p.registrationUrl!} target="_blank" rel="noopener noreferrer" className={buttonClass()}>
               <ExternalLink className="size-4" aria-hidden />
               Register warranty
@@ -134,6 +150,12 @@ function Product({ p }: { p: ProductView }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card icon={ShieldCheck} title="Warranty">
           <WarrantyTimeline p={p} />
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <p className="mb-2 text-sm text-slate-600">{p.warrantyRegistered ? 'You marked this warranty as registered.' : 'After completing registration with the brand, record it here.'}</p>
+            <Button size="sm" busy={savingRegistration} onClick={changeRegistration}>
+              {p.warrantyRegistered ? 'Undo registered status' : 'Mark as registered'}
+            </Button>
+          </div>
         </Card>
 
         <Card icon={Wallet} title="Owning it">
