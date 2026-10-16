@@ -36,6 +36,7 @@ export type ClaimKit = {
   serviceCentreUrl: string;
   /** e.g. ["Serial number", "Invoice number"]. */
   missing: string[];
+  previousServices: import('./service-records').ServiceRecord[];
 };
 
 export const getClaimKit = (productId: string) =>

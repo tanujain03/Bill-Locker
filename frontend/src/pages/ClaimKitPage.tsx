@@ -23,6 +23,7 @@ import { WarrantyStatusPill } from '../components/warranties/WarrantyStatusPill'
 import { errorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { claimEmail, COMMON_PROBLEMS, getClaimKit, mailtoLink, type ClaimKit } from '../lib/claims';
+import { ServiceTimeline } from '../components/services/ServiceTimeline';
 import { productLink } from '../lib/products';
 import { formatDate } from '../lib/document-form';
 import { downloadDocument, formatAmount } from '../lib/documents';
@@ -130,6 +131,7 @@ function Kit({ kit }: { kit: ClaimKit }) {
       </header>
 
       <StatusBanner kit={kit} />
+      {kit.previousServices.length > 0 && <section className="rounded-2xl border border-slate-200 bg-white p-5"><h2 className="mb-4 font-semibold">Previous services</h2><ServiceTimeline records={kit.previousServices} /></section>}
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">

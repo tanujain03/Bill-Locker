@@ -24,6 +24,12 @@ each task implements a part of this contract.
 | Return windows (task 14) | Documents carry `returnByDate` (also accepted by `PUT /api/documents/{id}`; before the purchase date → `400` `fieldErrors.returnByDate`); the AI fills it from a printed return policy. `GET /api/dashboard` adds `openReturns` (return date today or later, soonest first, `daysLeft`). See [`task-14-return-windows.md`](task-14-return-windows.md) |
 | `POST /api/assistant/chat` | Complete (task 6). Chat assistant: Gemini writes one SELECT on user-filtered `ai_*` views, run read-only as the `bill_locker_ai` role; answers from the rows. See section 11 and [`task-6-assistant.md`](task-6-assistant.md) |
 
+Task 15 adds service records: `POST`/`GET /api/documents/{id}/items/{position}/services`,
+`GET /api/services?type=&q=&due=`, and `PUT`/`DELETE /api/services/{id}`. SAVED bills only,
+JWT ownership, permanent product identity, service costs/history on product responses,
+`previousServices` on claim kits and `servicesDue` on dashboards. See
+[`task-15-service-records.md`](task-15-service-records.md) for fields, validation and reminder rules.
+
 Everything else is not built yet. How tasks 1–4 work is explained in
 [`task-1-auth.md`](task-1-auth.md), [`task-2-documents.md`](task-2-documents.md),
 [`task-3-gmail.md`](task-3-gmail.md) and [`task-4-dashboard.md`](task-4-dashboard.md).

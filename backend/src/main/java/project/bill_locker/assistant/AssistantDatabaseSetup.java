@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  * <li>A login {@code bill_locker_ai} (password: AI_DATABASE_PASSWORD) that may only SELECT
  * from the views below and belongs to no other role. {@link ReadOnlyQueryRunner} runs the AI's
  * SQL logged in as it, so {@code set_config('role', …)} has no role to switch to.</li>
- * <li>Seven {@code ai_*} views: the user's own data. Secrets (password hash, reset tokens, Gmail
+ * <li>Eight {@code ai_*} views: the user's own data. Secrets (password hash, reset tokens, Gmail
  * tokens) and file bytes are left out. Views read the tables with their owner's rights, so the
  * login never needs rights on a table. They are {@code security_barrier} views: Postgres
  * applies the user filter first. A plain view lets the planner test the AI's own conditions
@@ -50,7 +50,15 @@ class AssistantDatabaseSetup {
 
 	/** View name → its SELECT. Dropped and created again on start, so column changes never fail. */
 	private static final List<String[]> VIEWS = List.of(
-			new String[] {"ai_me", "SELECT name, email, monthly_budget, created_at FROM users WHERE id = " + ME},
+			new String[] {"ai_service_records", """
+                    SELECT r.id, r.document_id, r.item_id AS product_id, i.position AS item_position,
+                           i.product_name, r.type, r.title, r.description, r.service_date, r.provider_name,
+                           r.provider_contact, r.cost, r.covered_by_warranty, r.claim_number, r.claim_status,
+                           r.next_due_date, r.repeat_months, r.attachment_document_id, r.created_at, r.updated_at
+                    FROM product_service_records r JOIN document_items i ON i.id=r.item_id
+                    JOIN documents d ON d.id=r.document_id
+                    WHERE d.status='SAVED' AND d.user_id=r.user_id AND r.user_id = """ + ME},
+            new String[] {"ai_me", "SELECT name, email, monthly_budget, created_at FROM users WHERE id = " + ME},
 			new String[] {"ai_documents", """
 					SELECT id, file_name, content_type, size_bytes, status, document_type, document_number,
 					       seller_name, seller_address, seller_contact, buyer_name, buyer_address, buyer_email,
@@ -78,7 +86,15 @@ class AssistantDatabaseSetup {
 
 	/** What Gemini is told about the views. Keep in step with {@link #VIEWS}. */
 	public static final String VIEWS_DESCRIPTION = """
-			ai_me(name, email, monthly_budget, created_at): the signed-in user. monthly_budget: how much they plan
+            ai_service_records(id, document_id, product_id, item_position, product_name, type, title, description,
+              service_date, provider_name, provider_contact, cost, covered_by_warranty, claim_number, claim_status,
+              next_due_date, repeat_months, attachment_document_id, created_at, updated_at): repairs and services on
+              saved products. type: REPAIR, ROUTINE_SERVICE, PART_REPLACED, WARRANTY_CLAIM, OTHER.
+              claim_status: OPEN, RESOLVED, REJECTED or null. cost is actual recorded cost in rupees; null is unknown.
+              product_id -> ai_items.id; document_id -> ai_documents.id. For CURRENT reminders, select the newest
+              scheduled row per product (service_date desc, created_at desc, id desc), then compare next_due_date
+              with today's date. Overdue: before today; due soon: today through today+30 days inclusive.
+            ai_me(name, email, monthly_budget, created_at): the signed-in user. monthly_budget: how much they plan
 			  to spend per month, in rupees (set on the Expenses page); null = no budget set.
 			ai_documents(id, file_name, content_type, size_bytes, status, document_type, document_number,
 			  seller_name, seller_address, seller_contact, buyer_name, buyer_address, buyer_email,

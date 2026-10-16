@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes, useParams } from 'react-router';
+import { ServicesPage } from './pages/ServicesPage';
 import { AppLayout } from './components/AppLayout';
 import { GmailPage } from './pages/GmailPage';
 import { GuestOnly, RequireAuth } from './components/RouteGuards';
@@ -39,6 +40,7 @@ export function App() {
           <Route path="/expenses" element={<ExpensesPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/gmail" element={<GmailPage />} />
+          <Route path="/services" element={<ServicesPage />} />
           <Route path="/warranties" element={<WarrantiesPage />} />
           <Route path="/warranties/claim/:productId" element={<ClaimKitPage />} />
           {/* Older positional links cannot identify a product safely after list edits. */}

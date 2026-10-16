@@ -26,6 +26,7 @@ import { BILL_CATEGORY_LABELS, DOCUMENT_TYPE_LABELS, downloadDocument, formatAmo
 import { categoryIcon, daysBetween, today } from '../lib/expenses';
 import { useFeedback } from '../lib/feedback-context';
 import { getProduct, setWarrantyRegistration, ownedFor, type ProductView } from '../lib/products';
+import { ServiceHistorySection } from '../components/services/ServiceHistorySection';
 import { usePageTitle } from '../lib/usePageTitle';
 
 /**
@@ -138,6 +139,8 @@ function Product({ p, onUpdate }: { p: ProductView; onUpdate: (p: ProductView) =
         </div>
       </header>
 
+      <ServiceHistorySection product={p} onChanged={() => { getProduct(p.productId).then(onUpdate).catch((e) => toast(errorMessage(e), 'error')); }} />
+
       {p.bill.returnByDate && <ReturnBanner returnByDate={p.bill.returnByDate} />}
 
       {p.missing.length > 0 && (
@@ -173,7 +176,7 @@ function Product({ p, onUpdate }: { p: ProductView; onUpdate: (p: ProductView) =
               <Stat
                 label="Cost per month"
                 value={p.costPerMonth !== null ? formatAmount(p.costPerMonth, { whole: true }) : '—'}
-                sub={p.price !== null ? `${formatAmount(p.price, { whole: true })} spread over the months owned` : 'Add the price on the bill'}
+                sub={p.price !== null ? `${formatAmount(p.price, { whole: true })} plus service costs, spread over the months owned` : 'Add the price on the bill'}
               />
             </div>
           )}

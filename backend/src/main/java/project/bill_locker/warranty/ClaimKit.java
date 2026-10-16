@@ -44,5 +44,5 @@ public record ClaimKit(
 		/** A Google Maps search for the brand's service centres near the user. */
 		String serviceCentreUrl,
 		/** What a claim usually needs but this bill doesn't give, e.g. "Serial number". */
-		List<String> missing) {
+		List<String> missing, List<project.bill_locker.servicerecord.ServiceRecordView> previousServices) {
 }

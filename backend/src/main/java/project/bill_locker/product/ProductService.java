@@ -28,11 +28,13 @@ public class ProductService {
 	private final DocumentRepository documents;
 	private final Clock clock;
 	private final DocumentItemRepository items;
+	private final project.bill_locker.servicerecord.ServiceRecordService services;
 
-	public ProductService(DocumentRepository documents, Clock clock, DocumentItemRepository items) {
+	public ProductService(DocumentRepository documents, Clock clock, DocumentItemRepository items, project.bill_locker.servicerecord.ServiceRecordService services) {
 		this.documents = documents;
 		this.clock = clock;
 		this.items = items;
+		this.services = services;
 	}
 
 	/** Another user's bill, or a position the bill doesn't have, is a 404. */
@@ -52,6 +54,8 @@ public class ProductService {
 	}
 
 	private ProductView view(UUID userId, Document d, DocumentItem item) {
+		var history = services.history(userId, item.getId());
+		var serviceCost = project.bill_locker.servicerecord.ServiceRecordService.totalCost(history);
 		LocalDate today = LocalDate.now(clock);
 		LocalDate end = WarrantyRules.effectiveEnd(item.getWarrantyEndDate(), item.getWarrantyStartDate(),
 				item.getWarrantyPeriodMonths());
@@ -64,8 +68,10 @@ public class ProductService {
 				d.getSellerName(), d.getDocumentNumber(), bought,
 				item.getWarrantyProvider(), item.getWarrantyPeriodMonths(), item.getWarrantyStartDate(), end,
 				WarrantyRules.daysLeft(end, today), WarrantyRules.status(end, today), item.getRegistrationUrl(), item.isWarrantyRegistered(),
-				ownedDays, costPerMonth(item.getUnitPrice(), bought, today),
-				DocumentSummary.of(d), related(userId, d, item), missing(d, item, end));
+				ownedDays, costPerMonth(item.getUnitPrice() == null ? null : item.getUnitPrice().add(serviceCost), bought, today),
+				DocumentSummary.of(d), related(userId, d, item), missing(d, item, end), history, serviceCost,
+                history.isEmpty() ? null : history.getFirst().serviceDate(),
+                project.bill_locker.servicerecord.ServiceRecordService.nextDue(history));
 	}
 
 	@Transactional

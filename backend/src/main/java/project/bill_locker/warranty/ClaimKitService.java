@@ -26,11 +26,13 @@ public class ClaimKitService {
 	private final DocumentRepository documents;
 	private final Clock clock;
 	private final DocumentItemRepository items;
+	private final project.bill_locker.servicerecord.ServiceRecordService services;
 
-	public ClaimKitService(DocumentRepository documents, Clock clock, DocumentItemRepository items) {
+	public ClaimKitService(DocumentRepository documents, Clock clock, DocumentItemRepository items, project.bill_locker.servicerecord.ServiceRecordService services) {
 		this.documents = documents;
 		this.clock = clock;
 		this.items = items;
+		this.services = services;
 	}
 
 	/** Another user's bill, or a position the bill doesn't have, is a 404. */
@@ -65,7 +67,7 @@ public class ClaimKitService {
 				item.getRegistrationUrl(),
 				"https://www.google.com/search?q=" + encode(maker + " customer care warranty claim"),
 				"https://www.google.com/maps/search/?api=1&query=" + encode(maker + " authorised service centre near me"),
-				missing(d, item, end));
+				missing(d, item, end), services.history(userId, item.getId()));
 	}
 
 	/** The facts a service centre usually asks for, in the order the checklist shows them. */

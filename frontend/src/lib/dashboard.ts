@@ -28,6 +28,7 @@ export type Dashboard = {
   recentBills: DocumentSummary[];
   /** Saved bills that can still be returned, soonest first (daysLeft 0 = today is the last day). */
   openReturns: OpenReturn[];
+  servicesDue: import('./service-records').ServiceRecord[];
 };
 
 export type OpenReturn = {

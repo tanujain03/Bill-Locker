@@ -49,7 +49,9 @@ public record ProductView(
 		/** Other documents of the user with a product of the same serial number, or else the same model number. */
 		List<RelatedDocument> related,
 		/** Facts the bill doesn't give, e.g. "Serial number" (the page links to the bill to add them). */
-		List<String> missing) {
+		List<String> missing,
+        List<project.bill_locker.servicerecord.ServiceRecordView> serviceHistory,
+        BigDecimal totalServiceCost, LocalDate lastServiceDate, LocalDate nextServiceDue) {
 
 	/** {@code matchedBy} says why it is related: "serial number" or "model number". */
 	public record RelatedDocument(DocumentSummary document, String matchedBy) {

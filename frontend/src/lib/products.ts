@@ -40,6 +40,10 @@ export type ProductView = {
   related: RelatedDocument[];
   /** e.g. ["Serial number"]: add them on the bill. */
   missing: string[];
+  serviceHistory: import('./service-records').ServiceRecord[];
+  totalServiceCost: number;
+  lastServiceDate: string | null;
+  nextServiceDue: string | null;
 };
 
 export const getProduct = (productId: string) =>

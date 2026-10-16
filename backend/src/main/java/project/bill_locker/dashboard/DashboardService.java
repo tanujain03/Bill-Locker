@@ -36,11 +36,13 @@ public class DashboardService {
 	private final DocumentRepository documents;
 	private final WarrantyService warranties;
 	private final Clock clock;
+	private final project.bill_locker.servicerecord.ServiceRecordService services;
 
-	public DashboardService(DocumentRepository documents, WarrantyService warranties, Clock clock) {
+	public DashboardService(DocumentRepository documents, WarrantyService warranties, Clock clock, project.bill_locker.servicerecord.ServiceRecordService services) {
 		this.documents = documents;
 		this.warranties = warranties;
 		this.clock = clock;
+		this.services = services;
 	}
 
 	@Transactional(readOnly = true)
@@ -74,7 +76,7 @@ public class DashboardService {
 				saved.stream().filter(d -> d.getPurchaseDate() == null || d.getTotalAmount() == null).count(),
 				topShops(saved),
 				documents.findTop5ByUserIdOrderByCreatedAtDesc(userId).stream().map(DocumentSummary::of).toList(),
-				openReturns(saved, LocalDate.now(clock)));
+				openReturns(saved, LocalDate.now(clock)), services.due(userId).stream().limit(TOP).toList());
 	}
 
 	/** Saved bills whose return date is today or later, the one closing first at the top. */

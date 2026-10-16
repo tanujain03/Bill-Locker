@@ -1,6 +1,7 @@
 import { ArrowRight, CircleAlert, FlaskConical, Mail, Package, ReceiptText, Trash2, Undo2, Wallet } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
+import { ServiceDueBadge } from '../components/services/ServiceTimeline';
 import { ExpiringList } from '../components/dashboard/ExpiringList';
 import { GmailCard } from '../components/dashboard/GmailCard';
 import { RecentBills } from '../components/dashboard/RecentBills';
@@ -123,6 +124,15 @@ function Overview({ data, gmail }: { data: Dashboard; gmail: GmailOverview | nul
             <ArrowRight className="size-4" aria-hidden />
           </span>
         </Link>
+      )}
+
+      {data.servicesDue.length > 0 && (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Services due</h2><Link to="/services" className="text-sm font-medium text-brand-700 hover:underline">All services</Link></div>
+          <ul className="mt-3 divide-y divide-slate-100">{data.servicesDue.map((r) => <li key={r.id}>
+            <Link to={`/products/${r.productId}`} className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-3 hover:bg-slate-50"><span className="min-w-0"><span className="block text-sm font-medium">{r.productName ?? 'Product'}: {r.title}</span><span className="text-xs text-slate-500">Next service {r.nextDueDate && formatDate(r.nextDueDate)}</span></span><ServiceDueBadge record={r} /></Link>
+          </li>)}</ul>
+        </section>
       )}
 
       {data.openReturns.length > 0 && <OpenReturns items={data.openReturns} />}

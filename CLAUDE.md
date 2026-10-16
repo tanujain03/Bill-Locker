@@ -121,6 +121,17 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   form field with +7/+10/+15/+30, `ReturnBadge`/`ReturnBanner`, dashboard strip, 🔔. View `ai_documents.return_by_date`.
   Sample air fryer: bought 5 days ago, 10-day window. Guide: `docs/task-14-return-windows.md`.
 
+- Task 15: service and maintenance records (`servicerecord`, `/api/services`, `/services`). Repairs,
+  routine maintenance, parts and claims belong to a SAVED bill's permanent product ID; the document/
+  position endpoints remain, with an optional productId guard. Existing owned documents can be
+  linked as attachments. `ServiceRules` uses the Clock for overdue / due in 30 days / upcoming;
+  repeatMonths computes the next date from the service date. The newest scheduled record per
+  product drives reminders. Product pages include history/costs, claim kits include previous
+  services, dashboard/bell show services due. `ai_service_records` uses the existing signed user
+  filter and SELECT-only AI view permissions. Four service records accompany sample bills;
+  document/product deletion cascades to records. The new table is `product_service_records`, keeping
+  the old build's incompatible `service_records` table and its rows untouched. Guide: `docs/task-15-service-records.md`.
+
 ## Repository
 
 - `frontend/` — React 19 + TypeScript 5.9 + Vite 6 + Tailwind CSS 4 + React Router 7 +
@@ -131,9 +142,9 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
   Packages: `security` (SecurityConfig, JWT), `user` (incl. Settings endpoints), `auth` (incl. password reset),
   `common` (BaseEntity, ApiException, GlobalExceptionHandler), `document` (+ `document.ai`,
-  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`, `expense`, `sample`, `product`.
+  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`, `expense`, `sample`, `product`, `servicerecord`.
   Tables: `users`, `password_reset_tokens`, `documents`, `document_items`, `document_files`,
-  `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`, `category_budgets`.
+  `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`, `category_budgets`, `product_service_records`.
 - `docs/api-contract.md` — the full target REST API; its top lists what is built so far.
   `docs/database-design.md` — the target design (13 tables); entity classes at tag
   `step-2-database`. Hibernate `ddl-auto=update` creates tables. No migration scripts or

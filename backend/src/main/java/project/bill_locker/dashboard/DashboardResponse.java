@@ -28,7 +28,7 @@ public record DashboardResponse(
 		/** The 5 newest bills of any status. */
 		List<DocumentSummary> recentBills,
 		/** Saved bills that can still be returned (return date today or later), soonest first. */
-		List<OpenReturn> openReturns) {
+		List<OpenReturn> openReturns, List<project.bill_locker.servicerecord.ServiceRecordView> servicesDue) {
 
 	/** {@code daysLeft} 0 = today is the last day. {@code productName}: the bill's first product, or null. */
 	public record OpenReturn(java.util.UUID documentId, String sellerName, String productName,

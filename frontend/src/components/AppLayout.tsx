@@ -10,6 +10,7 @@ import {
   Settings,
   ShieldCheck,
   Wallet,
+  Wrench,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -43,6 +44,7 @@ const LINKS: NavItem[] = [
   // Everyday spending (rides, food, utilities): documents of type "Bill / receipt".
   { to: '/bills', label: 'Bills & receipts', short: 'Bills', Icon: Receipt },
   { to: '/warranties', label: 'Warranties', Icon: ShieldCheck, badge: (a) => a.expiring.length },
+  { to: '/services', label: 'Services', Icon: Wrench },
   { to: '/gmail', label: 'Gmail', Icon: Mail, badge: (a) => a.gmailFiles },
 ];
 
