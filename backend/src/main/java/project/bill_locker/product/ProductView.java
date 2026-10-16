@@ -14,6 +14,7 @@ import project.bill_locker.warranty.WarrantyStatus;
  */
 public record ProductView(
 		UUID documentId,
+		UUID productId,
 		int position,
 		// ---- the product ----
 		String productName,

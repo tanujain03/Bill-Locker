@@ -172,10 +172,10 @@ function WarrantyRows({ items }: { items: WarrantyView[] }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {items.map((w, i) => (
-            <tr key={`${w.documentId}-${i}`} className="hover:bg-slate-50">
+          {items.map((w) => (
+            <tr key={w.productId} className="hover:bg-slate-50">
               <td className="max-w-xs px-4 py-3">
-                <Link to={productLink(w.documentId, w.position)} className="block truncate font-medium hover:text-brand-700 hover:underline">
+                <Link to={productLink(w.productId)} className="block truncate font-medium hover:text-brand-700 hover:underline">
                   {w.productName ?? 'Unnamed product'}
                 </Link>
                 <ProductMeta warranty={w} />
@@ -196,11 +196,11 @@ function WarrantyRows({ items }: { items: WarrantyView[] }) {
       </table>
 
       <ul className="space-y-2 md:hidden">
-        {items.map((w, i) => (
-          <li key={`${w.documentId}-${i}`} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
+        {items.map((w) => (
+          <li key={w.productId} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <Link to={productLink(w.documentId, w.position)} className="block truncate font-medium hover:text-brand-700 hover:underline">
+                <Link to={productLink(w.productId)} className="block truncate font-medium hover:text-brand-700 hover:underline">
                   {w.productName ?? 'Unnamed product'}
                 </Link>
                 <p className="truncate text-sm text-slate-500">
@@ -239,7 +239,7 @@ function RowLinks({ warranty: w }: { warranty: WarrantyView }) {
   return (
     <span className="inline-flex shrink-0 items-center gap-1.5">
       <IconAction
-        to={claimKitLink(w.documentId, w.position)}
+        to={claimKitLink(w.productId)}
         icon={Wrench}
         tip="Claim kit"
         label={`Claim kit for ${product}`}

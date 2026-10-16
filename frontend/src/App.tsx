@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router';
+import { Navigate, Route, Routes, useParams } from 'react-router';
 import { AppLayout } from './components/AppLayout';
 import { GmailPage } from './pages/GmailPage';
 import { GuestOnly, RequireAuth } from './components/RouteGuards';
@@ -40,8 +40,11 @@ export function App() {
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/gmail" element={<GmailPage />} />
           <Route path="/warranties" element={<WarrantiesPage />} />
-          <Route path="/warranties/claim/:documentId/:position" element={<ClaimKitPage />} />
-          <Route path="/products/:documentId/:position" element={<ProductPage />} />
+          <Route path="/warranties/claim/:productId" element={<ClaimKitPage />} />
+          {/* Older positional links cannot identify a product safely after list edits. */}
+          <Route path="/products/:documentId/:position" element={<LegacyProductLink />} />
+          <Route path="/warranties/claim/:documentId/:position" element={<LegacyProductLink />} />
+          <Route path="/products/:productId" element={<ProductPage />} />
           <Route path="/bills" element={<BillsPage />} />
           <Route path="/documents/:id" element={<DocumentPage />} />
           <Route path="/settings" element={<SettingsPage />} />
@@ -51,4 +54,10 @@ export function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
+}
+
+/** Take old bookmarks to their bill so they cannot silently open a different product. */
+function LegacyProductLink() {
+  const { documentId } = useParams();
+  return <Navigate to={`/documents/${documentId}`} replace />;
 }

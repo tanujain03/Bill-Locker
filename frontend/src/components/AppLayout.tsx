@@ -21,6 +21,7 @@ import { DropAnywhere } from './DropAnywhere';
 import { Logo } from './Logo';
 import { NotificationBell } from './NotificationBell';
 import { UploadButton } from './UploadButton';
+import { UploadProvider } from './UploadProvider';
 import { UserMenu } from './UserMenu';
 import { WarrantyReminder } from './WarrantyReminder';
 
@@ -69,6 +70,10 @@ function readPinned(): boolean {
  * A file dragged onto any page uploads it (DropAnywhere).
  */
 export function AppLayout() {
+  return <UploadProvider><Layout /></UploadProvider>;
+}
+
+function Layout() {
   const [open, setOpen] = useState(false);
   const [pinned, setPinned] = useState(readPinned);
   /** Open for a moment because the mouse or keyboard focus is on it. */

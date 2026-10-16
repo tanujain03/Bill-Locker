@@ -58,7 +58,7 @@ public class WarrantyService {
 	private static WarrantyView view(Document document, DocumentItem item, LocalDate today) {
 		LocalDate end = WarrantyRules.effectiveEnd(item.getWarrantyEndDate(), item.getWarrantyStartDate(),
 				item.getWarrantyPeriodMonths());
-		return new WarrantyView(document.getId(), item.getPosition(), item.getProductName(), item.getModelNumber(), item.getSerialNumber(),
+		return new WarrantyView(document.getId(), item.getId(), item.getPosition(), item.getProductName(), item.getModelNumber(), item.getSerialNumber(),
 				document.getSellerName(), item.getWarrantyProvider(), document.getPurchaseDate(),
 				item.getWarrantyStartDate(), end, WarrantyRules.daysLeft(end, today), WarrantyRules.status(end, today),
 				item.getRegistrationUrl(), item.isWarrantyRegistered());

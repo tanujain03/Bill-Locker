@@ -170,6 +170,8 @@ export function DocumentPage() {
    * arrives, would be blocked as a pop-up. It shows "Finding…" until we send it on.
    */
   async function openRegistrationPage(position: number, brand: string) {
+    const itemId = form?.items[position]?.id;
+    if (!itemId) return;
     const tab = window.open('', '_blank');
     if (tab) {
       tab.opener = null; // the brand's page can't reach back into Bill Locker
@@ -180,7 +182,7 @@ export function DocumentPage() {
     }
     setFinding(position);
     try {
-      const page = await findRegistrationPage(id, position, brand);
+      const page = await findRegistrationPage(id, itemId, brand);
       if (tab) tab.location.href = page.url;
       else toast('Your browser blocked the new tab. Click the link under Warranty registration.', 'info');
       if (page.source === 'SEARCH') toast(`No official page found for ${brand}, so a Google search opened.`, 'info');
@@ -188,16 +190,16 @@ export function DocumentPage() {
       setForm((current) =>
         current && {
           ...current,
-          items: current.items.map((item, i) =>
-            i === position ? { ...item, registrationUrl: page.url, registrationSource: page.source } : item,
+          items: current.items.map((item) =>
+            item.id === itemId ? { ...item, registrationUrl: page.url, registrationSource: page.source } : item,
           ),
         },
       );
       setDocument((current) =>
         current && {
           ...current,
-          items: current.items.map((item, i) =>
-            i === position ? { ...item, registrationUrl: page.url, registrationSource: page.source } : item,
+          items: current.items.map((item) =>
+            item.id === itemId ? { ...item, registrationUrl: page.url, registrationSource: page.source } : item,
           ),
         },
       );
@@ -419,15 +421,15 @@ export function DocumentPage() {
                     fieldErrors={fieldErrors}
                     registration={{
                       finding: (index) => finding === index,
-                      // The backend looks the product up by its place on the bill, so it must exist there.
+                      // Search only for a saved product, identified independently of its list position.
                       canSearch: (index) =>
-                        document.status !== 'UPLOADED' && index < document.items.length && busy === null && finding === null,
+                        Boolean(form.items[index].id) && busy === null && finding === null,
                       onConfirm: (index, brand) => openRegistrationPage(index, brand),
                     }}
                     // These pages read the saved bill, so only for saved products without unsaved edits.
                     savedLinks={(index) =>
-                      document.status === 'SAVED' && !dirty && index < document.items.length
-                        ? { claim: claimKitLink(document.id, index), product: productLink(document.id, index) }
+                      document.status === 'SAVED' && !dirty && Boolean(form.items[index].id)
+                        ? { claim: claimKitLink(form.items[index].id), product: productLink(form.items[index].id) }
                         : null
                     }
                   />

@@ -12,7 +12,7 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { Button, buttonClass } from '../components/Button';
 import { ErrorState } from '../components/ErrorState';
@@ -29,24 +29,30 @@ import { getProduct, setWarrantyRegistration, ownedFor, type ProductView } from 
 import { usePageTitle } from '../lib/usePageTitle';
 
 /**
- * /products/:documentId/:position — one product with everything about it: its warranty on a
+ * /products/:productId — one product with everything about it: its warranty on a
  * timeline, its details, what owning it has cost so far, the bill it came from and other
  * documents with the same serial or model number. Actions: claim kit, register, open bill.
  */
 export function ProductPage() {
-  const { documentId = '', position = '0' } = useParams();
+  const { productId = '' } = useParams();
   const [product, setProduct] = useState<ProductView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const latest = useRef(0);
   usePageTitle(product?.productName ?? 'Product');
 
   const load = useCallback(() => {
+    const request = ++latest.current;
     setError(null);
-    getProduct(documentId, Number(position))
-      .then(setProduct)
-      .catch((e) => setError(errorMessage(e)));
-  }, [documentId, position]);
+    setProduct(null);
+    getProduct(productId)
+      .then((value) => { if (request === latest.current) setProduct(value); })
+      .catch((e) => { if (request === latest.current) setError(errorMessage(e)); });
+  }, [productId]);
 
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+    return () => { ++latest.current; };
+  }, [load]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -67,7 +73,7 @@ export function ProductPage() {
           </div>
         </div>
       ) : (
-        <Product key={`${product.documentId}/${product.position}`} p={product} onUpdate={setProduct} />
+        <Product key={product.productId} p={product} onUpdate={(next) => setProduct((current) => current?.productId === next.productId ? next : current)} />
       )}
     </main>
   );
@@ -80,7 +86,7 @@ function Product({ p, onUpdate }: { p: ProductView; onUpdate: (p: ProductView) =
     if (savingRegistration) return;
     setSavingRegistration(true);
     try {
-      onUpdate(await setWarrantyRegistration(p.documentId, p.position, !p.warrantyRegistered));
+      onUpdate(await setWarrantyRegistration(p.productId, !p.warrantyRegistered));
       toast(p.warrantyRegistered ? 'Registration status cleared.' : 'Warranty marked as registered.');
     } catch (e) {
       toast(errorMessage(e), 'error');
@@ -113,7 +119,7 @@ function Product({ p, onUpdate }: { p: ProductView; onUpdate: (p: ProductView) =
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to={claimKitLink(p.documentId, p.position)} className={buttonClass({ variant: 'primary' })}>
+          <Link to={claimKitLink(p.productId)} className={buttonClass({ variant: 'primary' })}>
             <Wrench className="size-4" aria-hidden />
             Claim kit
           </Link>

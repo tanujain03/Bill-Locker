@@ -88,6 +88,10 @@ public class DocumentItem extends BaseEntity {
 
 	DocumentItem(Document document, int position, DocumentItemView values) {
 		this.document = document;
+		update(position, values);
+	}
+
+	void update(int position, DocumentItemView values) {
 		this.position = position;
 		this.productName = values.productName();
 		this.warrantyRegistered = values.warrantyRegistered();

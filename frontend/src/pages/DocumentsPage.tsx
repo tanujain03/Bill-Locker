@@ -27,6 +27,7 @@ export function DocumentsPage() {
   // dashboard opens the list already filtered, and Back/refresh keep the filters.
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
+  const uploaded = params.get('uploaded') ?? ''; // Refresh after a batch, even on this same page.
   const type = params.get('type') ?? '';
   const status = params.get('status') ?? '';
   /** '' (all), 'UPLOAD' or 'GMAIL'. Filtered here: the list is already loaded. */
@@ -56,7 +57,7 @@ export function DocumentsPage() {
 
   // Exclude successful deletions even from list requests that started before deletion.
   const deletedIds = useRef(new Set<string>());
-  const requestScope = JSON.stringify([q, type, status]);
+  const requestScope = JSON.stringify([q, type, status, uploaded]);
   const latestScope = useRef(requestScope);
   latestScope.current = requestScope;
   function onDeleted(ids: string[]) {
@@ -84,7 +85,7 @@ export function DocumentsPage() {
       current = false;
       clearTimeout(timer);
     };
-  }, [q, type, status]);
+  }, [q, type, status, uploaded]);
 
   // While a document waits for the background AI read, ask again every 3 s with the same
   // filters, so "Reading…" turns into "Needs review" without a reload.
@@ -114,15 +115,15 @@ export function DocumentsPage() {
             </span>
             <p className="mt-3 font-medium">Add your first bill</p>
             <p className="mt-1 text-sm text-slate-500">
-              Drop a file anywhere on this page, or choose one. PDF, JPG, PNG or WebP, up to 10 MB.
+              Drop files anywhere on this page, or choose files. PDF, JPG, PNG or WebP, up to 10 MB per file.
             </p>
-            <UploadButton className="mt-4">Choose file</UploadButton>
+            <UploadButton className="mt-4">Choose files</UploadButton>
           </div>
         ) : (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3">
             <p className="flex items-center gap-2 text-sm text-slate-600">
               <Upload className="size-4 shrink-0 text-brand-600" aria-hidden />
-              Drop a bill anywhere on the page to upload it (PDF, JPG, PNG or WebP, up to 10 MB).
+              Drop bills anywhere on the page to upload them (PDF, JPG, PNG or WebP, up to 10 MB per file).
             </p>
             <UploadButton variant="secondary" />
           </div>

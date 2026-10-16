@@ -16,6 +16,7 @@ import project.bill_locker.common.ApiException;
 import project.bill_locker.document.BillCategory;
 import project.bill_locker.document.Document;
 import project.bill_locker.document.DocumentItem;
+import project.bill_locker.document.DocumentItemRepository;
 import project.bill_locker.document.DocumentRepository;
 import project.bill_locker.document.DocumentSummary;
 import project.bill_locker.warranty.WarrantyRules;
@@ -26,10 +27,12 @@ public class ProductService {
 
 	private final DocumentRepository documents;
 	private final Clock clock;
+	private final DocumentItemRepository items;
 
-	public ProductService(DocumentRepository documents, Clock clock) {
+	public ProductService(DocumentRepository documents, Clock clock, DocumentItemRepository items) {
 		this.documents = documents;
 		this.clock = clock;
+		this.items = items;
 	}
 
 	/** Another user's bill, or a position the bill doesn't have, is a 404. */
@@ -39,13 +42,23 @@ public class ProductService {
 		DocumentItem item = d.getItems().stream().filter(i -> i.getPosition() == position).findFirst()
 				.orElseThrow(ProductService::notFound);
 
+		return view(userId, d, item);
+	}
+
+	@Transactional(readOnly = true)
+	public ProductView product(UUID userId, UUID productId) {
+		DocumentItem item = items.findByIdAndDocumentUserId(productId, userId).orElseThrow(ProductService::notFound);
+		return view(userId, item.getDocument(), item);
+	}
+
+	private ProductView view(UUID userId, Document d, DocumentItem item) {
 		LocalDate today = LocalDate.now(clock);
 		LocalDate end = WarrantyRules.effectiveEnd(item.getWarrantyEndDate(), item.getWarrantyStartDate(),
 				item.getWarrantyPeriodMonths());
 		LocalDate bought = d.getPurchaseDate();
 		Long ownedDays = bought == null ? null : Math.max(0, ChronoUnit.DAYS.between(bought, today));
 
-		return new ProductView(d.getId(), position,
+		return new ProductView(d.getId(), item.getId(), item.getPosition(),
 				item.getProductName(), item.getBrand(), item.getModelNumber(), item.getSerialNumber(), item.getUnitPrice(),
 				BillCategory.parse(d.getCategory()),
 				d.getSellerName(), d.getDocumentNumber(), bought,
@@ -62,6 +75,13 @@ public class ProductService {
 				.orElseThrow(ProductService::notFound);
 		item.setWarrantyRegistered(registered);
 		return product(userId, documentId, position);
+	}
+
+	@Transactional
+	public ProductView setRegistration(UUID userId, UUID productId, boolean registered) {
+		DocumentItem item = items.findByIdAndDocumentUserId(productId, userId).orElseThrow(ProductService::notFound);
+		item.setWarrantyRegistered(registered);
+		return view(userId, item.getDocument(), item);
 	}
 
 	/**

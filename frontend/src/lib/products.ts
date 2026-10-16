@@ -10,6 +10,7 @@ export type RelatedDocument = { document: DocumentSummary; matchedBy: 'serial nu
 
 export type ProductView = {
   documentId: string;
+  productId: string;
   position: number;
   productName: string | null;
   brand: string | null;
@@ -41,13 +42,13 @@ export type ProductView = {
   missing: string[];
 };
 
-export const getProduct = (documentId: string, position: number) =>
-  api<ProductView>(`/documents/${documentId}/items/${position}/product`);
+export const getProduct = (productId: string) =>
+  api<ProductView>(`/products/${productId}`);
 
-export const setWarrantyRegistration = (documentId: string, position: number, registered: boolean) =>
-  api<ProductView>(`/documents/${documentId}/items/${position}/registration`, { method: 'PUT', body: { registered } });
+export const setWarrantyRegistration = (productId: string, registered: boolean) =>
+  api<ProductView>(`/products/${productId}/registration`, { method: 'PUT', body: { registered } });
 
-export const productLink = (documentId: string, position: number) => `/products/${documentId}/${position}`;
+export const productLink = (productId: string) => `/products/${productId}`;
 
 /** 273 days → "9 months", 40 → "1 month", 5 → "5 days", 400 → "1 year 1 month". */
 export function ownedFor(days: number): string {

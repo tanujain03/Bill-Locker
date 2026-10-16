@@ -12,6 +12,7 @@ import java.util.UUID;
  */
 public record ClaimKit(
 		UUID documentId,
+		UUID productId,
 		int position,
 		/** The stored bill's file name, for "Download invoice". */
 		String fileName,

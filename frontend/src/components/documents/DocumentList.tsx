@@ -81,7 +81,7 @@ export function DocumentList({ documents, filtered, emptyText, selectionScope, o
     try {
       if (!(await confirm({
         title: `Read ${ids.length} document${ids.length === 1 ? '' : 's'} again?`,
-        message: 'A new AI reading will replace the saved details, including any corrections and warranty registration status. Review the new details afterward.',
+        message: 'A new AI reading will replace the saved details, including any corrections. Review the new details afterward.',
         confirmLabel: 'Read again',
       }))) return;
       setActiveAction('reading');

@@ -5,9 +5,9 @@ import { Button, type ButtonVariant } from './Button';
 
 /**
  * "Upload bill" in one click: the button opens the file picker itself (it used to go
- * to the Documents page first). The choice is uploaded and opened for reading.
+ * to the Documents page first). Select one or several files; the shared queue handles progress and reading.
  */
-export function UploadButton({ variant = 'primary', className, children = 'Upload bill', iconOnlyOnPhones }: {
+export function UploadButton({ variant = 'primary', className, children = 'Upload bills', iconOnlyOnPhones }: {
   variant?: ButtonVariant;
   className?: string;
   children?: ReactNode;
@@ -24,7 +24,7 @@ export function UploadButton({ variant = 'primary', className, children = 'Uploa
         icon={Upload}
         busy={uploading}
         onClick={() => input.current?.click()}
-        aria-label={iconOnlyOnPhones ? 'Upload bill' : undefined}
+        aria-label={iconOnlyOnPhones ? 'Upload bills' : undefined}
         className={`${iconOnlyOnPhones ? 'max-sm:px-3' : ''} ${className ?? ''}`}
       >
         <span className={iconOnlyOnPhones ? 'hidden sm:inline' : undefined}>{uploading ? 'Uploading…' : children}</span>
@@ -32,10 +32,11 @@ export function UploadButton({ variant = 'primary', className, children = 'Uploa
       <input
         ref={input}
         type="file"
+        multiple
         accept={UPLOAD_ACCEPT}
         className="hidden"
         onChange={(e) => {
-          upload(e.target.files?.[0]);
+          upload(Array.from(e.target.files ?? []));
           e.target.value = ''; // so choosing the same file again still fires onChange
         }}
       />

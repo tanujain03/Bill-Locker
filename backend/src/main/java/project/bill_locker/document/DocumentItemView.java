@@ -2,6 +2,7 @@ package project.bill_locker.document;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 /**
  * One product on a bill, as JSON (camelCase versions of the CSV's field names).
@@ -20,7 +21,15 @@ public record DocumentItemView(
 		String brand,
 		String registrationUrl,
 		RegistrationSource registrationSource,
-		Boolean warrantyRegistered) {
+		Boolean warrantyRegistered,
+		UUID id) {
+
+	public DocumentItemView(String productName, String modelNumber, String serialNumber, BigDecimal unitPrice,
+			Integer warrantyPeriodMonths, LocalDate warrantyStartDate, LocalDate warrantyEndDate, String warrantyProvider,
+			String brand, String registrationUrl, RegistrationSource registrationSource, Boolean warrantyRegistered) {
+		this(productName, modelNumber, serialNumber, unitPrice, warrantyPeriodMonths, warrantyStartDate,
+				warrantyEndDate, warrantyProvider, brand, registrationUrl, registrationSource, warrantyRegistered, null);
+	}
 
 	public DocumentItemView {
 		warrantyRegistered = Boolean.TRUE.equals(warrantyRegistered);
@@ -44,18 +53,18 @@ public record DocumentItemView(
 		return new DocumentItemView(item.getProductName(), item.getModelNumber(), item.getSerialNumber(),
 				item.getUnitPrice(), item.getWarrantyPeriodMonths(), item.getWarrantyStartDate(),
 				item.getWarrantyEndDate(), item.getWarrantyProvider(), item.getBrand(), item.getRegistrationUrl(),
-				item.getRegistrationSource(), item.isWarrantyRegistered());
+				item.getRegistrationSource(), item.isWarrantyRegistered(), item.getId());
 	}
 
 	/** The same product with another warranty end date. */
 	DocumentItemView withWarrantyEndDate(LocalDate end) {
 		return new DocumentItemView(productName, modelNumber, serialNumber, unitPrice, warrantyPeriodMonths,
-				warrantyStartDate, end, warrantyProvider, brand, registrationUrl, registrationSource, warrantyRegistered);
+				warrantyStartDate, end, warrantyProvider, brand, registrationUrl, registrationSource, warrantyRegistered, id);
 	}
 
 	/** The same product with another registration link. */
 	public DocumentItemView withRegistration(String url, RegistrationSource source) {
 		return new DocumentItemView(productName, modelNumber, serialNumber, unitPrice, warrantyPeriodMonths,
-				warrantyStartDate, warrantyEndDate, warrantyProvider, brand, url, source, warrantyRegistered);
+				warrantyStartDate, warrantyEndDate, warrantyProvider, brand, url, source, warrantyRegistered, id);
 	}
 }

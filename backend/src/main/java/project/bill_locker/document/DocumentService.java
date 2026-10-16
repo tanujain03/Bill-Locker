@@ -66,6 +66,12 @@ public class DocumentService {
 
 	@Transactional
 	public DocumentDetail upload(UUID userId, MultipartFile file) {
+		return upload(userId, file, false);
+	}
+
+	/** Batch uploads queue AI reading so the browser need not hold the document page open. */
+	@Transactional
+	public DocumentDetail upload(UUID userId, MultipartFile file, boolean readInBackground) {
 		if (file.isEmpty()) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "FILE_EMPTY", "The file is empty.");
 		}
@@ -79,7 +85,9 @@ public class DocumentService {
 			throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_FILE",
 					"You already uploaded this file, so it was not added again.", null, earlier.get().getId());
 		}
-		return DocumentDetail.of(create(userId, file.getOriginalFilename(), bytes, null));
+		Document document = create(userId, file.getOriginalFilename(), bytes, null);
+		if (readInBackground) document.queueForReading();
+		return DocumentDetail.of(document);
 	}
 
 	/**
@@ -190,6 +198,7 @@ public class DocumentService {
 		DocumentDetails details = request.toDetails();
 		checkDates(details); // checks what the user typed, before we fill anything in
 		document.replaceDetails(withWarrantyEndDates(details), DocumentStatus.SAVED);
+		documents.flush(); // Assign UUIDs to new products before returning them.
 		return withCopies(document);
 	}
 
@@ -216,6 +225,7 @@ public class DocumentService {
 		return transaction.execute(status -> {
 			Document document = findOwned(userId, id); // it may have been deleted meanwhile → 404
 			document.replaceDetails(details, statusAfterRead(details));
+			documents.flush();
 			return withCopies(document);
 		});
 	}
@@ -300,16 +310,23 @@ public class DocumentService {
 	 * The link is also kept on the product, so next time it's simply a link.
 	 */
 	public RegistrationPage findRegistrationPage(UUID userId, UUID id, RegistrationPageRequest request) {
-		String productName = transaction.execute(status -> item(findOwned(userId, id), request.position()).getProductName());
+		record Target(UUID itemId, String productName) {}
+		Target target = transaction.execute(status -> {
+			Document document = findOwned(userId, id);
+			DocumentItem item = request.itemId() == null ? item(document, request.position())
+					: document.getItems().stream().filter(i -> request.itemId().equals(i.getId())).findFirst()
+							.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "ITEM_NOT_FOUND", "That product was not found."));
+			return new Target(item.getId(), item.getProductName());
+		});
 
-		RegistrationPage page = lookUp(request.brand().strip(), productName);
+		RegistrationPage page = lookUp(request.brand().strip(), target.productName());
 
 		transaction.executeWithoutResult(status -> {
 			Document document = findOwned(userId, id); // it may have been deleted meanwhile → 404
 			document.getItems().stream()
 					// Still the same product (the user may have saved changes meanwhile).
-					.filter(item -> item.getPosition() == request.position()
-							&& Objects.equals(item.getProductName(), productName))
+					.filter(item -> target.itemId().equals(item.getId())
+							&& Objects.equals(item.getProductName(), target.productName()))
 					.findFirst()
 					.ifPresent(item -> item.setRegistration(page.url(), page.source()));
 		});

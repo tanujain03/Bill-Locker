@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import project.bill_locker.common.ApiException;
 import project.bill_locker.document.Document;
 import project.bill_locker.document.DocumentItem;
+import project.bill_locker.document.DocumentItemRepository;
 import project.bill_locker.document.DocumentRepository;
 
 /**
@@ -24,10 +25,12 @@ public class ClaimKitService {
 
 	private final DocumentRepository documents;
 	private final Clock clock;
+	private final DocumentItemRepository items;
 
-	public ClaimKitService(DocumentRepository documents, Clock clock) {
+	public ClaimKitService(DocumentRepository documents, Clock clock, DocumentItemRepository items) {
 		this.documents = documents;
 		this.clock = clock;
+		this.items = items;
 	}
 
 	/** Another user's bill, or a position the bill doesn't have, is a 404. */
@@ -37,13 +40,23 @@ public class ClaimKitService {
 		DocumentItem item = d.getItems().stream().filter(i -> i.getPosition() == position).findFirst()
 				.orElseThrow(ClaimKitService::notFound);
 
+		return view(userId, d, item);
+	}
+
+	@Transactional(readOnly = true)
+	public ClaimKit kit(UUID userId, UUID productId) {
+		DocumentItem item = items.findByIdAndDocumentUserId(productId, userId).orElseThrow(ClaimKitService::notFound);
+		return view(userId, item.getDocument(), item);
+	}
+
+	private ClaimKit view(UUID userId, Document d, DocumentItem item) {
 		LocalDate today = LocalDate.now(clock);
 		LocalDate end = WarrantyRules.effectiveEnd(item.getWarrantyEndDate(), item.getWarrantyStartDate(),
 				item.getWarrantyPeriodMonths());
 		// The brand names the support pages; without one, the product name is the best guess.
 		String maker = firstNonBlank(item.getBrand(), item.getProductName(), "product");
 
-		return new ClaimKit(d.getId(), position, d.getFileName(),
+		return new ClaimKit(d.getId(), item.getId(), item.getPosition(), d.getFileName(),
 				item.getProductName(), item.getBrand(), item.getModelNumber(), item.getSerialNumber(), item.getUnitPrice(),
 				d.getSellerName(), d.getSellerContact(), d.getSellerAddress(), d.getDocumentNumber(), d.getPurchaseDate(),
 				d.getBuyerName(),

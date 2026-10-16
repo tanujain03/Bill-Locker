@@ -22,6 +22,17 @@ class ProductController {
 		this.products = products;
 	}
 
+	@GetMapping("/api/products/{productId}")
+	ProductView productById(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID productId) {
+		return products.product(CurrentUser.id(jwt), productId);
+	}
+
+	@PutMapping("/api/products/{productId}/registration")
+	ProductView registrationById(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID productId,
+			@Valid @RequestBody RegistrationRequest request) {
+		return products.setRegistration(CurrentUser.id(jwt), productId, request.registered());
+	}
+
 	record RegistrationRequest(@NotNull Boolean registered) {}
 
 	@PutMapping("/api/documents/{id}/items/{position}/registration")

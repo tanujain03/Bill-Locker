@@ -14,9 +14,9 @@ export function ExpiringList({ items }: { items: WarrantyView[] }) {
         <PanelEmpty>Nothing expires in the next 30 days.</PanelEmpty>
       ) : (
         <ul className="-mx-2 divide-y divide-slate-100">
-          {items.map((w, i) => (
-            <li key={`${w.documentId}-${i}`}>
-              <Link to={productLink(w.documentId, w.position)} className="flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-slate-50">
+          {items.map((w) => (
+            <li key={w.productId}>
+              <Link to={productLink(w.productId)} className="flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-slate-50">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{w.productName ?? 'Unnamed product'}</p>
                   <p className="truncate text-xs text-slate-600">
