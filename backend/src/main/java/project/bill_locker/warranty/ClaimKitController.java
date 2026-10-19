@@ -18,6 +18,11 @@ class ClaimKitController {
 		this.claimKits = claimKits;
 	}
 
+	@GetMapping("/api/products/{productId}/claim-kit")
+	ClaimKit kitById(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID productId) {
+		return claimKits.kit(CurrentUser.id(jwt), productId);
+	}
+
 	@GetMapping("/api/documents/{id}/items/{position}/claim-kit")
 	ClaimKit kit(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @PathVariable int position) {
 		return claimKits.kit(CurrentUser.id(jwt), id, position);

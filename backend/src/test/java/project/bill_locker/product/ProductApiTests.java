@@ -2,15 +2,52 @@ package project.bill_locker.product;
 
 import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 import project.bill_locker.document.DocumentApiTestBase;
 
 /** GET /api/documents/{id}/items/{position}/product — "today" is 2026-10-07 (FixedClockConfig). */
 class ProductApiTests extends DocumentApiTestBase {
+
+	private ResultActions registration(String token, String id, int position, String body) throws Exception {
+		return mvc.perform(put("/api/documents/" + id + "/items/" + position + "/registration")
+				.header("Authorization", bearer(token)).contentType(MediaType.APPLICATION_JSON).content(body));
+	}
+
+	@Test
+	void registrationPersistsAcrossReadsAndBillEditsAndCanBeUndone() throws Exception {
+		String token = registerAndGetToken(uniqueEmail("registration"));
+		String id = saveBill(token, PHONE_BILL);
+		product(token, id, 0).andExpect(jsonPath("$.warrantyRegistered").value(false));
+		registration(token, id, 0, "{\"registered\":true}").andExpect(status().isOk())
+				.andExpect(jsonPath("$.warrantyRegistered").value(true));
+		String details = mvc.perform(get("/api/documents/" + id).header("Authorization", bearer(token)))
+				.andExpect(jsonPath("$.items[0].warrantyRegistered").value(true))
+				.andReturn().getResponse().getContentAsString();
+		mvc.perform(put("/api/documents/" + id).header("Authorization", bearer(token))
+				.contentType(MediaType.APPLICATION_JSON).content(details)).andExpect(status().isOk());
+		product(token, id, 0).andExpect(jsonPath("$.warrantyRegistered").value(true));
+		mvc.perform(get("/api/warranties").header("Authorization", bearer(token)))
+				.andExpect(jsonPath("$.items[0].warrantyRegistered").value(true));
+		registration(token, id, 0, "{\"registered\":false}").andExpect(status().isOk());
+		product(token, id, 0).andExpect(jsonPath("$.warrantyRegistered").value(false));
+	}
+
+	@Test
+	void registrationRequiresOwnershipExistingItemAndExplicitStatus() throws Exception {
+		String token = registerAndGetToken(uniqueEmail("registration-owner"));
+		String other = registerAndGetToken(uniqueEmail("registration-other"));
+		String id = saveBill(token, PHONE_BILL);
+		registration(other, id, 0, "{\"registered\":true}").andExpect(status().isNotFound());
+		registration(token, id, 99, "{\"registered\":true}").andExpect(status().isNotFound());
+		registration(token, id, 0, "{}").andExpect(status().isBadRequest());
+		product(token, id, 0).andExpect(jsonPath("$.warrantyRegistered").value(false));
+	}
 
 	private static final String PHONE_BILL = """
 			{"documentType": "INVOICE", "category": "ELECTRONICS", "documentNumber": "INV-1", "sellerName": "Croma",

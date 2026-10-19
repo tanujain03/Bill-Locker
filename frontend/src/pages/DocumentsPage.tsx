@@ -1,5 +1,5 @@
 import { CalendarDays, FilterX, Search, Tag, Upload, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { DocumentList } from '../components/documents/DocumentList';
 import { Button } from '../components/Button';
@@ -27,6 +27,7 @@ export function DocumentsPage() {
   // dashboard opens the list already filtered, and Back/refresh keep the filters.
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
+  const uploaded = params.get('uploaded') ?? ''; // Refresh after a batch, even on this same page.
   const type = params.get('type') ?? '';
   const status = params.get('status') ?? '';
   /** '' (all), 'UPLOAD' or 'GMAIL'. Filtered here: the list is already loaded. */
@@ -54,15 +55,26 @@ export function DocumentsPage() {
   const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
 
+  // Exclude successful deletions even from list requests that started before deletion.
+  const deletedIds = useRef(new Set<string>());
+  const requestScope = JSON.stringify([q, type, status, uploaded]);
+  const latestScope = useRef(requestScope);
+  latestScope.current = requestScope;
+  function onDeleted(ids: string[]) {
+    for (const id of ids) deletedIds.current.add(id);
+    setDocuments((current) => current?.filter((d) => !deletedIds.current.has(d.id)) ?? null);
+  }
+
   // Reload the list when a filter changes. The search waits 300 ms after the last
   // key press, so we don't call the backend for every letter.
   useEffect(() => {
+    setDocuments(null);
     let current = true; // ignore answers that arrive after a newer request started
     const timer = setTimeout(() => {
       listDocuments({ q, type, status })
         .then((list) => {
           if (!current) return;
-          setDocuments(list);
+          setDocuments(list.filter((d) => !deletedIds.current.has(d.id)));
           setListError(null);
         })
         .catch((error) => {
@@ -73,13 +85,15 @@ export function DocumentsPage() {
       current = false;
       clearTimeout(timer);
     };
-  }, [q, type, status]);
+  }, [q, type, status, uploaded]);
 
   // While a document waits for the background AI read, ask again every 3 s with the same
   // filters, so "Reading…" turns into "Needs review" without a reload.
   usePolling(documents?.some((d) => d.readQueued) ?? false, () => {
     listDocuments({ q, type, status })
-      .then(setDocuments)
+      .then((list) => {
+        if (latestScope.current === requestScope) setDocuments(list.filter((d) => !deletedIds.current.has(d.id)));
+      })
       .catch(() => {}); // the next tick tries again
   });
 
@@ -101,15 +115,15 @@ export function DocumentsPage() {
             </span>
             <p className="mt-3 font-medium">Add your first bill</p>
             <p className="mt-1 text-sm text-slate-500">
-              Drop a file anywhere on this page, or choose one. PDF, JPG, PNG or WebP, up to 10 MB.
+              Drop files anywhere on this page, or choose files. PDF, JPG, PNG or WebP, up to 10 MB per file.
             </p>
-            <UploadButton className="mt-4">Choose file</UploadButton>
+            <UploadButton className="mt-4">Choose files</UploadButton>
           </div>
         ) : (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3">
             <p className="flex items-center gap-2 text-sm text-slate-600">
               <Upload className="size-4 shrink-0 text-brand-600" aria-hidden />
-              Drop a bill anywhere on the page to upload it (PDF, JPG, PNG or WebP, up to 10 MB).
+              Drop bills anywhere on the page to upload them (PDF, JPG, PNG or WebP, up to 10 MB per file).
             </p>
             <UploadButton variant="secondary" />
           </div>
@@ -202,6 +216,15 @@ export function DocumentsPage() {
                 (!category || (d.category ?? 'NONE') === category),
             )}
             filtered={filtered}
+            selectionScope={params.toString()}
+            onDeleted={onDeleted}
+            onRead={() => {
+              listDocuments({ q, type, status }).then((list) => {
+                if (latestScope.current === requestScope) setDocuments(list.filter((d) => !deletedIds.current.has(d.id)));
+              }).catch((error) => {
+                if (latestScope.current === requestScope) setListError(errorMessage(error));
+              });
+            }}
           />
         )}
       </main>

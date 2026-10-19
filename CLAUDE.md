@@ -121,6 +121,37 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   form field with +7/+10/+15/+30, `ReturnBadge`/`ReturnBanner`, dashboard strip, 🔔. View `ai_documents.return_by_date`.
   Sample air fryer: bought 5 days ago, 10-day window. Guide: `docs/task-14-return-windows.md`.
 
+- Task 15: service and maintenance records (`servicerecord`, `/api/services`, `/services`). Repairs,
+  routine maintenance, parts and claims belong to a SAVED bill's permanent product ID; the document/
+  position endpoints remain, with an optional productId guard. Existing owned documents can be
+  linked as attachments. `ServiceRules` uses the Clock for overdue / due in 30 days / upcoming;
+  repeatMonths computes the next date from the service date. The newest scheduled record per
+  product drives reminders. Product pages include history/costs, claim kits include previous
+  services, dashboard/bell show services due. `ai_service_records` uses the existing signed user
+  filter and SELECT-only AI view permissions. Four service records accompany sample bills;
+  document/product deletion cascades to records. The new table is `product_service_records`, keeping
+  the old build's incompatible `service_records` table and its rows untouched. Guide: `docs/task-15-service-records.md`.
+
+
+- Task 16: split bills with friends (`billsplit`, `/api/splits`, `/splits`). Owner-managed groups,
+  guest placeholders and seven-day, one-time personal invite links (`/split-invite#token=…`;
+  SHA-256 hash stored). Equal/custom INR shares use exact paise. Immutable expense snapshots can
+  start from an owned SAVED bill; original files/buyer details stay private and document deletion
+  leaves the ledger intact. Manual payments remain pending until recipient confirmation (owner
+  may confirm for an unclaimed guest). Request UUIDs and group locks prevent duplicate expenses,
+  over-settlement and invite races. No AI access, payments integration or automatic messaging.
+  Owner-only group deletion removes all shared history for everyone after UI confirmation, keeping
+  original bills. Unique `bill_split_*` tables preserve legacy data. Guide: `docs/task-16-bill-splitting.md`.
+
+- Task 17: price comparison (`pricecompare`, `/api/price-comparison`, `/compare-prices`). SerpApi
+  Google Shopping for India, one explicit request per search, no new dependencies. Backend-only
+  `SERPAPI_API_KEY`; per-user 30-minute cache and persisted shared rolling-31-day budget (default
+  200, max 250), 40/hour, five new attempts/user/day. Failures count locally. Quota reservation
+  uses a PostgreSQL transaction lock. Model-title matches are labelled, not verified variants;
+  INR listings, conditional/sponsored labels and safe retailer/Google links. No background tracking,
+  automatic paid upgrades or AI access. Tables `price_compare_attempts` / `price_compare_cache`.
+  Guide: `docs/task-17-price-comparison.md`.
+
 ## Repository
 
 - `frontend/` — React 19 + TypeScript 5.9 + Vite 6 + Tailwind CSS 4 + React Router 7 +
@@ -131,9 +162,9 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
 - `backend/` — Spring Boot 4.1.1, Java 21, Maven wrapper, package `project.bill_locker`.
   Packages: `security` (SecurityConfig, JWT), `user` (incl. Settings endpoints), `auth` (incl. password reset),
   `common` (BaseEntity, ApiException, GlobalExceptionHandler), `document` (+ `document.ai`,
-  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`, `expense`, `sample`, `product`.
+  `document.registration`), `gmail`, `dashboard`, `warranty`, `assistant`, `expense`, `sample`, `product`, `servicerecord`, `billsplit`.
   Tables: `users`, `password_reset_tokens`, `documents`, `document_items`, `document_files`,
-  `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`, `category_budgets`.
+  `gmail_accounts`, `gmail_emails`, `gmail_files`, `gmail_connect_states`, `category_budgets`, `product_service_records`, and `bill_split_*`.
 - `docs/api-contract.md` — the full target REST API; its top lists what is built so far.
   `docs/database-design.md` — the target design (13 tables); entity classes at tag
   `step-2-database`. Hibernate `ddl-auto=update` creates tables. No migration scripts or

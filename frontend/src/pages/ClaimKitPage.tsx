@@ -14,7 +14,7 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { Button, buttonClass } from '../components/Button';
 import { CopyButton } from '../components/documents/CopyButton';
@@ -23,6 +23,7 @@ import { WarrantyStatusPill } from '../components/warranties/WarrantyStatusPill'
 import { errorMessage } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { claimEmail, COMMON_PROBLEMS, getClaimKit, mailtoLink, type ClaimKit } from '../lib/claims';
+import { ServiceTimeline } from '../components/services/ServiceTimeline';
 import { productLink } from '../lib/products';
 import { formatDate } from '../lib/document-form';
 import { downloadDocument, formatAmount } from '../lib/documents';
@@ -31,25 +32,31 @@ import { useFeedback } from '../lib/feedback-context';
 import { usePageTitle } from '../lib/usePageTitle';
 
 /**
- * /warranties/claim/:documentId/:position — everything needed to claim one product's
+ * /warranties/claim/:productId — everything needed to claim one product's
  * warranty: its status, the facts, a ready claim email, where to send it and what is
  * missing. The app never sends anything: the user copies the email or opens it in their
  * own email app, and can print the page as a claim sheet.
  */
 export function ClaimKitPage() {
   usePageTitle('Warranty claim kit');
-  const { documentId = '', position = '0' } = useParams();
+  const { productId = '' } = useParams();
   const [kit, setKit] = useState<ClaimKit | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const latest = useRef(0);
 
   const load = useCallback(() => {
+    const request = ++latest.current;
     setError(null);
-    getClaimKit(documentId, Number(position))
-      .then(setKit)
-      .catch((e) => setError(errorMessage(e)));
-  }, [documentId, position]);
+    setKit(null);
+    getClaimKit(productId)
+      .then((value) => { if (request === latest.current) setKit(value); })
+      .catch((e) => { if (request === latest.current) setError(errorMessage(e)); });
+  }, [productId]);
 
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+    return () => { ++latest.current; };
+  }, [load]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 print:max-w-none print:p-0">
@@ -103,7 +110,7 @@ function Kit({ kit }: { kit: ClaimKit }) {
         <div>
           <p className="text-sm font-medium text-brand-700">Warranty claim kit</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
-            <Link to={productLink(kit.documentId, kit.position)} className="hover:text-brand-700 hover:underline print:no-underline">
+            <Link to={productLink(kit.productId)} className="hover:text-brand-700 hover:underline print:no-underline">
               {product}
             </Link>
           </h1>
@@ -124,6 +131,7 @@ function Kit({ kit }: { kit: ClaimKit }) {
       </header>
 
       <StatusBanner kit={kit} />
+      {kit.previousServices.length > 0 && <section className="rounded-2xl border border-slate-200 bg-white p-5"><h2 className="mb-4 font-semibold">Previous services</h2><ServiceTimeline records={kit.previousServices} /></section>}
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">

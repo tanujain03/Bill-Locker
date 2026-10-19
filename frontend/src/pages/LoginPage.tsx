@@ -10,7 +10,8 @@ export function LoginPage() {
   const { login } = useAuth();
   // Other pages send us here with a message: { message: "Your password has been changed…" }
   // (success) or { info: "Enter your email…" } (from /forgot-password opened without one).
-  const state = useLocation().state as { message?: string; info?: string } | null;
+  const location = useLocation();
+  const state = location.state as { message?: string; info?: string } | null;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +39,7 @@ export function LoginPage() {
     <AuthLayout
       title="Sign in to your locker"
       // One way to sign up on this screen (the promo panel's button is the big one).
-      footer={<>New here? <Link to="/register" className="font-medium text-brand-700 hover:underline">Create an account</Link></>}
+      footer={<>New here? <Link to="/register" state={location.state} className="font-medium text-brand-700 hover:underline">Create an account</Link></>}
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {state?.message && !error && <Alert tone="success">{state.message}</Alert>}

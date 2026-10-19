@@ -46,6 +46,8 @@ export const BILL_CATEGORY_LABELS: Record<BillCategory, string> = {
 export type RegistrationSource = 'DOCUMENT' | 'QR_CODE' | 'WEB_SEARCH' | 'SEARCH' | 'USER';
 
 export type DocumentItem = {
+  /** Permanent server ID; null for a newly added product. */
+  id: string | null;
   productName: string | null;
   modelNumber: string | null;
   serialNumber: string | null;
@@ -57,6 +59,7 @@ export type DocumentItem = {
   /** The manufacturer's brand, e.g. "Noise": used to find its registration page. */
   brand: string | null;
   registrationUrl: string | null;
+  warrantyRegistered: boolean;
   registrationSource: RegistrationSource | null;
 };
 
@@ -175,7 +178,7 @@ export const ITEM_LABELS = {
   warrantyProvider: 'Warranty provider',
   brand: 'Brand',
   registrationUrl: 'Warranty registration link',
-} as const satisfies Record<Exclude<keyof DocumentItem, 'registrationSource'>, string>;
+} as const satisfies Record<Exclude<keyof DocumentItem, 'registrationSource' | 'warrantyRegistered' | 'id'>, string>;
 
 /** The page to open: the brand's official one (WEB_SEARCH) or, if none was found, a Google search (SEARCH). */
 export type RegistrationPage = { url: string; source: RegistrationSource };
@@ -184,13 +187,13 @@ export type RegistrationPage = { url: string; source: RegistrationSource };
  * When the bill has no registration link or QR code: after the user confirmed the brand,
  * the backend finds that brand's official warranty registration page (and keeps it on the product).
  */
-export const findRegistrationPage = (id: string, position: number, brand: string) =>
-  api<RegistrationPage>(`/documents/${id}/registration-page`, { body: { position, brand } });
+export const findRegistrationPage = (id: string, itemId: string, brand: string) =>
+  api<RegistrationPage>(`/documents/${id}/registration-page`, { body: { itemId, brand } });
 
-export const uploadDocument = (file: File) => {
+export const uploadDocument = (file: File, readInBackground = false) => {
   const form = new FormData();
   form.append('file', file);
-  return api<DocumentDetail>('/documents/upload', { body: form });
+  return api<DocumentDetail>(`/documents/upload${readInBackground ? '?read=true' : ''}`, { body: form });
 };
 
 export const listDocuments = (filters: { q?: string; type?: string; status?: string }) => {

@@ -18,6 +18,14 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Comparator;
+import org.springframework.http.HttpStatus;
+import project.bill_locker.common.ApiException;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -157,8 +165,8 @@ public class Document extends BaseEntity {
 	}
 
 	/**
-	 * Replaces all details and products (used by "read with AI" and by "save").
-	 * Old item rows are deleted because they leave the list (orphanRemoval).
+	 * Updates retained products in place so their UUIDs survive edits and reordering.
+	 * Missing products are removed; new products receive fresh UUIDs.
 	 */
 	void replaceDetails(DocumentDetails details, DocumentStatus newStatus) {
 		this.documentType = details.documentType();
@@ -174,14 +182,60 @@ public class Document extends BaseEntity {
 		this.totalAmount = details.totalAmount();
 		this.category = details.category() == null ? null : details.category().name();
 		this.returnByDate = details.returnByDate();
-		this.items.clear();
-		for (DocumentItemView item : details.items()) {
-			this.items.add(new DocumentItem(this, items.size(), item));
+		List<DocumentItem> next = new ArrayList<>();
+		HashSet<UUID> seen = new HashSet<>();
+		Set<UUID> explicitIds = details.items().stream().map(DocumentItemView::id)
+				.filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+		for (DocumentItemView values : details.items()) {
+			DocumentItem item;
+			if (values.id() == null) {
+				// AI readings and older clients have no IDs. Reuse only an unambiguous identity,
+				// never a list position (or a name shared by several products).
+				String key = identity(values);
+				List<DocumentItem> matches = key == null ? List.of() : items.stream()
+						.filter(old -> !explicitIds.contains(old.getId()) && !seen.contains(old.getId()))
+						.filter(old -> key.equals(identity(DocumentItemView.of(old)))).toList();
+				long incomingMatches = key == null ? 0 : details.items().stream()
+						.filter(v -> v.id() == null && key.equals(identity(v))).count();
+				if (matches.size() == 1 && incomingMatches == 1) {
+					item = matches.getFirst();
+					seen.add(item.getId());
+					boolean registered = item.isWarrantyRegistered();
+					item.update(next.size(), values);
+					item.setWarrantyRegistered(registered); // AI cannot reset a user-confirmed registration.
+				} else {
+					item = new DocumentItem(this, next.size(), values);
+				}
+			} else {
+				if (!seen.add(values.id())) {
+					throw new ApiException(HttpStatus.BAD_REQUEST, "DUPLICATE_ITEM_ID", "A product can only appear once on a bill.");
+				}
+				item = items.stream().filter(old -> values.id().equals(old.getId())).findFirst()
+						.orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "INVALID_ITEM_ID",
+								"That product is no longer on this bill. Reload the bill before saving."));
+				item.update(next.size(), values);
+			}
+			next.add(item);
 		}
+		items.removeIf(item -> !next.contains(item));
+		for (DocumentItem item : next) if (!items.contains(item)) items.add(item);
+		items.sort(Comparator.comparingInt(DocumentItem::getPosition));
 		this.status = newStatus;
 		// A manual read or save takes the document out of the reading queue.
 		this.readQueuedAt = null;
 		this.readError = null;
+	}
+
+	private static String identity(DocumentItemView item) {
+		String serial = normalized(item.serialNumber());
+		if (!serial.isEmpty()) return "serial:" + serial;
+		String name = normalized(item.productName());
+		String model = normalized(item.modelNumber());
+		return name.isEmpty() || model.isEmpty() ? null : "model:" + model + "\nname:" + name;
+	}
+
+	private static String normalized(String value) {
+		return value == null ? "" : value.strip().toLowerCase(Locale.ROOT);
 	}
 
 	/** Part of "Try with sample data". */

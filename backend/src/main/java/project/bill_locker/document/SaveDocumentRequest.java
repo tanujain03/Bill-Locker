@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * The reviewed details the user saves (PUT /api/documents/{id}). Every field is
@@ -48,14 +49,16 @@ public record SaveDocumentRequest(
 			// Only web links: the page turns this into a link, and "javascript:…" must never get there.
 			@Size(max = 1000) @Pattern(regexp = "^https?://\\S+$", message = "Enter a link starting with https://")
 			String registrationUrl,
-			RegistrationSource registrationSource) {
+			RegistrationSource registrationSource,
+			Boolean warrantyRegistered,
+			UUID id) {
 
 		DocumentItemView toView() {
 			return new DocumentItemView(productName, modelNumber, serialNumber, unitPrice, warrantyPeriodMonths,
 					warrantyStartDate, warrantyEndDate, warrantyProvider, blankToNull(brand), blankToNull(registrationUrl),
 					// A link without a source was typed in by the user.
 					registrationUrl == null || registrationUrl.isBlank() ? null
-							: registrationSource == null ? RegistrationSource.USER : registrationSource);
+							: registrationSource == null ? RegistrationSource.USER : registrationSource, Boolean.TRUE.equals(warrantyRegistered), id);
 		}
 
 		private static String blankToNull(String text) {

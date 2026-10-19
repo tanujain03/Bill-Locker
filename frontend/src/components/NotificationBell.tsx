@@ -1,4 +1,4 @@
-import { Bell, CircleAlert, Clock, Eye, Mail, Undo2, type LucideIcon } from 'lucide-react';
+import { Bell, CircleAlert, Clock, Wrench, Eye, Mail, Undo2, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import type { Attention } from '../lib/useAttention';
@@ -39,6 +39,10 @@ export function NotificationBell({ attention }: { attention: Attention | null })
         text: `${r.productName ?? r.sellerName ?? 'A purchase'}: ${r.daysLeft === 0 ? 'last day to return is today' : `return within ${r.daysLeft} day${r.daysLeft === 1 ? '' : 's'}`}`,
       });
     }
+    for (const r of attention.servicesDue) {
+      items.push({ to: `/products/${r.productId}`, Icon: Wrench, tone: r.dueStatus === 'OVERDUE' ? 'text-rose-600' : 'text-amber-600',
+        text: `${r.productName ?? 'Product'}: Service ${r.dueStatus === 'OVERDUE' ? 'overdue' : 'due'} (${r.nextDueDate})` });
+    }
     for (const w of attention.expiring) {
       items.push({
         to: `/documents/${w.documentId}`,
@@ -72,7 +76,7 @@ export function NotificationBell({ attention }: { attention: Attention | null })
           {items.length === 0 ? (
             <p className="px-3 pb-3 text-sm text-slate-500">You’re all caught up.</p>
           ) : (
-            <ul>
+            <ul className="max-h-[60dvh] overflow-y-auto">
               {items.map(({ to, Icon, tone, text }) => (
                 <li key={to + text}>
                   <Link

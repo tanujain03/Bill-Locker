@@ -21,7 +21,7 @@ export type FormValues = Record<keyof typeof FIELD_LABELS, string> & { items: It
 /** The product fields shown with a label (and copied by "Copy"). */
 const LABELLED_ITEM_FIELDS = Object.keys(ITEM_LABELS) as (keyof typeof ITEM_LABELS)[];
 /** …plus where the registration link came from, kept with the form but not shown as a box. */
-const ITEM_FIELDS: (keyof DocumentItem)[] = [...LABELLED_ITEM_FIELDS, 'registrationSource'];
+const ITEM_FIELDS: (keyof DocumentItem)[] = [...LABELLED_ITEM_FIELDS, 'registrationSource', 'warrantyRegistered', 'id'];
 const FIELDS = Object.keys(FIELD_LABELS) as (keyof typeof FIELD_LABELS)[];
 
 export const emptyItem = (): ItemValues =>
@@ -56,6 +56,7 @@ export function fromForm(values: FormValues): DocumentDetails {
     totalAmount: number(values.totalAmount),
     returnByDate: text(values.returnByDate),
     items: values.items.map((item) => ({
+      id: text(item.id),
       productName: text(item.productName),
       modelNumber: text(item.modelNumber),
       serialNumber: text(item.serialNumber),
@@ -64,6 +65,7 @@ export function fromForm(values: FormValues): DocumentDetails {
       warrantyStartDate: text(item.warrantyStartDate),
       warrantyEndDate: text(item.warrantyEndDate),
       warrantyProvider: text(item.warrantyProvider),
+      warrantyRegistered: item.warrantyRegistered === 'true',
       brand: text(item.brand),
       registrationUrl: text(item.registrationUrl),
       registrationSource: item.registrationUrl.trim() ? ((item.registrationSource || 'USER') as RegistrationSource) : null,

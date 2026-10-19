@@ -4,7 +4,7 @@ This is the full REST API Bill Locker is heading towards. The backend and the
 frontend are rebuilt from scratch on the `restart` branch, one task at a time;
 each task implements a part of this contract.
 
-### Implemented so far (restart branch, tasks 1–14)
+### Implemented so far (restart branch, tasks 1–17)
 
 | Endpoint | Notes |
 |---|---|
@@ -23,6 +23,22 @@ each task implements a part of this contract.
 | `GET /api/documents/{id}/items/{position}/product` | Complete (task 13). A product's page: facts, warranty end/status/days left, owned days, cost per month, the bill, related documents (same serial or model number, `matchedBy`), missing facts. `404 ITEM_NOT_FOUND` for a position the bill doesn't have. See [`task-13-product-pages.md`](task-13-product-pages.md) |
 | Return windows (task 14) | Documents carry `returnByDate` (also accepted by `PUT /api/documents/{id}`; before the purchase date → `400` `fieldErrors.returnByDate`); the AI fills it from a printed return policy. `GET /api/dashboard` adds `openReturns` (return date today or later, soonest first, `daysLeft`). See [`task-14-return-windows.md`](task-14-return-windows.md) |
 | `POST /api/assistant/chat` | Complete (task 6). Chat assistant: Gemini writes one SELECT on user-filtered `ai_*` views, run read-only as the `bill_locker_ai` role; answers from the rows. See section 11 and [`task-6-assistant.md`](task-6-assistant.md) |
+
+Task 15 adds service records: `POST`/`GET /api/documents/{id}/items/{position}/services`,
+`GET /api/services?type=&q=&due=`, and `PUT`/`DELETE /api/services/{id}`. SAVED bills only,
+JWT ownership, permanent product identity, service costs/history on product responses,
+`previousServices` on claim kits and `servicesDue` on dashboards. See
+[`task-15-service-records.md`](task-15-service-records.md) for fields, validation and reminder rules.
+
+
+Task 16 adds bill splitting under `/api/splits`: groups, guest members, personal invitation links,
+immutable equal/custom INR expense snapshots, balances, and manual payments requiring recipient
+confirmation. Group membership controls access; private document files are never shared.
+See [`task-16-bill-splitting.md`](task-16-bill-splitting.md) for the endpoints, payloads and rules.
+
+Task 17 adds `GET /api/price-comparison/status` and `POST /api/price-comparison/search` for
+explicit SerpApi Google Shopping searches, with user-scoped caching and persisted request budgets.
+See [`task-17-price-comparison.md`](task-17-price-comparison.md).
 
 Everything else is not built yet. How tasks 1–4 work is explained in
 [`task-1-auth.md`](task-1-auth.md), [`task-2-documents.md`](task-2-documents.md),

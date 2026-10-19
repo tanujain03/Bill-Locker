@@ -14,6 +14,7 @@ import project.bill_locker.warranty.WarrantyStatus;
  */
 public record ProductView(
 		UUID documentId,
+		UUID productId,
 		int position,
 		// ---- the product ----
 		String productName,
@@ -36,6 +37,7 @@ public record ProductView(
 		Long daysLeft,
 		WarrantyStatus status,
 		String registrationUrl,
+		boolean warrantyRegistered,
 		// ---- owning it ----
 		/** Whole days since the purchase date (0 on the day itself); null without a purchase date. */
 		Long ownedDays,
@@ -47,7 +49,9 @@ public record ProductView(
 		/** Other documents of the user with a product of the same serial number, or else the same model number. */
 		List<RelatedDocument> related,
 		/** Facts the bill doesn't give, e.g. "Serial number" (the page links to the bill to add them). */
-		List<String> missing) {
+		List<String> missing,
+        List<project.bill_locker.servicerecord.ServiceRecordView> serviceHistory,
+        BigDecimal totalServiceCost, LocalDate lastServiceDate, LocalDate nextServiceDue) {
 
 	/** {@code matchedBy} says why it is related: "serial number" or "model number". */
 	public record RelatedDocument(DocumentSummary document, String matchedBy) {

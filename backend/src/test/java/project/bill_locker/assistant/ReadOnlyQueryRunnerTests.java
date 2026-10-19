@@ -216,7 +216,7 @@ class ReadOnlyQueryRunnerTests extends DocumentApiTestBase {
 				""", String.class);
 		assertThat(plain).isEmpty();
 		assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_class WHERE relkind = 'v' AND relname LIKE 'ai\\_%'", Long.class))
-				.isEqualTo(7);
+				.isEqualTo(8);
 	}
 
 	@Test

@@ -16,6 +16,7 @@ import project.bill_locker.common.ApiException;
 import project.bill_locker.document.BillCategory;
 import project.bill_locker.document.Document;
 import project.bill_locker.document.DocumentItem;
+import project.bill_locker.document.DocumentItemRepository;
 import project.bill_locker.document.DocumentRepository;
 import project.bill_locker.document.DocumentSummary;
 import project.bill_locker.warranty.WarrantyRules;
@@ -26,10 +27,14 @@ public class ProductService {
 
 	private final DocumentRepository documents;
 	private final Clock clock;
+	private final DocumentItemRepository items;
+	private final project.bill_locker.servicerecord.ServiceRecordService services;
 
-	public ProductService(DocumentRepository documents, Clock clock) {
+	public ProductService(DocumentRepository documents, Clock clock, DocumentItemRepository items, project.bill_locker.servicerecord.ServiceRecordService services) {
 		this.documents = documents;
 		this.clock = clock;
+		this.items = items;
+		this.services = services;
 	}
 
 	/** Another user's bill, or a position the bill doesn't have, is a 404. */
@@ -39,20 +44,50 @@ public class ProductService {
 		DocumentItem item = d.getItems().stream().filter(i -> i.getPosition() == position).findFirst()
 				.orElseThrow(ProductService::notFound);
 
+		return view(userId, d, item);
+	}
+
+	@Transactional(readOnly = true)
+	public ProductView product(UUID userId, UUID productId) {
+		DocumentItem item = items.findByIdAndDocumentUserId(productId, userId).orElseThrow(ProductService::notFound);
+		return view(userId, item.getDocument(), item);
+	}
+
+	private ProductView view(UUID userId, Document d, DocumentItem item) {
+		var history = services.history(userId, item.getId());
+		var serviceCost = project.bill_locker.servicerecord.ServiceRecordService.totalCost(history);
 		LocalDate today = LocalDate.now(clock);
 		LocalDate end = WarrantyRules.effectiveEnd(item.getWarrantyEndDate(), item.getWarrantyStartDate(),
 				item.getWarrantyPeriodMonths());
 		LocalDate bought = d.getPurchaseDate();
 		Long ownedDays = bought == null ? null : Math.max(0, ChronoUnit.DAYS.between(bought, today));
 
-		return new ProductView(d.getId(), position,
+		return new ProductView(d.getId(), item.getId(), item.getPosition(),
 				item.getProductName(), item.getBrand(), item.getModelNumber(), item.getSerialNumber(), item.getUnitPrice(),
 				BillCategory.parse(d.getCategory()),
 				d.getSellerName(), d.getDocumentNumber(), bought,
 				item.getWarrantyProvider(), item.getWarrantyPeriodMonths(), item.getWarrantyStartDate(), end,
-				WarrantyRules.daysLeft(end, today), WarrantyRules.status(end, today), item.getRegistrationUrl(),
-				ownedDays, costPerMonth(item.getUnitPrice(), bought, today),
-				DocumentSummary.of(d), related(userId, d, item), missing(d, item, end));
+				WarrantyRules.daysLeft(end, today), WarrantyRules.status(end, today), item.getRegistrationUrl(), item.isWarrantyRegistered(),
+				ownedDays, costPerMonth(item.getUnitPrice() == null ? null : item.getUnitPrice().add(serviceCost), bought, today),
+				DocumentSummary.of(d), related(userId, d, item), missing(d, item, end), history, serviceCost,
+                history.isEmpty() ? null : history.getFirst().serviceDate(),
+                project.bill_locker.servicerecord.ServiceRecordService.nextDue(history));
+	}
+
+	@Transactional
+	public ProductView setRegistration(UUID userId, UUID documentId, int position, boolean registered) {
+		Document d = documents.findByIdAndUserId(documentId, userId).orElseThrow(ProductService::notFound);
+		DocumentItem item = d.getItems().stream().filter(i -> i.getPosition() == position).findFirst()
+				.orElseThrow(ProductService::notFound);
+		item.setWarrantyRegistered(registered);
+		return product(userId, documentId, position);
+	}
+
+	@Transactional
+	public ProductView setRegistration(UUID userId, UUID productId, boolean registered) {
+		DocumentItem item = items.findByIdAndDocumentUserId(productId, userId).orElseThrow(ProductService::notFound);
+		item.setWarrantyRegistered(registered);
+		return view(userId, item.getDocument(), item);
 	}
 
 	/**

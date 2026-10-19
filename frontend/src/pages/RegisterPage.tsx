@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { AuthLayout } from '../components/AuthLayout';
 import { Alert, PasswordField, PasswordRules, SubmitButton, TextField } from '../components/FormParts';
 import { ApiError, errorMessage } from '../lib/api';
@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth-context';
 
 export function RegisterPage() {
   const { register } = useAuth();
+  const location = useLocation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,7 +34,7 @@ export function RegisterPage() {
     <AuthLayout
       title="Create your account"
       subtitle="Keep every bill and warranty in one place."
-      footer={<>Already have an account? <Link to="/login" className="font-medium text-brand-700 hover:underline">Sign in</Link></>}
+      footer={<>Already have an account? <Link to="/login" state={location.state} className="font-medium text-brand-700 hover:underline">Sign in</Link></>}
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {error && <Alert tone="error">{error}</Alert>}

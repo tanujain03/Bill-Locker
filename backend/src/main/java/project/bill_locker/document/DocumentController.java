@@ -38,8 +38,9 @@ public class DocumentController {
 	/** The browser sends the file as multipart/form-data, in a part called "file". */
 	@PostMapping("/upload")
 	@ResponseStatus(HttpStatus.CREATED)
-	public DocumentDetail upload(@AuthenticationPrincipal Jwt jwt, @RequestParam("file") MultipartFile file) {
-		return documentService.upload(CurrentUser.id(jwt), file);
+	public DocumentDetail upload(@AuthenticationPrincipal Jwt jwt, @RequestParam("file") MultipartFile file,
+			@RequestParam(defaultValue = "false") boolean read) {
+		return documentService.upload(CurrentUser.id(jwt), file, read);
 	}
 
 	/** The documents list. All three filters are optional. */

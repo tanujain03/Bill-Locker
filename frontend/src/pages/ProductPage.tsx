@@ -12,7 +12,7 @@ import {
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { Button, buttonClass } from '../components/Button';
 import { ErrorState } from '../components/ErrorState';
@@ -25,28 +25,35 @@ import { formatDate } from '../lib/document-form';
 import { BILL_CATEGORY_LABELS, DOCUMENT_TYPE_LABELS, downloadDocument, formatAmount, type DocumentSummary } from '../lib/documents';
 import { categoryIcon, daysBetween, today } from '../lib/expenses';
 import { useFeedback } from '../lib/feedback-context';
-import { getProduct, ownedFor, type ProductView } from '../lib/products';
+import { getProduct, setWarrantyRegistration, ownedFor, type ProductView } from '../lib/products';
+import { ServiceHistorySection } from '../components/services/ServiceHistorySection';
 import { usePageTitle } from '../lib/usePageTitle';
 
 /**
- * /products/:documentId/:position — one product with everything about it: its warranty on a
+ * /products/:productId — one product with everything about it: its warranty on a
  * timeline, its details, what owning it has cost so far, the bill it came from and other
  * documents with the same serial or model number. Actions: claim kit, register, open bill.
  */
 export function ProductPage() {
-  const { documentId = '', position = '0' } = useParams();
+  const { productId = '' } = useParams();
   const [product, setProduct] = useState<ProductView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const latest = useRef(0);
   usePageTitle(product?.productName ?? 'Product');
 
   const load = useCallback(() => {
+    const request = ++latest.current;
     setError(null);
-    getProduct(documentId, Number(position))
-      .then(setProduct)
-      .catch((e) => setError(errorMessage(e)));
-  }, [documentId, position]);
+    setProduct(null);
+    getProduct(productId)
+      .then((value) => { if (request === latest.current) setProduct(value); })
+      .catch((e) => { if (request === latest.current) setError(errorMessage(e)); });
+  }, [productId]);
 
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+    return () => { ++latest.current; };
+  }, [load]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -67,13 +74,27 @@ export function ProductPage() {
           </div>
         </div>
       ) : (
-        <Product p={product} />
+        <Product key={product.productId} p={product} onUpdate={(next) => setProduct((current) => current?.productId === next.productId ? next : current)} />
       )}
     </main>
   );
 }
 
-function Product({ p }: { p: ProductView }) {
+function Product({ p, onUpdate }: { p: ProductView; onUpdate: (p: ProductView) => void }) {
+  const { toast } = useFeedback();
+  const [savingRegistration, setSavingRegistration] = useState(false);
+  async function changeRegistration() {
+    if (savingRegistration) return;
+    setSavingRegistration(true);
+    try {
+      onUpdate(await setWarrantyRegistration(p.productId, !p.warrantyRegistered));
+      toast(p.warrantyRegistered ? 'Registration status cleared.' : 'Warranty marked as registered.');
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setSavingRegistration(false);
+    }
+  }
   const Icon = categoryIcon(p.category);
   const canRegister = Boolean(p.registrationUrl && /^https?:\/\//i.test(p.registrationUrl));
 
@@ -99,11 +120,13 @@ function Product({ p }: { p: ProductView }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link to={claimKitLink(p.documentId, p.position)} className={buttonClass({ variant: 'primary' })}>
+          <Link to={claimKitLink(p.productId)} className={buttonClass({ variant: 'primary' })}>
             <Wrench className="size-4" aria-hidden />
             Claim kit
           </Link>
-          {canRegister && (
+          {p.warrantyRegistered ? (
+            <Button icon={ShieldCheck} disabled>Warranty registered</Button>
+          ) : canRegister && (
             <a href={p.registrationUrl!} target="_blank" rel="noopener noreferrer" className={buttonClass()}>
               <ExternalLink className="size-4" aria-hidden />
               Register warranty
@@ -115,6 +138,8 @@ function Product({ p }: { p: ProductView }) {
           </Link>
         </div>
       </header>
+
+      <ServiceHistorySection product={p} onChanged={() => { getProduct(p.productId).then(onUpdate).catch((e) => toast(errorMessage(e), 'error')); }} />
 
       {p.bill.returnByDate && <ReturnBanner returnByDate={p.bill.returnByDate} />}
 
@@ -134,6 +159,12 @@ function Product({ p }: { p: ProductView }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card icon={ShieldCheck} title="Warranty">
           <WarrantyTimeline p={p} />
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <p className="mb-2 text-sm text-slate-600">{p.warrantyRegistered ? 'You marked this warranty as registered.' : 'After completing registration with the brand, record it here.'}</p>
+            <Button size="sm" busy={savingRegistration} onClick={changeRegistration}>
+              {p.warrantyRegistered ? 'Undo registered status' : 'Mark as registered'}
+            </Button>
+          </div>
         </Card>
 
         <Card icon={Wallet} title="Owning it">
@@ -145,7 +176,7 @@ function Product({ p }: { p: ProductView }) {
               <Stat
                 label="Cost per month"
                 value={p.costPerMonth !== null ? formatAmount(p.costPerMonth, { whole: true }) : '—'}
-                sub={p.price !== null ? `${formatAmount(p.price, { whole: true })} spread over the months owned` : 'Add the price on the bill'}
+                sub={p.price !== null ? `${formatAmount(p.price, { whole: true })} plus service costs, spread over the months owned` : 'Add the price on the bill'}
               />
             </div>
           )}

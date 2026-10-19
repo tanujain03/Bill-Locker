@@ -10,6 +10,7 @@ import type { WarrantyStatus } from './warranties';
 
 export type ClaimKit = {
   documentId: string;
+  productId: string;
   position: number;
   /** The stored bill's file name, for "Download invoice". */
   fileName: string;
@@ -35,12 +36,13 @@ export type ClaimKit = {
   serviceCentreUrl: string;
   /** e.g. ["Serial number", "Invoice number"]. */
   missing: string[];
+  previousServices: import('./service-records').ServiceRecord[];
 };
 
-export const getClaimKit = (documentId: string, position: number) =>
-  api<ClaimKit>(`/documents/${documentId}/items/${position}/claim-kit`);
+export const getClaimKit = (productId: string) =>
+  api<ClaimKit>(`/products/${productId}/claim-kit`);
 
-export const claimKitLink = (documentId: string, position: number) => `/warranties/claim/${documentId}/${position}`;
+export const claimKitLink = (productId: string) => `/warranties/claim/${productId}`;
 
 /** Quick choices for the problem box: one click fills a common description. */
 export const COMMON_PROBLEMS = [

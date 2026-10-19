@@ -9,7 +9,10 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  ShoppingBag,
+  Users,
   Wallet,
+  Wrench,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -21,6 +24,7 @@ import { DropAnywhere } from './DropAnywhere';
 import { Logo } from './Logo';
 import { NotificationBell } from './NotificationBell';
 import { UploadButton } from './UploadButton';
+import { UploadProvider } from './UploadProvider';
 import { UserMenu } from './UserMenu';
 import { WarrantyReminder } from './WarrantyReminder';
 
@@ -42,6 +46,9 @@ const LINKS: NavItem[] = [
   // Everyday spending (rides, food, utilities): documents of type "Bill / receipt".
   { to: '/bills', label: 'Bills & receipts', short: 'Bills', Icon: Receipt },
   { to: '/warranties', label: 'Warranties', Icon: ShieldCheck, badge: (a) => a.expiring.length },
+  { to: '/services', label: 'Services', Icon: Wrench },
+  { to: '/splits', label: 'Split bills', Icon: Users },
+  { to: '/compare-prices', label: 'Compare prices', Icon: ShoppingBag },
   { to: '/gmail', label: 'Gmail', Icon: Mail, badge: (a) => a.gmailFiles },
 ];
 
@@ -69,6 +76,10 @@ function readPinned(): boolean {
  * A file dragged onto any page uploads it (DropAnywhere).
  */
 export function AppLayout() {
+  return <UploadProvider><Layout /></UploadProvider>;
+}
+
+function Layout() {
   const [open, setOpen] = useState(false);
   const [pinned, setPinned] = useState(readPinned);
   /** Open for a moment because the mouse or keyboard focus is on it. */
@@ -160,7 +171,7 @@ export function AppLayout() {
             onClick={() => setOpen(true)}
             aria-label="Open menu"
             aria-expanded={open}
-            className="hidden rounded-lg p-2 text-slate-700 hover:bg-slate-100 sm:block lg:hidden"
+            className="rounded-lg p-2 text-slate-700 hover:bg-slate-100 lg:hidden"
           >
             <Menu className="size-5" aria-hidden />
           </button>

@@ -177,7 +177,7 @@ export function DetailsForm({ value, onChange, fieldErrors, registration, savedL
         <div className="mt-3 space-y-4">
           {value.items.map((item, index) => (
             <ItemCard
-              key={index}
+              key={item.id || `new-${index}`}
               index={index}
               item={item}
               onChange={(next) => setItem(index, next)}
@@ -325,6 +325,8 @@ function ItemCard(props: {
           {field('warrantyEndDate', 'date', endHint)}
         </div>
         <RegistrationLink
+          registered={item.warrantyRegistered === 'true'}
+          onRegisteredChange={(registered) => props.onChange({ ...item, warrantyRegistered: String(registered) })}
           url={item.registrationUrl}
           source={item.registrationSource as RegistrationSource | ''}
           brand={item.brand}

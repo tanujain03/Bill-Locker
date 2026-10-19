@@ -10,7 +10,8 @@ import java.util.UUID;
  */
 public record WarrantyView(
 		UUID documentId,
-		/** The product's place on its bill (0, 1, 2…): with documentId it names the product, e.g. for its claim kit. */
+		UUID productId,
+		/** The product's display order on the bill; productId is its permanent identity. */
 		int position,
 		String productName,
 		String modelNumber,
@@ -23,5 +24,6 @@ public record WarrantyView(
 		Long daysLeft,
 		WarrantyStatus status,
 		/** The brand's warranty registration page (task 5), or null. */
-		String registrationUrl) {
+		String registrationUrl,
+		boolean warrantyRegistered) {
 }
