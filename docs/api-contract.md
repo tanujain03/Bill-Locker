@@ -4,7 +4,7 @@ This is the full REST API Bill Locker is heading towards. The backend and the
 frontend are rebuilt from scratch on the `restart` branch, one task at a time;
 each task implements a part of this contract.
 
-### Implemented so far (restart branch, tasks 1–16)
+### Implemented so far (restart branch, tasks 1–17)
 
 | Endpoint | Notes |
 |---|---|
@@ -35,6 +35,10 @@ Task 16 adds bill splitting under `/api/splits`: groups, guest members, personal
 immutable equal/custom INR expense snapshots, balances, and manual payments requiring recipient
 confirmation. Group membership controls access; private document files are never shared.
 See [`task-16-bill-splitting.md`](task-16-bill-splitting.md) for the endpoints, payloads and rules.
+
+Task 17 adds `GET /api/price-comparison/status` and `POST /api/price-comparison/search` for
+explicit SerpApi Google Shopping searches, with user-scoped caching and persisted request budgets.
+See [`task-17-price-comparison.md`](task-17-price-comparison.md).
 
 Everything else is not built yet. How tasks 1–4 work is explained in
 [`task-1-auth.md`](task-1-auth.md), [`task-2-documents.md`](task-2-documents.md),

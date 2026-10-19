@@ -143,6 +143,15 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   Owner-only group deletion removes all shared history for everyone after UI confirmation, keeping
   original bills. Unique `bill_split_*` tables preserve legacy data. Guide: `docs/task-16-bill-splitting.md`.
 
+- Task 17: price comparison (`pricecompare`, `/api/price-comparison`, `/compare-prices`). SerpApi
+  Google Shopping for India, one explicit request per search, no new dependencies. Backend-only
+  `SERPAPI_API_KEY`; per-user 30-minute cache and persisted shared rolling-31-day budget (default
+  200, max 250), 40/hour, five new attempts/user/day. Failures count locally. Quota reservation
+  uses a PostgreSQL transaction lock. Model-title matches are labelled, not verified variants;
+  INR listings, conditional/sponsored labels and safe retailer/Google links. No background tracking,
+  automatic paid upgrades or AI access. Tables `price_compare_attempts` / `price_compare_cache`.
+  Guide: `docs/task-17-price-comparison.md`.
+
 ## Repository
 
 - `frontend/` — React 19 + TypeScript 5.9 + Vite 6 + Tailwind CSS 4 + React Router 7 +

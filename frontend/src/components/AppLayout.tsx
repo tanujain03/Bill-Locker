@@ -9,6 +9,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  ShoppingBag,
   Users,
   Wallet,
   Wrench,
@@ -47,6 +48,7 @@ const LINKS: NavItem[] = [
   { to: '/warranties', label: 'Warranties', Icon: ShieldCheck, badge: (a) => a.expiring.length },
   { to: '/services', label: 'Services', Icon: Wrench },
   { to: '/splits', label: 'Split bills', Icon: Users },
+  { to: '/compare-prices', label: 'Compare prices', Icon: ShoppingBag },
   { to: '/gmail', label: 'Gmail', Icon: Mail, badge: (a) => a.gmailFiles },
 ];
 

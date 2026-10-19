@@ -1,3 +1,4 @@
+import { PriceComparisonPage } from './pages/PriceComparisonPage';
 import { SplitsPage } from './pages/SplitsPage';
 import { SplitGroupPage } from './pages/SplitGroupPage';
 import { SplitInvitePage } from './pages/SplitInvitePage';
@@ -41,6 +42,7 @@ export function App() {
         {/* Every signed-in page sits in the same frame: navigation on the left. */}
         <Route element={<AppLayout />}>
           <Route path="/home" element={<DashboardPage />} />
+          <Route path="/compare-prices" element={<PriceComparisonPage />} />
           <Route path="/expenses" element={<ExpensesPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/gmail" element={<GmailPage />} />

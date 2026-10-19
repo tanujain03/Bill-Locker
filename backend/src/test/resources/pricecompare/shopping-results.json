@@ -1,0 +1,27 @@
+{
+  "shopping_results": [
+    {
+      "title": "Casio Watch",
+      "product_link": "https://www.google.com/search?ibp=oshop&q=Casio A168WA-1 watch&prds=catalogid:6258867384750282568,productid:1758791008072091387,headlineOfferDocid:16809022486116358246,imageDocid:3872116783957464727,rds:PC_364412981301595385|PROD_PC_364412981301595385,gpcid:364412981301595385,mid:576462807574302330,pvt:a&hl=en&gl=in&udm=28",
+      "source": "Myntra",
+      "price": "₹2,695",
+      "extracted_price": 2695,
+      "delivery": "Free delivery by Sun"
+    },
+    {
+      "title": "Casio A158WA-1DF Vintage Collection Digital Watch",
+      "product_link": "https://www.google.com/search?ibp=oshop&q=Casio A168WA-1 watch&prds=catalogid:9646203727714807869,productid:7625407539293080424,headlineOfferDocid:622680803273739271,imageDocid:9436397900288943719,rds:PC_4892726686892383358|PROD_PC_4892726686892383358,gpcid:4892726686892383358,mid:576462563305777837,pvt:a&hl=en&gl=in&udm=28",
+      "source": "Amazon.in",
+      "price": "₹1,893",
+      "extracted_price": 1893,
+      "delivery": "Free delivery"
+    },
+    {
+      "title": "Mens Casio Watch A168WA-1YES",
+      "product_link": "https://www.google.com/search?ibp=oshop&q=Casio A168WA-1 watch&prds=catalogid:4428375721482133273,productid:2397505682298005187,headlineOfferDocid:8688443452661936412,imageDocid:13010153071475505464,rds:PC_6263263974768157265|PROD_PC_6263263974768157265,gpcid:6263263974768157265,mid:576462892662742059,pvt:a&hl=en&gl=in&udm=28",
+      "source": "ubuy.co.in",
+      "price": "₹4,014",
+      "extracted_price": 4014
+    }
+  ]
+}
