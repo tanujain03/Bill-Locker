@@ -1,3 +1,6 @@
+import { SplitsPage } from './pages/SplitsPage';
+import { SplitGroupPage } from './pages/SplitGroupPage';
+import { SplitInvitePage } from './pages/SplitInvitePage';
 import { Navigate, Route, Routes, useParams } from 'react-router';
 import { ServicesPage } from './pages/ServicesPage';
 import { AppLayout } from './components/AppLayout';
@@ -29,6 +32,7 @@ export function App() {
       </Route>
 
       {/* Open to everyone: a reset link must work even if you're signed in. */}
+      <Route path="/split-invite" element={<SplitInvitePage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
@@ -40,6 +44,8 @@ export function App() {
           <Route path="/expenses" element={<ExpensesPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/gmail" element={<GmailPage />} />
+          <Route path="/splits" element={<SplitsPage />} />
+          <Route path="/splits/:groupId" element={<SplitGroupPage />} />
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/warranties" element={<WarrantiesPage />} />
           <Route path="/warranties/claim/:productId" element={<ClaimKitPage />} />

@@ -4,7 +4,7 @@ This is the full REST API Bill Locker is heading towards. The backend and the
 frontend are rebuilt from scratch on the `restart` branch, one task at a time;
 each task implements a part of this contract.
 
-### Implemented so far (restart branch, tasks 1–14)
+### Implemented so far (restart branch, tasks 1–16)
 
 | Endpoint | Notes |
 |---|---|
@@ -29,6 +29,12 @@ Task 15 adds service records: `POST`/`GET /api/documents/{id}/items/{position}/s
 JWT ownership, permanent product identity, service costs/history on product responses,
 `previousServices` on claim kits and `servicesDue` on dashboards. See
 [`task-15-service-records.md`](task-15-service-records.md) for fields, validation and reminder rules.
+
+
+Task 16 adds bill splitting under `/api/splits`: groups, guest members, personal invitation links,
+immutable equal/custom INR expense snapshots, balances, and manual payments requiring recipient
+confirmation. Group membership controls access; private document files are never shared.
+See [`task-16-bill-splitting.md`](task-16-bill-splitting.md) for the endpoints, payloads and rules.
 
 Everything else is not built yet. How tasks 1–4 work is explained in
 [`task-1-auth.md`](task-1-auth.md), [`task-2-documents.md`](task-2-documents.md),

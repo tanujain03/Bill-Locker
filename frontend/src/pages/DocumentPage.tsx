@@ -20,7 +20,7 @@ import { ReturnBanner } from '../components/documents/ReturnWindow';
 import { MoreMenu } from '../components/documents/MoreMenu';
 import { FileTypeIcon, SourceBadge } from '../components/documents/SourceBadge';
 import { StatusBadge } from '../components/documents/StatusBadge';
-import { Button } from '../components/Button';
+import { Button, buttonClass } from '../components/Button';
 import { Alert } from '../components/FormParts';
 import { ApiError, errorMessage } from '../lib/api';
 import { detailsToText, fromForm, toForm, type FormValues } from '../lib/document-form';
@@ -357,6 +357,7 @@ export function DocumentPage() {
                     Copy all
                   </CopyButton>
                 )}
+                {document.status === 'SAVED' && !dirty && <Link to={`/splits?document=${document.id}`} className={buttonClass()}>Split bill</Link>}
                 <MoreMenu disabled={busy !== null} deleting={busy === 'deleting'} onDownload={download} onDelete={remove} />
               </div>
             </div>

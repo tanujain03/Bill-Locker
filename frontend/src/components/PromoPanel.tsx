@@ -1,5 +1,5 @@
 import { ArrowRight, BellRing, Mail, ShieldAlert, ShieldCheck, ShieldX, Sparkles, type LucideIcon } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 
 /** What the three short feature lines say, each with its icon. */
 const FEATURES: { icon: LucideIcon; text: string }[] = [
@@ -14,6 +14,7 @@ const FEATURES: { icon: LucideIcon; text: string }[] = [
  * very large screen it stays together instead of spreading out.
  */
 export function PromoPanel() {
+  const location = useLocation();
   return (
     // No background of its own: AuthLayout paints it from the split to the screen's edge.
     <aside className="relative hidden w-3/5 items-center justify-center lg:flex">
@@ -44,6 +45,7 @@ export function PromoPanel() {
 
         <Link
           to="/register"
+          state={location.state}
           className="mt-8 inline-flex items-center gap-2 rounded-full bg-brand-600 px-7 py-3.5 text-lg font-semibold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-700"
         >
           Create your free locker

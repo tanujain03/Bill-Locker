@@ -9,6 +9,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Users,
   Wallet,
   Wrench,
   X,
@@ -45,6 +46,7 @@ const LINKS: NavItem[] = [
   { to: '/bills', label: 'Bills & receipts', short: 'Bills', Icon: Receipt },
   { to: '/warranties', label: 'Warranties', Icon: ShieldCheck, badge: (a) => a.expiring.length },
   { to: '/services', label: 'Services', Icon: Wrench },
+  { to: '/splits', label: 'Split bills', Icon: Users },
   { to: '/gmail', label: 'Gmail', Icon: Mail, badge: (a) => a.gmailFiles },
 ];
 
@@ -167,7 +169,7 @@ function Layout() {
             onClick={() => setOpen(true)}
             aria-label="Open menu"
             aria-expanded={open}
-            className="hidden rounded-lg p-2 text-slate-700 hover:bg-slate-100 sm:block lg:hidden"
+            className="rounded-lg p-2 text-slate-700 hover:bg-slate-100 lg:hidden"
           >
             <Menu className="size-5" aria-hidden />
           </button>
