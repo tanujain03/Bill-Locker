@@ -11,5 +11,6 @@ class ShoppingSearchCache extends BaseEntity {
  @Column(name="query_key",nullable=false,length=64) private String queryKey;
  @Column(name="checked_at",nullable=false) private Instant checkedAt;
  @Column(name="response_json",nullable=false,columnDefinition="text") private String responseJson;
+ void updateResponse(String json) {responseJson=json;}
  ShoppingSearchCache(UUID user,String key,Instant now,String json) {userId=user;queryKey=key;checkedAt=now;responseJson=json;}
 }

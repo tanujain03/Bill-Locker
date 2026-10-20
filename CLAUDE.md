@@ -150,6 +150,8 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   uses a PostgreSQL transaction lock. Model-title matches are labelled, not verified variants;
   INR listings, conditional/sponsored labels and safe retailer/Google links. No background tracking,
   automatic paid upgrades or AI access. Tables `price_compare_attempts` / `price_compare_cache`.
+  Cards open retailer product pages; Google-only results use an explicit, quota-counted SerpApi
+  detail lookup, scoped to the caller’s cached offer and cached afterward. No eager detail calls.
   Guide: `docs/task-17-price-comparison.md`.
 
 ## Repository

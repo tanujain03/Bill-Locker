@@ -55,4 +55,16 @@ class ShoppingResultParserTests {
   }
  }
 
+ @Test void resolvesTheSelectedRetailerWithoutSwitchingStoresOrFollowingUnsafeUrls() {
+  String body="""
+  {"product_results":{"stores":[{"name":"Flipkart","link":"https://flipkart.com/item"},
+  {"name":"Amazon","link":"https://amazon.in.evil.example/item"},
+  {"name":"Amazon.in","link":"https://www.amazon.in/dp/123"}]}}
+  """;
+  assertThat(ShoppingResultParser.storeLink(body,"Amazon.in")).isEqualTo("https://www.amazon.in/dp/123");
+  assertThat(ShoppingResultParser.storeLink(body,"Myntra")).isNull();
+  assertThat(ShoppingResultParser.safeMerchantLink("https://127.0.0.1/a")).isNull();
+  assertThat(ShoppingResultParser.storeLink("{\"product_results\":{\"stores\":[{\"name\":\"Ubuy\",\"link\":\"https://www.ubuy.co.in/product/123\"}]}}","ubuy.co.in")).isEqualTo("https://www.ubuy.co.in/product/123");
+ }
+
 }

@@ -7,7 +7,7 @@ async function compiled(name,imports={}) {
  for(const [path,url] of Object.entries(imports))outputText=outputText.replace(`from '${path}'`,`from '${url}'`);
  return `data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`;
 }
-const {comparePrices,getPriceSearchStatus,offerRetailer,isGoogleListing}=await import(await compiled('price-comparison',{'./api':await compiled('api')}));
+const {comparePrices,getPriceSearchStatus,getPriceStoreLink,offerRetailer,isGoogleListing}=await import(await compiled('price-comparison',{'./api':await compiled('api')}));
 globalThis.localStorage={getItem:()=> 'token'};globalThis.sessionStorage={getItem:()=>null};
 test('search is an explicit authenticated POST and contains no provider key',async t=>{
  let request;t.mock.method(globalThis,'fetch',async(path,options)=>{request={path,options};return new Response('{"offers":[]}');});
@@ -27,4 +27,11 @@ test('retailer matching distinguishes Google seller labels from direct merchant 
  assert.equal(offerRetailer({url:'https://www.google.com/shopping/product/1',seller:'amazon.in.evil.example'}),'Other');
  assert.equal(isGoogleListing('https://www.google.com/shopping/product/1'),true);
  assert.equal(isGoogleListing('https://www.flipkart.com/watch'),false);
+});
+
+test('store lookup sends only the selected cached search and offer identity',async t=>{
+ let sent;t.mock.method(globalThis,'fetch',async(path,options)=>{sent={path,body:JSON.parse(options.body)};return new Response('{"url":"https://amazon.in/dp/123"}');});
+ const search={query:'Casio',model:'A168WA-1'};
+ await getPriceStoreLink(search,{url:'https://www.google.com/shopping/product/1',seller:'Amazon.in',lookupToken:'not-sent'});
+ assert.equal(sent.path,'/api/price-comparison/store-link');assert.deepEqual(sent.body,{search,url:'https://www.google.com/shopping/product/1',seller:'Amazon.in'});
 });

@@ -22,4 +22,12 @@ class SerpApiShoppingProviderTests {
   server.expect(anything()).andRespond(withStatus(HttpStatus.UNAUTHORIZED).body("test-secret"));
   assertThatThrownBy(()->provider.search("watch")).isInstanceOf(project.bill_locker.common.ApiException.class).hasMessageNotContaining("test-secret");server.verify();
  }
+ @Test void usesFixedDetailEndpointAndTokenInsteadOfFetchingProviderSuppliedUrls() {
+  var builder=RestClient.builder();var server=MockRestServiceServer.bindTo(builder).build();
+  var provider=new SerpApiShoppingProvider(builder.build(),"test-secret");
+  server.expect(requestTo(containsString("https://serpapi.com/search.json?engine=google_immersive_product")))
+   .andExpect(requestTo(containsString("page_token=saved-token"))).andRespond(withSuccess("{}",MediaType.APPLICATION_JSON));
+  provider.stores("saved-token");server.verify();
+ }
+
 }
