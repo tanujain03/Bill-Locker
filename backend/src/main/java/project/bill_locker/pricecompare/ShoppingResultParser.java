@@ -45,8 +45,42 @@ public final class ShoppingResultParser {
    String summary=(title+" "+priceText+" "+text(n,"condition",100)+" "+text(n,"durability",100)+" "+text(n,"second_hand_condition",100)).toLowerCase(Locale.ROOT);
    boolean conditional=n.hasNonNull("installment") || Pattern.compile("(?i)\\bemi\\b|/mo\\b|per month|with.*(card|coupon|exchange)|\\brenewed\\b|\\brefurbished\\b|pre-owned|\\bused\\b").matcher(summary).find();
    String match=model!=null&&!model.isBlank()&&modelMatches(title,model)?"MODEL_MATCH":"POSSIBLE_MATCH";
-   offers.add(new PriceComparisonView.Offer(title,seller,price,priceText,url,text(n,"delivery",200),match,conditional,sponsored));
+   offers.add(new PriceComparisonView.Offer(title,seller,price,priceText,url,text(n,"delivery",200),match,conditional,sponsored,text(n,"immersive_product_page_token",12000),null));
   }
+ }
+
+ public static String storeLink(String body,String seller) {
+  JsonNode root;
+  try {root=JSON.readTree(body);}catch(Exception e){throw unavailable();}
+  if(root==null||root.has("error"))throw unavailable();
+  String wanted=retailerDomain(seller);
+  for(var store:root.path("product_results").path("stores")) {
+   String url=safeMerchantLink(text(store,"link",3000));
+   if(url==null||isGoogle(url))continue;
+   if(wanted!=null&&hostEquals(URI.create(url).getHost(),wanted))return url;
+   if(wanted==null && (hostEquals(URI.create(url).getHost(),seller.strip().replaceFirst("(?i)^www[.]","")) ||
+    normalizedSeller(seller).equals(normalizedSeller(text(store,"name",120)))))return url;
+  }
+  return null;
+ }
+ private static String normalizedSeller(String value) {return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]","");}
+ static String safeMerchantLink(String value) {
+  String link=normalizeHttps(value);if(link==null||isGoogle(link))return null;
+  String host=URI.create(link).getHost().toLowerCase(Locale.ROOT);
+  if(!host.contains(".")||host.matches("[0-9.]+")||host.contains(":")||
+   host.endsWith(".localhost")||host.endsWith(".local")||host.endsWith(".internal")||host.endsWith(".test")||host.endsWith(".invalid"))return null;
+  return link;
+ }
+ static boolean isGoogle(String url) {return List.of("google.com","www.google.com","google.co.in","www.google.co.in").contains(URI.create(url).getHost().toLowerCase(Locale.ROOT));}
+ private static String retailerDomain(String seller) {
+  String normalized=seller.toLowerCase(Locale.ROOT).strip().replaceFirst("^www[.]","");
+  return switch(normalized) {
+   case "amazon","amazon.in" -> "amazon.in";
+   case "flipkart","flipkart.com" -> "flipkart.com";
+   case "myntra","myntra.com" -> "myntra.com";
+   case "ajio","ajio.com" -> "ajio.com";
+   default -> null;
+  };
  }
  public static boolean modelMatches(String title,String model) {
   String clean=model.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]","");
@@ -56,18 +90,19 @@ public final class ShoppingResultParser {
   return Pattern.compile("(?i)(?<![a-z0-9])"+pattern+"(?![a-z0-9])").matcher(title).find();
  }
  static String safeLink(String value) {
+  String link=normalizeHttps(value);if(link==null)return null;
+  var uri=URI.create(link);String host=uri.getHost().toLowerCase(Locale.ROOT);
+  boolean store=List.of("amazon.in","flipkart.com","myntra.com","ajio.com").stream().anyMatch(d->hostEquals(host,d));
+  boolean google=isGoogle(link)&&(uri.getPath().startsWith("/shopping/")||uri.getPath().equals("/search"));
+  return store||google?link:null;
+ }
+ private static String normalizeHttps(String value) {
   try {
-   if(value.chars().anyMatch(Character::isISOControl))return null;
-   // SerpApi's Google product URLs may contain raw spaces/pipes. Preserve existing escapes.
-   for(char c:new char[]{' ','|','^','`','{','}','<','>','"'})
-    value=value.replace(String.valueOf(c),"%"+Integer.toHexString(c).toUpperCase(Locale.ROOT));
-   var uri=URI.create(value);String host=uri.getHost();
-   if(!"https".equalsIgnoreCase(uri.getScheme())||host==null||uri.getUserInfo()!=null||(uri.getPort()!=-1&&uri.getPort()!=443))return null;
-   host=host.toLowerCase(Locale.ROOT);
-   boolean store=List.of("amazon.in","flipkart.com","myntra.com","ajio.com").stream().anyMatch(d->hostEquals(uri.getHost(),d));
-   boolean google=List.of("www.google.com","www.google.co.in","google.com","google.co.in").contains(host)
-    && (uri.getPath().startsWith("/shopping/")||uri.getPath().equals("/search"));
-   return store||google?uri.toASCIIString():null;
+   if(value==null||value.chars().anyMatch(Character::isISOControl))return null;
+   for(char c:new char[]{' ','|','^','`','{','}','<','>','"'})value=value.replace(String.valueOf(c),"%"+Integer.toHexString(c).toUpperCase(Locale.ROOT));
+   var uri=URI.create(value);
+   if(!"https".equalsIgnoreCase(uri.getScheme())||uri.getHost()==null||uri.getUserInfo()!=null||(uri.getPort()!=-1&&uri.getPort()!=443))return null;
+   return uri.toASCIIString();
   }catch(Exception e){return null;}
  }
  private static boolean hostEquals(String host,String domain) {host=host.toLowerCase(Locale.ROOT);return host.equals(domain)||host.endsWith("."+domain);}

@@ -1,12 +1,14 @@
 import { api } from './api';
 export type PriceOffer = {
   title: string; seller: string; price: number; priceText: string; url: string;
-  delivery: string; match: 'MODEL_MATCH' | 'POSSIBLE_MATCH'; conditional: boolean; sponsored: boolean;
+  delivery: string; match: 'MODEL_MATCH' | 'POSSIBLE_MATCH'; conditional: boolean; sponsored: boolean; lookupToken?: string | null; directUrl?: string | null;
 };
 export type PriceComparison = { query: string; model: string; checkedAt: string; cached: boolean; offers: PriceOffer[] };
 export type PriceSearchStatus = { configured: boolean; remaining: number; limit: number; dailyLimit: number; provider: string };
 export const getPriceSearchStatus = () => api<PriceSearchStatus>('/price-comparison/status');
 export const comparePrices = (query: string, model: string) => api<PriceComparison>('/price-comparison/search', { body: { query, model } });
+export const getPriceStoreLink = (search: { query: string; model: string }, offer: PriceOffer) =>
+  api<{ url: string }>('/price-comparison/store-link', { body: { search, url: offer.url, seller: offer.seller } });
 export const RETAILERS = ['Amazon', 'Flipkart', 'Myntra', 'AJIO'] as const;
 export function offerRetailer(offer: PriceOffer): string {
   let host = '';

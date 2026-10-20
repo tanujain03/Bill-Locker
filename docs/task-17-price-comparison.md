@@ -56,7 +56,7 @@ a conservative local budget, not a copy of the provider's billing-cycle counter.
 transaction advisory lock serializes budget check + insert across backend instances. Failed,
 timed-out and empty requests all count locally. Restarts do not reset counters. Cache lookup
 happens first, so cached queries still work when new searches are capped. No pagination or extra
-product-detail/retailer calls are made automatically.
+product-detail/retailer calls are made automatically; explicit card clicks can resolve a retailer link.
 
 The parser reads standard, categorized and inline shopping results; prices must be positive INR
 amounts with at most two decimals. Foreign currency, missing/unreadable prices and unsafe links
@@ -100,3 +100,34 @@ one successful live Casio watch search. Amazon and Myntra appeared; Flipkart and
 Representative public listings are saved as a test fixture without provider/account metadata or
 credentials. The response contains Google product URLs with unescaped spaces; these are normalized
 before validation. Automated tests never call the real provider.
+
+## 5. Open the retailer's product page
+
+Minimal cards show a store badge, product title, prominent price and delivery details. The entire
+card opens the retailer; the separate Visit store button is replaced by a quiet Open offer cue.
+Google listing fallback links live inside each eligible card’s three-dot menu, including after a
+store URL has been resolved. The menu is a separate keyboard-accessible control, not nested in the
+card link. Cards stack on mobile.
+When a listing already includes a direct retailer URL, it opens immediately without another search.
+Google-only listings keep their SerpApi immersive-product token (not an API key). On an explicit
+click, `POST /api/price-comparison/store-link` takes `{search:{query,model},url,seller}`. The service
+finds that user's unexpired cached offer, reserves one request through the same quotas, and calls
+SerpApi's fixed `google_immersive_product` endpoint with the cached token. Caller-provided tokens
+and provider URLs are never fetched. Old cached search formats are invalidated by a cache-key version.
+
+Only a product URL for the selected retailer is returned; the resolver never substitutes another
+retailer. Amazon/Flipkart/Myntra/AJIO require matching URL domains, while other stores require a
+matching provider store name or seller domain. Links must be HTTPS, without credentials, custom
+ports, IP literals or local hostnames. The backend does not fetch these merchant URLs. Direct
+URLs and successful lookups with no matching retailer are cached for the original search's
+remaining 30-minute lifetime, avoiding repeated quota spending. Provider errors remain retryable.
+The price/timestamp stays the original search observation and may differ at checkout.
+
+A click opens a temporary tab during the user gesture to avoid popup blockers, with no opener and
+no referrer. It navigates to the resolved store; failures close it and show a message. An explicit
+Google listing link remains as a fallback. One extra lookup may consume a free-plan search, but
+there are no eager lookups for every result, automatic pagination or purchased credits.
+
+Mocked tests cover fixed provider endpoints, owned-search lookup, forged/cross-user offers,
+cache reuse, matching retailer domains and unsafe destinations. A manual free-plan check on
+20 October 2026 successfully obtained Amazon, Flipkart and Myntra product URLs for one watch.

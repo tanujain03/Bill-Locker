@@ -29,11 +29,12 @@ class PriceComparisonApiTests extends ApiTest {
   @Bean @Primary Fake fakeShoppingProvider(){return new Fake();}
  }
  static class Fake implements ShoppingProvider {
-  AtomicInteger calls=new AtomicInteger();boolean enabled=true,fail=false;
+  AtomicInteger calls=new AtomicInteger();boolean enabled=true,fail=false;String response=RESPONSE;
   public boolean configured(){return enabled;}
-  public String search(String query){calls.incrementAndGet();if(fail)throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,"PRICE_PROVIDER_ERROR","Unavailable");return RESPONSE;}
+  public String search(String query){calls.incrementAndGet();if(fail)throw new ApiException(org.springframework.http.HttpStatus.BAD_GATEWAY,"PRICE_PROVIDER_ERROR","Unavailable");return response;}
+  public String stores(String token){calls.incrementAndGet();return "{\"product_results\":{\"stores\":[{\"name\":\"Amazon.in\",\"link\":\"https://www.amazon.in/dp/RESOLVED\"}]}}";}
  }
- @BeforeEach void reset(){jdbc.update("delete from price_compare_cache");jdbc.update("delete from price_compare_attempts");provider.calls.set(0);provider.enabled=true;provider.fail=false;}
+ @BeforeEach void reset(){jdbc.update("delete from price_compare_cache");jdbc.update("delete from price_compare_attempts");provider.calls.set(0);provider.enabled=true;provider.fail=false;provider.response=RESPONSE;}
  private String token() throws Exception{return registerAndGetToken(uniqueEmail("compare"));}
  private ResultActions search(String token,String query) throws Exception {
   return mvc.perform(post("/api/price-comparison/search").header("Authorization",bearer(token)).contentType(MediaType.APPLICATION_JSON)
@@ -89,6 +90,47 @@ class PriceComparisonApiTests extends ApiTest {
    assertThat(results).containsExactlyInAnyOrder(200,200,200,200,200,429);
    assertThat(attempts.count()).isEqualTo(5);assertThat(provider.calls.get()).isEqualTo(5);
   }
+ }
+
+ @Test void opensOnlyOwnedCachedOffersAndCachesResolvedStoreLinks() throws Exception {
+  String t=token(),other=token();
+  provider.response="""
+  {"shopping_results":[{"title":"Casio A168WA-1","source":"Amazon.in","price":"₹2495","extracted_price":2495,
+  "product_link":"https://www.google.com/shopping/product/123","immersive_product_page_token":"saved-token"}]}
+  """;
+  search(t,"Casio watch").andExpect(status().isOk());
+  String body="""
+  {"search":{"query":"Casio watch","model":"A168WA-1"},"url":"https://www.google.com/shopping/product/123","seller":"Amazon.in"}
+  """;
+  mvc.perform(post("/api/price-comparison/store-link").header("Authorization",bearer(other)).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isNotFound());
+  mvc.perform(post("/api/price-comparison/store-link").header("Authorization",bearer(t)).contentType(MediaType.APPLICATION_JSON).content(body.replace("product/123","product/999"))).andExpect(status().isNotFound());
+  assertThat(provider.calls.get()).isEqualTo(1);
+  for(int i=0;i<2;i++)mvc.perform(post("/api/price-comparison/store-link").header("Authorization",bearer(t)).contentType(MediaType.APPLICATION_JSON).content(body))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.url").value("https://www.amazon.in/dp/RESOLVED"));
+  assertThat(provider.calls.get()).isEqualTo(2);assertThat(attempts.count()).isEqualTo(2);
+ }
+ @Test void directStoreLinksDoNotUseExtraQuotaAndUnknownTokensAreNotFetched() throws Exception {
+  String t=token();search(t,"Casio watch").andExpect(status().isOk());
+  String body="""
+  {"search":{"query":"Casio watch","model":"A168WA-1"},"url":"https://www.amazon.in/dp/TEST","seller":"Amazon.in"}
+  """;
+  mvc.perform(post("/api/price-comparison/store-link").header("Authorization",bearer(t)).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
+  assertThat(provider.calls.get()).isEqualTo(1);
+ }
+
+ @Test void missingRetailerIsNotReplacedAndDoesNotSpendQuotaRepeatedly() throws Exception {
+  String t=token();
+  provider.response="""
+  {"shopping_results":[{"title":"Casio A168WA-1","source":"Myntra","price":"₹2495","extracted_price":2495,
+  "product_link":"https://www.google.com/shopping/product/123","immersive_product_page_token":"saved-token"}]}
+  """;
+  search(t,"Casio watch").andExpect(status().isOk());
+  String body="""
+  {"search":{"query":"Casio watch","model":"A168WA-1"},"url":"https://www.google.com/shopping/product/123","seller":"Myntra"}
+  """;
+  for(int i=0;i<2;i++)mvc.perform(post("/api/price-comparison/store-link").header("Authorization",bearer(t)).contentType(MediaType.APPLICATION_JSON).content(body))
+   .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("PRICE_STORE_LINK_UNAVAILABLE"));
+  assertThat(provider.calls.get()).isEqualTo(2);assertThat(attempts.count()).isEqualTo(2);
  }
 
 }

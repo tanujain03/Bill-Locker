@@ -27,7 +27,7 @@ class PriceSearchQuota {
    throw new ApiException(HttpStatus.TOO_MANY_REQUESTS,"PRICE_HOURLY_LIMIT","Price searches are temporarily limited. Try a recent search or return later.");
   Instant day=LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
   if(attempts.countByUserIdAndAttemptedAtGreaterThanEqual(user,day)>=5)
-   throw new ApiException(HttpStatus.TOO_MANY_REQUESTS,"PRICE_DAILY_LIMIT","You have used today's five new price searches. Try a recent search or return tomorrow.");
+   throw new ApiException(HttpStatus.TOO_MANY_REQUESTS,"PRICE_DAILY_LIMIT","You have used today's five price searches or store lookups. Try a recent result or return tomorrow.");
   attempts.saveAndFlush(new ShoppingSearchAttempt(user,clock.instant()));
  }
  public int remaining() {return Math.max(0,limit-(int)attempts.countByAttemptedAtGreaterThanEqual(clock.instant().minus(Duration.ofDays(31))));}
