@@ -152,6 +152,8 @@ steps 8–9 (brand registration, Chrome extension) are in `git stash` as
   automatic paid upgrades or AI access. Tables `price_compare_attempts` / `price_compare_cache`.
   Cards open retailer product pages; Google-only results use an explicit, quota-counted SerpApi
   detail lookup, scoped to the caller’s cached offer and cached afterward. No eager detail calls.
+  Local title relevance filters unrelated offers, classifies matches/alternatives, checks requested
+  SPF/quantity/model, and preserves provider order by default (`ProductRelevance`).
   Guide: `docs/task-17-price-comparison.md`.
 
 ## Repository

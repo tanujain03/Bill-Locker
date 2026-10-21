@@ -1,10 +1,10 @@
 import { api } from './api';
 export type PriceOffer = {
   title: string; seller: string; price: number; priceText: string; url: string;
-  delivery: string; match: 'MODEL_MATCH' | 'POSSIBLE_MATCH'; conditional: boolean; sponsored: boolean; lookupToken?: string | null; directUrl?: string | null;
+  delivery: string; match: 'MODEL_MATCH' | 'TITLE_MATCH' | 'ALTERNATIVE' | 'POSSIBLE_MATCH'; conditional: boolean; sponsored: boolean; lookupToken?: string | null; directUrl?: string | null;
 };
 export type PriceComparison = { query: string; model: string; checkedAt: string; cached: boolean; offers: PriceOffer[] };
-export type PriceSearchStatus = { configured: boolean; remaining: number; limit: number; dailyLimit: number; provider: string };
+export type PriceSearchStatus = { configured: boolean; remaining: number; limit: number; dailyLimit: number; dailyRemaining: number; hourlyRemaining: number; dailyResetsAt: string; provider: string };
 export const getPriceSearchStatus = () => api<PriceSearchStatus>('/price-comparison/status');
 export const comparePrices = (query: string, model: string) => api<PriceComparison>('/price-comparison/search', { body: { query, model } });
 export const getPriceStoreLink = (search: { query: string; model: string }, offer: PriceOffer) =>

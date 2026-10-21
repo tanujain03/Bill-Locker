@@ -23,8 +23,13 @@ public final class ShoppingResultParser {
   for(var category:root.path("categorized_shopping_results")) collect(category.path("shopping_results"),model,false,offers);
   Map<String,PriceComparisonView.Offer> unique=new LinkedHashMap<>();
   for(var o:offers) unique.putIfAbsent(o.seller()+"|"+o.url()+"|"+o.price(),o);
-  return unique.values().stream().sorted(Comparator.comparing(PriceComparisonView.Offer::conditional)
-   .thenComparing(o->!o.match().equals("MODEL_MATCH")).thenComparing(PriceComparisonView.Offer::price)).limit(40).toList();
+  return unique.values().stream().limit(40).toList();
+ }
+ public static List<PriceComparisonView.Offer> parse(String body,String query,String model) {
+  return parse(body,model).stream().map(o->{
+   String match=ProductRelevance.classify(o.title(),query,model);
+   return match==null?null:new PriceComparisonView.Offer(o.title(),o.seller(),o.price(),o.priceText(),o.url(),o.delivery(),match,o.conditional(),o.sponsored(),o.lookupToken(),o.directUrl());
+  }).filter(Objects::nonNull).toList();
  }
  private static void collect(JsonNode nodes,String model,boolean sponsored,List<PriceComparisonView.Offer> offers) {
   if(!nodes.isArray())return;

@@ -8,5 +8,5 @@ public record PriceComparisonView(String query,String model,Instant checkedAt,bo
   public Offer withDirectUrl(String direct) {return new Offer(title,seller,price,priceText,url,delivery,match,conditional,sponsored,lookupToken,direct);}
  }
  public record StoreLink(String url) {}
- public record Status(boolean configured,int remaining,int limit,int dailyLimit,String provider) {}
+ public record Status(boolean configured,int remaining,int limit,int dailyLimit,String provider,int dailyRemaining,int hourlyRemaining,Instant dailyResetsAt) {}
 }

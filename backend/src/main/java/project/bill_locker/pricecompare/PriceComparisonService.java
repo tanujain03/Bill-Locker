@@ -17,7 +17,7 @@ public class PriceComparisonService {
  PriceComparisonService(ShoppingProvider provider,PriceSearchQuota quota,ShoppingSearchCacheRepository cache,Clock clock) {
   this.provider=provider;this.quota=quota;this.cache=cache;this.clock=clock;
  }
- public PriceComparisonView.Status status() {return new PriceComparisonView.Status(provider.configured(),quota.remaining(),quota.limit(),5,"SerpApi");}
+ public PriceComparisonView.Status status(UUID user) {return new PriceComparisonView.Status(provider.configured(),quota.remaining(),quota.limit(),5,"SerpApi",quota.dailyRemaining(user),quota.hourlyRemaining(),quota.dailyResetsAt());}
  public PriceComparisonView search(UUID user,PriceComparisonRequest r) {
   String query=r.query().strip().replaceAll("\\s+"," ");
   String model=r.model()==null?"":r.model().strip().replaceAll("\\s+"," ");
@@ -33,7 +33,7 @@ public class PriceComparisonService {
   if(!provider.configured())throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"PRICE_SEARCH_NOT_CONFIGURED","Price comparison has not been enabled on this server yet.");
   quota.reserve(user); // Commits before the HTTP request; failed/uncertain requests still use a reservation.
   String raw=provider.search(effective);
-  var view=new PriceComparisonView(query,model,clock.instant(),false,ShoppingResultParser.parse(raw,model));
+  var view=new PriceComparisonView(query,model,clock.instant(),false,ShoppingResultParser.parse(raw,query,model));
   cache.save(new ShoppingSearchCache(user,key,view.checkedAt(),JSON.writeValueAsString(view)));
   return view;
  }
@@ -67,7 +67,7 @@ public class PriceComparisonService {
  private static String cacheKey(String query,String model) {
   query=query.strip().replaceAll("\\s+"," ");model=model.strip().replaceAll("\\s+"," ");
   String effective=query.toLowerCase(Locale.ROOT).contains(model.toLowerCase(Locale.ROOT))?query:query+" "+model;
-  return hash("store-links-v1|"+effective.toLowerCase(Locale.ROOT)+"|"+model.toLowerCase(Locale.ROOT));
+  return hash("relevance-v2|"+effective.toLowerCase(Locale.ROOT)+"|"+model.toLowerCase(Locale.ROOT));
  }
  private static String hash(String value) {
   try {return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}

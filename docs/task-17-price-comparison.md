@@ -69,8 +69,7 @@ and noreferrer. No arbitrary URL is fetched by the backend.
 variation and checking alphanumeric boundaries. It is **not** proof of equal size/colour/strap
 or authentic seller. Other results are `POSSIBLE_MATCH`. Instalments, apparent conditional
 prices and used/refurbished conditions are flagged. Sponsored inline results are labelled.
-Default ordering puts unconditional model matches first, then other unconditional listings,
-then conditional ones; users may sort by price. No invented price, guaranteed cheapest claim,
+Default ordering preserves provider relevance; users may explicitly sort by price. No invented price, guaranteed cheapest claim,
 checkout verification, bank-discount calculation or guessed missing retailer price.
 
 ## 3. Frontend
@@ -103,11 +102,9 @@ before validation. Automated tests never call the real provider.
 
 ## 5. Open the retailer's product page
 
-Minimal cards show a store badge, product title, prominent price and delivery details. The entire
-card opens the retailer; the separate Visit store button is replaced by a quiet Open offer cue.
-Google listing fallback links live inside each eligible card’s three-dot menu, including after a
-store URL has been resolved. The menu is a separate keyboard-accessible control, not nested in the
-card link. Cards stack on mobile.
+Minimal cards show a store badge, product title, prominent price and delivery details. Only the Visit store button opens the retailer; clicking the card itself does nothing.
+Google listing fallback links appear as buttons beside Visit store on eligible cards, including
+after a store URL has been resolved. Both actions are keyboard-accessible and wrap on narrow screens. Cards stack on mobile.
 When a listing already includes a direct retailer URL, it opens immediately without another search.
 Google-only listings keep their SerpApi immersive-product token (not an API key). On an explicit
 click, `POST /api/price-comparison/store-link` takes `{search:{query,model},url,seller}`. The service
@@ -131,3 +128,39 @@ there are no eager lookups for every result, automatic pagination or purchased c
 Mocked tests cover fixed provider endpoints, owned-search lookup, forged/cross-user offers,
 cache reuse, matching retailer domains and unsafe destinations. A manual free-plan check on
 20 October 2026 successfully obtained Amazon, Flipkart and Myntra product URLs for one watch.
+
+## 6. Product relevance
+
+Matching happens locally after the existing Shopping request, without extra provider calls.
+The leading meaningful query word anchors the brand/product; at least 60% of meaningful query
+words must occur as whole title words (or the supplied exact model must match), otherwise the offer is omitted. This is a conservative
+text heuristic, not brand detection. Search filler words are ignored, and case/Unicode are normalized.
+A typo is not silently corrected: use the exact spelling and a specific product name.
+
+All meaningful words, the optional model, and requested SPF/quantity must match for a matching
+product label. Otherwise retained related listings are classified as alternatives internally. SPF and g/ml/kg/l quantities are parsed locally;
+equivalent units are normalized, but grams and millilitres are never treated as equivalent.
+Absent specifications are not assumed to match. Other attributes, such as colour, are title words;
+pack counts and product identity are not independently verified. Matching products still require
+verification at the store. Unrelated results are omitted.
+
+The existing minimal-card UI, labels and filters remain unchanged at the user’s request.
+Backend classifications do not add sections or alter card styling. Provider order is preserved
+unless the user explicitly sorts by price. Price, conditional and sponsored warnings,
+link validation and request quotas remain unchanged. The cache-key version invalidates old relevance
+results. Unit tests cover unrelated brands/products, misspellings, SPF/size differences, equivalent
+units, model boundaries and provider order. This does not broaden allowed merchant links or change
+the separate explicit store-link lookup behavior.
+
+## 7. Information panel
+
+The info icon beside Compare prices opens a native, keyboard-accessible popover (Escape,
+outside click or Close dismiss it). Request/cache explanations, provider attribution and the
+checkout disclaimer live here instead of separate page text or a banner.
+
+The authenticated status endpoint now includes `dailyRemaining`, `hourlyRemaining` and
+`dailyResetsAt`, using only the JWT user and the Clock. It does not call SerpApi. The panel shows
+the app’s shared rolling budget, the caller’s daily allowance and the minimum currently available
+under shared/day/hour caps. These are local counters, not a live provider-account balance.
+Daily reset is displayed in the browser’s local time from the server’s reset instant.
+Searches and store lookups refresh status; cached results and Google links use no additional quota.

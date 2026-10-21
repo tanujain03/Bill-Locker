@@ -43,13 +43,28 @@ class PriceComparisonApiTests extends ApiTest {
  @Test void comparesAndCachesOnlyTheCallersResults() throws Exception {
   String first=token(),second=token();
   search(first,"Casio watch").andExpect(status().isOk()).andExpect(jsonPath("$.cached").value(false))
-   .andExpect(jsonPath("$.offers[0].price").value(2300)).andExpect(jsonPath("$.offers[0].match").value("MODEL_MATCH"));
+   .andExpect(jsonPath("$.offers[0].price").value(2495)).andExpect(jsonPath("$.offers[0].match").value("MODEL_MATCH"));
   search(first,"  Casio   watch  ").andExpect(status().isOk()).andExpect(jsonPath("$.cached").value(true));
   assertThat(provider.calls.get()).isEqualTo(1);
   search(second,"Casio watch").andExpect(status().isOk()).andExpect(jsonPath("$.cached").value(false));
   assertThat(provider.calls.get()).isEqualTo(2);
   jdbc.update("update price_compare_cache set checked_at=?",java.sql.Timestamp.from(clock.instant().minus(Duration.ofMinutes(30))));
   search(first,"Casio watch").andExpect(status().isOk()).andExpect(jsonPath("$.cached").value(false));
+ }
+ @Test void statusReportsOnlyTheSignedInUsersDailyAllowanceWithoutProviderCalls() throws Exception {
+  String first=token(),second=token();
+  search(first,"Casio watch").andExpect(status().isOk());
+  mvc.perform(get("/api/price-comparison/status").header("Authorization",bearer(first)))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.dailyRemaining").value(4))
+   .andExpect(jsonPath("$.hourlyRemaining").value(39)).andExpect(jsonPath("$.remaining").value(199))
+   .andExpect(jsonPath("$.dailyResetsAt").value(LocalDate.now(clock).plusDays(1).atStartOfDay(clock.getZone()).toInstant().toString()));
+  mvc.perform(get("/api/price-comparison/status").header("Authorization",bearer(second)))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.dailyRemaining").value(5));
+  jdbc.update("update price_compare_attempts set attempted_at=?",java.sql.Timestamp.from(clock.instant().minus(Duration.ofDays(1))));
+  mvc.perform(get("/api/price-comparison/status").header("Authorization",bearer(first)))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.dailyRemaining").value(5))
+   .andExpect(jsonPath("$.hourlyRemaining").value(40)).andExpect(jsonPath("$.remaining").value(199));
+  assertThat(provider.calls.get()).isEqualTo(1);
  }
  @Test void loginAndValidationAndMissingConfigurationDoNotSpendRequests() throws Exception {
   mvc.perform(get("/api/price-comparison/status")).andExpect(status().isUnauthorized());

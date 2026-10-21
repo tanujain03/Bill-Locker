@@ -31,5 +31,11 @@ class PriceSearchQuota {
   attempts.saveAndFlush(new ShoppingSearchAttempt(user,clock.instant()));
  }
  public int remaining() {return Math.max(0,limit-(int)attempts.countByAttemptedAtGreaterThanEqual(clock.instant().minus(Duration.ofDays(31))));}
+ public int dailyRemaining(UUID user) {
+  Instant day=LocalDate.now(clock).atStartOfDay(clock.getZone()).toInstant();
+  return Math.max(0,5-(int)attempts.countByUserIdAndAttemptedAtGreaterThanEqual(user,day));
+ }
+ public int hourlyRemaining() {return Math.max(0,40-(int)attempts.countByAttemptedAtGreaterThanEqual(clock.instant().minus(Duration.ofHours(1))));}
+ public Instant dailyResetsAt() {return LocalDate.now(clock).plusDays(1).atStartOfDay(clock.getZone()).toInstant();}
  public int limit() {return limit;}
 }
